@@ -78,6 +78,7 @@ public class PlayerController : MonoBehaviour
 
         inputActions.Player1.Point.performed += OnPointPerformed;
         inputActions.Player1.Click.performed += OnClickPerformed;
+        inputActions.Player1.Open.performed += OnOpenPerformed;
 
         inputActions.Player1.Run.performed += OnRunPerformed;
         inputActions.Player1.Run.canceled += OnRunCanceled;
@@ -92,6 +93,7 @@ public class PlayerController : MonoBehaviour
 
         inputActions.Player1.Point.performed -= OnPointPerformed;
         inputActions.Player1.Click.performed -= OnClickPerformed;
+        inputActions.Player1.Open.performed -= OnOpenPerformed;
 
         inputActions.Player1.Run.performed -= OnRunPerformed;
         inputActions.Player1.Run.canceled -= OnRunCanceled;
@@ -247,6 +249,30 @@ public class PlayerController : MonoBehaviour
     private void OnRunCanceled(InputAction.CallbackContext ctx)
     {
         isRunning = false;
+    }
+
+    private void OnOpenPerformed(InputAction.CallbackContext ctx)
+    {
+        // 獲取玩家前方的位置
+        Vector3 openPosition = transform.position + (Vector3)lastValidAimDirection * 1.5f;
+        Debug.Log("OnOpenPerformed: " + openPosition);
+        // 呼叫DoorController來開啟門
+        if (DoorController.Instance != null)
+        {
+            bool success = DoorController.Instance.RemoveDoorAtWorldPosition(openPosition);
+            if (success)
+            {
+                Debug.Log($"成功開啟/刪除門在位置: {openPosition}");
+            }
+            else
+            {
+                Debug.Log($"在位置 {openPosition} 沒有找到門");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("DoorController 實例不存在");
+        }
     }
 
     #region 公開方法
