@@ -1,12 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// ¼Ä¤HµøÄ±¤Æ²Õ¥ó
-/// Â¾³d¡G³B²z Gizmo Ã¸»s¡Bª¬ºAÃC¦âÅã¥Ü
+/// æ•µäººè¦–è¦ºåŒ–çµ„ä»¶
+/// è·è²¬ï¼šè™•ç† Gizmo ç¹ªè£½ã€ç‹€æ…‹é¡è‰²é¡¯ç¤º
 /// </summary>
 public class EnemyVisualizer : MonoBehaviour
 {
-    [Header("µøÄ±¤Æ³]©w")]
+    [Header("è¦–è¦ºåŒ–è¨­å®š")]
     [SerializeField] private bool showDebugGizmos = true;
     [SerializeField] private Color normalColor = Color.yellow;
     [SerializeField] private Color alertColor = Color.orange;
@@ -24,7 +24,7 @@ public class EnemyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// ³]©wª¬ºA¾÷°Ñ¦Ò
+    /// è¨­å®šç‹€æ…‹æ©Ÿåƒè€ƒ
     /// </summary>
     public void SetStateMachine(EnemyStateMachine stateMachine)
     {
@@ -32,7 +32,7 @@ public class EnemyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// ¶}Ãö½Õ¸Õ Gizmos
+    /// é–‹é—œèª¿è©¦ Gizmos
     /// </summary>
     public void SetShowDebugGizmos(bool show)
     {
@@ -40,7 +40,7 @@ public class EnemyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// ³]©wª¬ºAÃC¦â
+    /// è¨­å®šç‹€æ…‹é¡è‰²
     /// </summary>
     public void SetStateColors(Color normal, Color alert, Color chase, Color dead)
     {
@@ -57,21 +57,21 @@ public class EnemyVisualizer : MonoBehaviour
         Vector3 pos = transform.position;
         Color currentColor = GetCurrentStateColor();
 
-        // °»´ú½d³ò
+        // åµæ¸¬ç¯„åœ
         if (detection != null)
         {
             Gizmos.color = currentColor;
             //Gizmos.DrawWireSphere(pos, detection.ViewRange);
 
-            // µø³¥¨¤«×
+            // è¦–é‡è§’åº¦
             DrawViewAngle(pos, currentColor);
 
-            // °lÀ»½d³ò
+            // è¿½æ“Šç¯„åœ
             Gizmos.color = Color.magenta;
             //Gizmos.DrawWireSphere(pos, detection.ChaseRange);
         }
 
-        // ¨µÅŞÂI
+        // å·¡é‚é»
         DrawPatrolPoints();
     }
 
@@ -84,7 +84,7 @@ public class EnemyVisualizer : MonoBehaviour
         float halfAngle = detection.ViewAngle * 0.5f;
         Vector3 forward = transform.right;
 
-        // ­pºâµø³¥Ãä¬É
+        // è¨ˆç®—è¦–é‡é‚Šç•Œ
         Vector3 leftBoundary = Quaternion.Euler(0, 0, halfAngle) * forward * detection.ViewRange;
         Vector3 rightBoundary = Quaternion.Euler(0, 0, -halfAngle) * forward * detection.ViewRange;
 
@@ -108,7 +108,7 @@ public class EnemyVisualizer : MonoBehaviour
             }
         }
 
-        // Ã¸»s¨µÅŞ¸ô®|³s½u
+        // ç¹ªè£½å·¡é‚è·¯å¾‘é€£ç·š
         if (patrolPoints.Length > 1)
         {
             Gizmos.color = Color.cyan;
@@ -140,7 +140,7 @@ public class EnemyVisualizer : MonoBehaviour
     }
 
     /// <summary>
-    /// ¦b³õ´ºµø¹Ï¤¤Åã¥Üª¬ºA¤å¦r
+    /// åœ¨å ´æ™¯è¦–åœ–ä¸­é¡¯ç¤ºç‹€æ…‹æ–‡å­—
     /// </summary>
     private void OnDrawGizmosSelected()
     {

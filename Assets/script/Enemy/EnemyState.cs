@@ -1,26 +1,26 @@
 using UnityEngine;
 
 /// <summary>
-/// ¼Ä¤Hª¬ºAªTÁ|©Mª¬ºA¬ÛÃöªº¼Æ¾Úµ²ºc
+/// æ•µäººç‹€æ…‹ï¼ŒåŒ…å«å·¡é‚ã€è­¦æˆ’ã€è¿½æ“Šã€è¿”å›ã€æ­»äº¡
 /// </summary>
 public enum EnemyState
 {
-    Patrol,     // ¨µÅŞ
-    Alert,      // Äµ§Ù
-    Chase,      // °lÀ»
-    Return,     // ªğ¦^
-    Dead        // ¦º¤`
+    Patrol,     // å·¡é‚
+    Alert,      // è­¦æˆ’
+    Chase,      // è¿½æ“Š
+    Return,     // è¿”å›
+    Dead        // æ­»äº¡
 }
 
 /// <summary>
-/// ¼Ä¤Hª¬ºA¾÷ºŞ²z¾¹
+/// æ•µäººç‹€æ…‹æ©Ÿ
 /// </summary>
 public class EnemyStateMachine
 {
     public EnemyState CurrentState { get; private set; } = EnemyState.Patrol;
     public bool IsDead => CurrentState == EnemyState.Dead;
 
-    // ª¬ºAÅÜ§ó¨Æ¥ó
+    // ç‹€æ…‹è®Šæ›´äº‹ä»¶
     public System.Action<EnemyState, EnemyState> OnStateChanged;
 
     private float alertTimer;
@@ -32,7 +32,7 @@ public class EnemyStateMachine
     }
 
     /// <summary>
-    /// §ïÅÜª¬ºA
+    /// æ”¹è®Šç‹€æ…‹
     /// </summary>
     public void ChangeState(EnemyState newState)
     {
@@ -48,7 +48,7 @@ public class EnemyStateMachine
     }
 
     /// <summary>
-    /// §ó·sÄµ§Ù­p®É¾¹
+    /// æ›´æ–°è­¦æˆ’è¨ˆæ™‚å™¨
     /// </summary>
     public void UpdateAlertTimer()
     {
@@ -59,7 +59,7 @@ public class EnemyStateMachine
     }
 
     /// <summary>
-    /// ÀË¬dÄµ§Ù®É¶¡¬O§_µ²§ô
+    /// æª¢æŸ¥è­¦æˆ’æ™‚é–“æ˜¯å¦çµæŸ
     /// </summary>
     public bool IsAlertTimeUp()
     {
@@ -78,6 +78,6 @@ public class EnemyStateMachine
 
     private void OnExitState(EnemyState state)
     {
-        // ¥i¦b¦¹³B¥[¤JÂ÷¶}ª¬ºA®Éªº²M²zÅŞ¿è
+        // å¯åœ¨ç‹€æ…‹åŠ å…¥æ™‚ï¼Œé€²è¡Œç‰¹æ®Šç®¡ç†
     }
 }

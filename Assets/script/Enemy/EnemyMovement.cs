@@ -1,17 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// ¼Ä¤H²¾°Ê±±¨î¾¹
-/// Â¾³d¡G³B²z²¾°ÊÅŞ¿è¡B¨µÅŞ¦æ¬°
+/// æ•µäººç§»å‹•æ§åˆ¶å™¨
+/// è·è²¬ï¼šè™•ç†ç§»å‹•é‚è¼¯ã€å·¡é‚è¡Œç‚º
 /// </summary>
 public class EnemyMovement : MonoBehaviour
 {
-    [Header("²¾°Ê°Ñ¼Æ")]
+    [Header("ç§»å‹•åƒæ•¸")]
     [SerializeField] private float speed = 2f;
     [SerializeField] private float chaseSpeedMultiplier = 1.5f;
     [SerializeField] private float arriveThreshold = 0.2f;
 
-    [Header("¨µÅŞ¸ô®|")]
+    [Header("å·¡é‚è·¯å¾‘")]
     [SerializeField] private Transform[] patrolPoints;
 
     private Rigidbody2D rb;
@@ -33,7 +33,7 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// ³]©w¨µÅŞÂI
+    /// è¨­å®šå·¡é‚é»
     /// </summary>
     public void SetPatrolPoints(Transform[] points)
     {
@@ -42,7 +42,7 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// °õ¦æ¨µÅŞ²¾°Ê
+    /// åŸ·è¡Œå·¡é‚ç§»å‹•
     /// </summary>
     public void PerformPatrol()
     {
@@ -62,7 +62,30 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// ¦V¥Ø¼Ğ²¾°Ê
+    /// æ²¿è‘—locationsç§»å‹•ï¼ˆç”¨æ–¼Patrolå’ŒAlertç‹€æ…‹ï¼‰
+    /// </summary>
+    public void MoveAlongLocations(Vector3[] locations, int currentIndex)
+    {
+        if (locations == null || locations.Length == 0)
+        {
+            StopMovement();
+            return;
+        }
+
+        Vector2 targetPos = locations[currentIndex];
+        MoveTowards(targetPos, 1f);
+    }
+
+    /// <summary>
+    /// æª¢æŸ¥æ˜¯å¦åˆ°é”æŒ‡å®šçš„location
+    /// </summary>
+    public bool HasArrivedAtLocation(Vector3 location)
+    {
+        return Vector2.Distance(Position, location) < arriveThreshold;
+    }
+
+    /// <summary>
+    /// å‘ç›®æ¨™ç§»å‹•
     /// </summary>
     public void MoveTowards(Vector2 target, float speedMultiplier)
     {
@@ -73,7 +96,7 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// °lÀ»²¾°Ê
+    /// è¿½æ“Šç§»å‹•
     /// </summary>
     public void ChaseTarget(Vector2 targetPos)
     {
@@ -81,7 +104,7 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// °±¤î²¾°Ê
+    /// åœæ­¢ç§»å‹•
     /// </summary>
     public void StopMovement()
     {
@@ -92,19 +115,19 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// Àò¨úªğ¦^¥Ø¼Ğ¦ì¸m
+    /// ç²å–è¿”å›ç›®æ¨™ä½ç½®ï¼ˆè¿”å›ç¬¬ä¸€å€‹patrol pointï¼Œå³spawn pointï¼‰
     /// </summary>
     public Vector2 GetReturnTarget()
     {
         if (patrolPoints != null && patrolPoints.Length > 0)
         {
-            return patrolPoints[patrolIndex].position;
+            return patrolPoints[0].position; // ç¸½æ˜¯è¿”å›ç¬¬ä¸€å€‹patrol point
         }
         return spawnPoint;
     }
 
     /// <summary>
-    /// ÀË¬d¬O§_¨ì¹F¥Ø¼Ğ¦ì¸m
+    /// æª¢æŸ¥æ˜¯å¦åˆ°é”ç›®æ¨™ä½ç½®
     /// </summary>
     public bool HasArrivedAt(Vector2 target)
     {
@@ -112,7 +135,7 @@ public class EnemyMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// Àò¨ú·í«e¨µÅŞÂI
+    /// ç²å–ç•¶å‰å·¡é‚é»
     /// </summary>
     public Transform[] GetPatrolPoints()
     {

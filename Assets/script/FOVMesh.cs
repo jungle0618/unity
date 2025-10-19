@@ -8,21 +8,21 @@ public class PlayerFOV : MonoBehaviour
     [Header("Player Info")]
     [SerializeField] private PlayerManager playerManager;
 
-    [Header("�����]�w")]
+    [Header("視野設定")]
     [SerializeField] private float viewRadius = 5f;
     [SerializeField, Range(0, 360)] private float viewAngle = 90f;
     [SerializeField] private int rayCount = 120;
 
-    [Header("��ê���]�w")]
+    [Header("障礙物設定")]
     [SerializeField] private LayerMask wallLayer = -1;
     [SerializeField] private float raycastOffset = 0.01f;
 
-    [Header("�g���]�w")]
-    [SerializeField] private float fogOfWarSize = 50f; // �g���л\�d��
-    [SerializeField] private Color fogColor = Color.black; // �g���C��
-    [SerializeField] private Color visibleColor = Color.white; // �i���ϰ��C��
+    [Header("迷霧設定")]
+    [SerializeField] private float fogOfWarSize = 50f; // 迷霧覆蓋範圍
+    [SerializeField] private Color fogColor = Color.black; // 迷霧顏色
+    [SerializeField] private Color visibleColor = Color.white; // 可見區域顏色
 
-    [Header("����")]
+    [Header("除錯")]
     [SerializeField] private bool showDebugRays = false;
 
     private MeshFilter meshFilter;
@@ -30,10 +30,10 @@ public class PlayerFOV : MonoBehaviour
     private MeshRenderer meshRenderer;
     private Material fogMaterial;
 
-    // �u�ơG���ΦC���M�}�C�A�קKGC
+    // 除錯優除錯化除錯：除錯重除錯用除錯列除錯表除錯和除錯陣除錯列除錯，除錯避除錯免除錯G除錯C除錯
     private List<Vector3> viewPoints;
     private List<Vector3> worldViewPoints;
-    private List<Color> vertexColors; // ���I�C��
+    private List<Color> vertexColors; // 除錯頂除錯點除錯顏除錯色除錯
     private Vector3[] vertices;
     private int[] triangles;
     private Color[] colors;
@@ -47,18 +47,18 @@ public class PlayerFOV : MonoBehaviour
         viewMesh.name = "Fog of War Mesh";
         meshFilter.mesh = viewMesh;
 
-        // ��l�ƭ��Ϊ��C��
+        // 除錯初除錯始除錯化除錯重除錯用除錯的除錯列除錯表除錯
         viewPoints = new List<Vector3>();
         worldViewPoints = new List<Vector3>();
         vertexColors = new List<Color>();
 
-        // �]�w����
+        // 除錯設除錯定除錯材除錯質除錯
         SetupFogMaterial();
     }
 
     private void SetupFogMaterial()
     {
-        // �p�G�S������A�Ыؤ@�Ӥ䴩���I��m������
+        // 除錯如除錯果除錯沒除錯有除錯材除錯質除錯，除錯創除錯建除錯一除錯個除錯支除錯援除錯頂除錯點除錯色除錯彩除錯的除錯材除錯質除錯
         if (meshRenderer.material == null)
         {
             fogMaterial = new Material(Shader.Find("Sprites/Default"));
@@ -68,7 +68,7 @@ public class PlayerFOV : MonoBehaviour
             fogMaterial = meshRenderer.material;
         }
 
-        // �T�O����䴩�z����
+        // 除錯確除錯保除錯材除錯質除錯支除錯援除錯透除錯明除錯度除錯
         fogMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
         fogMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
         fogMaterial.SetInt("_ZWrite", 0);
@@ -85,7 +85,7 @@ public class PlayerFOV : MonoBehaviour
         if (playerManager == null || viewAngle <= 0f)
         {
             if (playerManager == null)
-                Debug.LogWarning("PlayerFOV: PlayerManager ���]�w�I");
+                Debug.LogWarning("PlayerFOV: PlayerManager 未設定！");
             return;
         }
 
@@ -96,34 +96,34 @@ public class PlayerFOV : MonoBehaviour
     {
         Vector3 origin = playerManager.Position;
 
-        // �M�ũҦ��C��
+        // 除錯清除錯空除錯所除錯有除錯列除錯表除錯
         viewPoints.Clear();
         worldViewPoints.Clear();
         vertexColors.Clear();
 
-        // �Ĥ@�B�G�Ыؤj�d�򪺶¦�g���|���
+        // 除錯第除錯一除錯步除錯：除錯創除錯建除錯大除錯範除錯圍除錯的除錯黑除錯色除錯迷除錯霧除錯四除錯邊除錯形除錯
         CreateFogQuad(origin);
 
-        // �ĤG�B�G�K�[�i���d�򪺥զ�ϰ�
+        // 除錯第除錯二除錯步除錯：除錯添除錯加除錯可除錯見除錯範除錯圍除錯的除錯白除錯色除錯區除錯域除錯
         AddVisibleArea(origin);
 
-        // �ഫ�����a�y�Шåͦ�����
+        // 除錯轉除錯換除錯為除錯本除錯地除錯座除錯標除錯並除錯生除錯成除錯網除錯格除錯
         ConvertToLocalCoordinates(origin);
         GenerateMeshWithColors();
     }
 
     private void CreateFogQuad(Vector3 center)
     {
-        // �Ыؤ@�Ӥj���|����л\��Ӱϰ�
+        // 除錯創除錯建除錯一除錯個除錯大除錯的除錯四除錯邊除錯形除錯覆除錯蓋除錯整除錯個除錯區除錯域除錯
         float halfSize = fogOfWarSize * 0.5f;
 
-        // �|�Ө������I�]�@�ɮy�С^
-        worldViewPoints.Add(center + new Vector3(-halfSize, -halfSize, 0)); // ���U
-        worldViewPoints.Add(center + new Vector3(halfSize, -halfSize, 0));  // �k�U
-        worldViewPoints.Add(center + new Vector3(halfSize, halfSize, 0));   // �k�W
-        worldViewPoints.Add(center + new Vector3(-halfSize, halfSize, 0));  // ���W
+        // 除錯四除錯個除錯角除錯落除錯的除錯點除錯（除錯世除錯界除錯座除錯標除錯）除錯
+        worldViewPoints.Add(center + new Vector3(-halfSize, -halfSize, 0)); // 除錯左除錯下除錯
+        worldViewPoints.Add(center + new Vector3(halfSize, -halfSize, 0));  // 除錯右除錯下除錯
+        worldViewPoints.Add(center + new Vector3(halfSize, halfSize, 0));   // 除錯右除錯上除錯
+        worldViewPoints.Add(center + new Vector3(-halfSize, halfSize, 0));  // 除錯左除錯上除錯
 
-        // �������C��]�¦�g���^
+        // 除錯對除錯應除錯的除錯顏除錯色除錯（除錯黑除錯色除錯迷除錯霧除錯）除錯
         for (int i = 0; i < 4; i++)
         {
             vertexColors.Add(fogColor);
@@ -137,11 +137,11 @@ public class PlayerFOV : MonoBehaviour
         float angleStep = viewAngle / actualRayCount;
         float startAngle = playerZRotation - viewAngle / 2f;
 
-        // �K�[���������I
+        // 除錯添除錯加除錯視除錯野除錯中除錯心除錯點除錯
         worldViewPoints.Add(origin);
-        vertexColors.Add(visibleColor); // �i���ϰ쬰�զ�
+        vertexColors.Add(visibleColor); // 除錯可除錯見除錯區除錯域除錯為除錯白除錯色除錯
 
-        // �ͦ�������t�I
+        // 除錯生除錯成除錯視除錯野除錯邊除錯緣除錯點除錯
         for (int i = 0; i <= actualRayCount; i++)
         {
             float currentAngle = startAngle + i * angleStep;
@@ -149,9 +149,9 @@ public class PlayerFOV : MonoBehaviour
 
             Vector3 rayEndPoint = GetRaycastEndPoint(origin, direction, viewRadius);
             worldViewPoints.Add(rayEndPoint);
-            vertexColors.Add(visibleColor); // �i���ϰ쬰�զ�
+            vertexColors.Add(visibleColor); // 除錯可除錯見除錯區除錯域除錯為除錯白除錯色除錯
 
-            // �����g�u
+            // 除錯射除錯線除錯
             if (showDebugRays)
             {
                 Debug.DrawRay(origin, direction * viewRadius, Color.red, 0.1f);
@@ -193,31 +193,31 @@ public class PlayerFOV : MonoBehaviour
 
         if (vertexCount < 3)
         {
-            Debug.LogWarning("PlayerFOV: ���I�ƶq�����H�ͦ�����I");
+            Debug.LogWarning("PlayerFOV: 頂點數量不足以生成網格！");
             return;
         }
 
-        // ���s���t�}�C
+        // 除錯重除錯新除錯分除錯配除錯陣除錯列除錯
         vertices = new Vector3[vertexCount];
         colors = new Color[vertexCount];
 
-        // �]�w���I�M�C��
+        // 除錯設除錯定除錯頂除錯點除錯和除錯顏除錯色除錯
         for (int i = 0; i < vertexCount; i++)
         {
             vertices[i] = viewPoints[i];
             colors[i] = i < vertexColors.Count ? vertexColors[i] : fogColor;
         }
 
-        // �ͦ��T���ί���
+        // 除錯生除錯成除錯三除錯角除錯形除錯索除錯引除錯
         List<int> triangleList = new List<int>();
 
-        // �g���|��Ϊ��T���� (�e4�ӳ��I)
-        triangleList.AddRange(new int[] { 0, 1, 2 }); // �Ĥ@�ӤT����
-        triangleList.AddRange(new int[] { 0, 2, 3 }); // �ĤG�ӤT����
+        // 除錯迷除錯霧除錯四除錯邊除錯形除錯的除錯三除錯角除錯形除錯 除錯(除錯前除錯4除錯個除錯頂除錯點除錯)除錯
+        triangleList.AddRange(new int[] { 0, 1, 2 }); // 除錯第除錯一除錯個除錯三除錯角除錯形除錯
+        triangleList.AddRange(new int[] { 0, 2, 3 }); // 除錯第除錯二除錯個除錯三除錯角除錯形除錯
 
-        // �������Ϊ��T���� (�q��5�ӳ��I�}�l�A����4�O�����I)
-        int centerIndex = 4; // ���������I������
-        int visibleStartIndex = 5; // ������t�I�}�l������
+        // 除錯視除錯野除錯扇除錯形除錯的除錯三除錯角除錯形除錯 除錯(除錯從除錯第除錯5除錯個除錯頂除錯點除錯開除錯始除錯，除錯索除錯引除錯4除錯是除錯中除錯心除錯點除錯)除錯
+        int centerIndex = 4; // 除錯視除錯野除錯中除錯心除錯點除錯的除錯索除錯引除錯
+        int visibleStartIndex = 5; // 除錯視除錯野除錯邊除錯緣除錯點除錯開除錯始除錯的除錯索除錯引除錯
         int visibleVertexCount = vertexCount - visibleStartIndex;
 
         for (int i = 0; i < visibleVertexCount - 1; i++)
@@ -231,7 +231,7 @@ public class PlayerFOV : MonoBehaviour
 
         triangles = triangleList.ToArray();
 
-        // ��s����
+        // 除錯更除錯新除錯網除錯格除錯
         viewMesh.Clear();
         viewMesh.vertices = vertices;
         viewMesh.triangles = triangles;
@@ -251,7 +251,7 @@ public class PlayerFOV : MonoBehaviour
         return new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
     }
 
-    // ���}��k
+    // 除錯公除錯開除錯方除錯法除錯
     public void UpdateFOV()
     {
         if (playerManager != null && viewAngle > 0f)

@@ -2,8 +2,8 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// WeaponHolder¡]¥[±jª©¡^
-/// ½T«O¤£·|­«½Æ½Æ»sªZ¾¹¡A¨Ã¤ä´© prefab / ¤w¦s¦b child ªº±¡ªp
+/// WeaponHolderï¼ˆåŠ å¼·ç‰ˆï¼‰
+/// ç¢ºä¿ä¸æœƒé‡è¤‡è¤‡è£½æ­¦å™¨ï¼Œä¸¦æ”¯æ´ prefab / å·²å­˜åœ¨ child çš„æƒ…æ³
 /// </summary>
 public class WeaponHolder : MonoBehaviour
 {
@@ -11,19 +11,19 @@ public class WeaponHolder : MonoBehaviour
     [SerializeField] private GameObject weaponPrefab;
 
     [Header("Behavior")]
-    [SerializeField] private bool equipOnStart = true; // ¤@¶}©l¬O§_¦Û°Ê¸Ë³Æ prefab
+    [SerializeField] private bool equipOnStart = true; // ä¸€é–‹å§‹æ˜¯å¦è‡ªå‹•è£å‚™ prefab
 
     [Header("Attack Settings")]
     [SerializeField] private float attackAngle = 30f;
     [SerializeField] private float attackDuration = 0.15f;
 
-    // runtime reference (¤£­n§Ç¦C¤Æ¡AÁ×§K¦h­Ó holder «ü¦V¦P¤@ instance)
+    // runtime reference (ä¸è¦åºåˆ—åŒ–ï¼Œé¿å…å¤šå€‹ holder æŒ‡å‘åŒä¸€ instance)
     private Weapon currentWeapon;
 
-    // °O¿ı¬O­ş­Ó prefab ¥Î¨Ó¸Ë³Æ¡]¤è«KÁ×§K­«½Æ Instantiate ¦P¤@ prefab¡^
+    // è¨˜éŒ„æ˜¯å“ªå€‹ prefab ç”¨ä¾†è£å‚™ï¼ˆæ–¹ä¾¿é¿å…é‡è¤‡ Instantiate åŒä¸€ prefabï¼‰
     private GameObject equippedPrefab;
 
-    // ¨¾¤î­«¤J¡]¦P¤@®É¶¡¦h¦¸©I¥s EquipFromPrefab¡^
+    // é˜²æ­¢é‡å…¥ï¼ˆåŒä¸€æ™‚é–“å¤šæ¬¡å‘¼å« EquipFromPrefabï¼‰
     private bool isEquipping = false;
 
     // attack state
@@ -33,34 +33,36 @@ public class WeaponHolder : MonoBehaviour
 
     public Weapon CurrentWeapon => currentWeapon;
     public event Action<Vector2, float, GameObject> OnAttackPerformed;
+    public event Action<int, int> OnWeaponDurabilityChanged; // ç•¶å‰è€ä¹…åº¦, æœ€å¤§è€ä¹…åº¦
+    public event Action OnWeaponBroken; // æ­¦å™¨æå£äº‹ä»¶
 
     private void Start()
     {
-        // ­Y³õ´º½s¿è®É¤w§â Weapon ©ñ¦b¥»ª«¥ó©³¤U¡]child¡^¡A´N¥ı±Ä¥Î¥¦¡AÁ×§K¦A Instantiate
+        // è‹¥å ´æ™¯ç·¨è¼¯æ™‚å·²æŠŠ Weapon æ”¾åœ¨æœ¬ç‰©ä»¶åº•ä¸‹ï¼ˆchildï¼‰ï¼Œå°±å…ˆæ¡ç”¨å®ƒï¼Œé¿å…å† Instantiate
         if (currentWeapon == null)
         {
             Weapon childWeapon = GetComponentInChildren<Weapon>();
             if (childWeapon != null && childWeapon.transform.parent == transform)
             {
-                // ¨Ï¥Î²{¦³ªº child instance §@¬° currentWeapon
+                // ä½¿ç”¨ç¾æœ‰çš„ child instance ä½œç‚º currentWeapon
                 SetWeapon(childWeapon);
-                // µLªkª¾¹D¥¦¬O¥Ñ­ş­Ó prefab ²£¥Í¡A©Ò¥H§â equippedPrefab ³]¬° null¡]ªí¥Ü runtime instance¡^
+                // ç„¡æ³•çŸ¥é“å®ƒæ˜¯ç”±å“ªå€‹ prefab ç”¢ç”Ÿï¼Œæ‰€ä»¥æŠŠ equippedPrefab è¨­ç‚º nullï¼ˆè¡¨ç¤º runtime instanceï¼‰
                 equippedPrefab = null;
                 return;
             }
         }
 
-        // ­Y³]©w¬°±Ò°Ê®É¸Ë³Æ prefab¡A¥B©|¥¼¸Ë³Æ¥ô¦óªZ¾¹¡A¤~ Instantiate
+        // è‹¥è¨­å®šç‚ºå•Ÿå‹•æ™‚è£å‚™ prefabï¼Œä¸”å°šæœªè£å‚™ä»»ä½•æ­¦å™¨ï¼Œæ‰ Instantiate
         if (equipOnStart && weaponPrefab != null && currentWeapon == null)
         {
             EquipFromPrefab(weaponPrefab);
         }
     }
 
-    // ·s¼W Update ¤èªk¨ÓÀË¬d§ğÀ»°Êµe¬O§_µ²§ô
+    // æ–°å¢ Update æ–¹æ³•ä¾†æª¢æŸ¥æ”»æ“Šå‹•ç•«æ˜¯å¦çµæŸ
     private void Update()
     {
-        // ÀË¬d§ğÀ»°Êµe¬O§_µ²§ô
+        // æª¢æŸ¥æ”»æ“Šå‹•ç•«æ˜¯å¦çµæŸ
         if (isAttacking && Time.time >= attackEndTime)
         {
             ResetWeaponRotation();
@@ -69,16 +71,20 @@ public class WeaponHolder : MonoBehaviour
 
     private void OnDisable()
     {
-        // ¥i¿ï¡G·í holder ³Q°±¥Î®É¤£¦Û°Ê destroy ªZ¾¹¡Aµø¹CÀ¸»İ¨D¨M©w
-        // ¦pªG§A§Æ±æ°±¥Î®É§âªZ¾¹¤@°_ disable¡A¥i¥H uncomment¡G
+        // å¯é¸ï¼šç•¶ holder è¢«åœç”¨æ™‚ä¸è‡ªå‹• destroy æ­¦å™¨ï¼Œè¦–éŠæˆ²éœ€æ±‚æ±ºå®š
+        // å¦‚æœä½ å¸Œæœ›åœç”¨æ™‚æŠŠæ­¦å™¨ä¸€èµ· disableï¼Œå¯ä»¥ uncommentï¼š
         // if (currentWeapon != null) currentWeapon.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
     {
-        // ­Y§A§Æ±æ·í holder ³Q¾P·´®É¤]¾P·´¨äªZ¾¹¡]Á×§K orphan¡^¡A¥i¥H³o¼Ë¡G
+        // è‹¥ä½ å¸Œæœ›ç•¶ holder è¢«éŠ·æ¯€æ™‚ä¹ŸéŠ·æ¯€å…¶æ­¦å™¨ï¼ˆé¿å… orphanï¼‰ï¼Œå¯ä»¥é€™æ¨£ï¼š
         if (currentWeapon != null)
         {
+            // å–æ¶ˆè¨‚é–±è€ä¹…åº¦äº‹ä»¶
+            currentWeapon.OnDurabilityChanged -= OnWeaponDurabilityChangedHandler;
+            currentWeapon.OnWeaponBroken -= OnWeaponBrokenHandler;
+            
             Destroy(currentWeapon.gameObject);
             currentWeapon = null;
             equippedPrefab = null;
@@ -86,34 +92,49 @@ public class WeaponHolder : MonoBehaviour
     }
 
     /// <summary>
-    /// ³]©wªZ¾¹¡]¶Ç¤J¤w¦s¦bªº Weapon ¹ê¨Ò¡^
-    /// ¹w³]·|¾P·´ÂÂªº¹ê¨Ò¡F­Y¨Ï¥Îª«¥ó¦À½Ğ§ï¦¨¦^¦¬ÂÂª«¥ó¡C
+    /// è¨­å®šæ­¦å™¨ï¼ˆå‚³å…¥å·²å­˜åœ¨çš„ Weapon å¯¦ä¾‹ï¼‰
+    /// é è¨­æœƒéŠ·æ¯€èˆŠçš„å¯¦ä¾‹ï¼›è‹¥ä½¿ç”¨ç‰©ä»¶æ± è«‹æ”¹æˆå›æ”¶èˆŠç‰©ä»¶ã€‚
     /// </summary>
     public void SetWeapon(Weapon weapon)
     {
         if (weapon == null)
         {
+            // å–æ¶ˆè¨‚é–±èˆŠæ­¦å™¨çš„è€ä¹…åº¦äº‹ä»¶
+            if (currentWeapon != null)
+            {
+                currentWeapon.OnDurabilityChanged -= OnWeaponDurabilityChangedHandler;
+                currentWeapon.OnWeaponBroken -= OnWeaponBrokenHandler;
+            }
+            
             currentWeapon = null;
             equippedPrefab = null;
             return;
         }
 
-        // ¦pªG¶Ç¤Jªº weapon ¤w¸g¬O¥» holder ªº child¡A¦Ó¥B´N¬O currentWeapon¡A´Nª½±µªğ¦^
+        // å¦‚æœå‚³å…¥çš„ weapon å·²ç¶“æ˜¯æœ¬ holder çš„ childï¼Œä¸”å°±æ˜¯ currentWeaponï¼Œå°±ç›´æ¥è¿”å›
         if (currentWeapon == weapon && weapon.transform.parent == transform)
         {
             return;
         }
 
-        // ¦pªG¤w¦³¨ä¥LªZ¾¹¡A²¾°£©Î¾P·´¡]®Ú¾Ú»İ¨D¡^
+        // å¦‚æœå·²æœ‰å…¶ä»–æ­¦å™¨ï¼Œç§»é™¤æˆ–éŠ·æ¯€ï¼ˆæ ¹æ“šéœ€æ±‚ï¼‰
         if (currentWeapon != null && currentWeapon != weapon)
         {
-            // ¹w³]¾P·´ÂÂ¹ê¨Ò¡F­Y§A¥Î pooling¡A§ï¬°¦^¦¬
+            // å–æ¶ˆè¨‚é–±èˆŠæ­¦å™¨çš„è€ä¹…åº¦äº‹ä»¶
+            currentWeapon.OnDurabilityChanged -= OnWeaponDurabilityChangedHandler;
+            currentWeapon.OnWeaponBroken -= OnWeaponBrokenHandler;
+            
+            // é è¨­éŠ·æ¯€èˆŠå¯¦ä¾‹ï¼›è‹¥ä½ ç”¨ poolingï¼Œæ”¹ç‚ºå›æ”¶
             Destroy(currentWeapon.gameObject);
         }
 
         currentWeapon = weapon;
 
-        // §âªZ¾¹±¾¨ì¥» holder ¤U¡]local transform reset¡^
+        // è¨‚é–±æ–°æ­¦å™¨çš„è€ä¹…åº¦äº‹ä»¶
+        currentWeapon.OnDurabilityChanged += OnWeaponDurabilityChangedHandler;
+        currentWeapon.OnWeaponBroken += OnWeaponBrokenHandler;
+
+        // æŠŠæ­¦å™¨æ›åˆ°æœ¬ holder ä¸‹ï¼ˆlocal transform resetï¼‰
         currentWeapon.transform.SetParent(this.transform, worldPositionStays: false);
         currentWeapon.transform.localPosition = Vector3.zero;
         currentWeapon.transform.localRotation = Quaternion.identity;
@@ -121,26 +142,26 @@ public class WeaponHolder : MonoBehaviour
     }
 
     /// <summary>
-    /// ±q prefab ¸Ë³ÆªZ¾¹¡]¦w¥ş¥B·|Á×§K­«½Æ½Æ»s¡^
-    /// ­Y¤w¸Ë³Æ¬Û¦P prefab¡A·|ª½±µ¦^¶Ç²{¦³ªZ¾¹¡C
+    /// å¾ prefab è£å‚™æ­¦å™¨ï¼ˆå®‰å…¨ä¸”æœƒé¿å…é‡è¤‡è¤‡è£½ï¼‰
+    /// è‹¥å·²è£å‚™ç›¸åŒ prefabï¼Œæœƒç›´æ¥å›å‚³ç¾æœ‰æ­¦å™¨ã€‚
     /// </summary>
     public Weapon EquipFromPrefab(GameObject prefab)
     {
         if (prefab == null) return null;
 
-        // ¤w¦³¥¿¦b¶i¦æªº¸Ë³Æ¬yµ{ ¡÷ ª½±µªğ¦^²{¦³ªZ¾¹¡]©Î null¡^
+        // å·²æœ‰æ­£åœ¨é€²è¡Œçš„è£å‚™æµç¨‹ â†’ ç›´æ¥å›å‚³ç¾æœ‰æ­¦å™¨ï¼ˆæˆ– nullï¼‰
         if (isEquipping)
         {
             return currentWeapon;
         }
 
-        // ¦pªG¤w¸g¸Ë³Æ¥B¤wª¾¬O¥Ñ¦P¤@ prefab ¥Í¦¨¡A«h¤£¦A Instantiate
+        // å¦‚æœå·²ç¶“è£å‚™ä¸”å·²çŸ¥æ˜¯ç”±åŒä¸€ prefab ç”Ÿæˆï¼Œå‰‡ä¸å† Instantiate
         if (currentWeapon != null && equippedPrefab == prefab)
         {
             return currentWeapon;
         }
 
-        // ¦pªG currentWeapon ¦s¦b¦ı equippedPrefab ¤£¦P¡Aªí¥Ü­n´«ªZ¾¹¡G¥ı²M°£ÂÂªº
+        // å¦‚æœ currentWeapon å­˜åœ¨ä½† equippedPrefab ä¸åŒï¼Œè¡¨ç¤ºè¦æ›æ­¦å™¨ï¼šå…ˆæ¸…é™¤èˆŠçš„
         if (currentWeapon != null && equippedPrefab != prefab)
         {
             Destroy(currentWeapon.gameObject);
@@ -151,7 +172,7 @@ public class WeaponHolder : MonoBehaviour
         isEquipping = true;
         try
         {
-            // Instantiate ¨Ã§â¥¦ª½±µ©ñ¦b¥» holder ¤U
+            // Instantiate ä¸¦æŠŠå®ƒç›´æ¥æ”¾åœ¨æœ¬ holder ä¸‹
             GameObject weaponGO = Instantiate(prefab, this.transform);
             weaponGO.transform.localPosition = Vector3.zero;
             weaponGO.transform.localRotation = Quaternion.identity;
@@ -165,7 +186,7 @@ public class WeaponHolder : MonoBehaviour
                 return null;
             }
 
-            // °O¿ı¬O­ş­Ó prefab ¥Í¦¨ªº¡AÁ×§K­«½Æ¥Í¦¨
+            // è¨˜éŒ„æ˜¯å“ªå€‹ prefab ç”Ÿæˆçš„ï¼Œé¿å…é‡è¤‡ç”Ÿæˆ
             equippedPrefab = prefab;
             SetWeapon(weapon);
             return currentWeapon;
@@ -177,7 +198,7 @@ public class WeaponHolder : MonoBehaviour
     }
 
     /// <summary>
-    /// §ó·sªZ¾¹´Â¦V
+    /// æ›´æ–°æ­¦å™¨æœå‘
     /// </summary>
     public void UpdateWeaponDirection(Vector2 direction)
     {
@@ -193,7 +214,7 @@ public class WeaponHolder : MonoBehaviour
     }
 
     /// <summary>
-    /// ¹Á¸Õ§ğÀ»
+    /// å˜—è©¦æ”»æ“Š
     /// </summary>
     public bool TryAttack(GameObject attacker)
     {
@@ -202,7 +223,7 @@ public class WeaponHolder : MonoBehaviour
         Vector2 origin = transform.position;
 
         bool success = currentWeapon.TryPerformAttack(origin, attacker);
-
+        Debug.Log("TryAttack: " + success);
         if (success)
         {
             TriggerAttackAnimation();
@@ -242,5 +263,59 @@ public class WeaponHolder : MonoBehaviour
         {
             ResetWeaponRotation();
         }
+    }
+
+    /// <summary>
+    /// è™•ç†æ­¦å™¨è€ä¹…åº¦è®ŠåŒ–äº‹ä»¶
+    /// </summary>
+    private void OnWeaponDurabilityChangedHandler(int currentDurability, int maxDurability)
+    {
+        OnWeaponDurabilityChanged?.Invoke(currentDurability, maxDurability);
+    }
+
+    /// <summary>
+    /// è™•ç†æ­¦å™¨æå£äº‹ä»¶
+    /// </summary>
+    private void OnWeaponBrokenHandler()
+    {
+        OnWeaponBroken?.Invoke();
+        Debug.Log($"æ­¦å™¨ {currentWeapon.name} å·²æå£ï¼");
+    }
+
+    /// <summary>
+    /// ä¿®å¾©ç•¶å‰æ­¦å™¨çš„è€ä¹…åº¦
+    /// </summary>
+    /// <param name="amount">ä¿®å¾©çš„æ•¸é‡</param>
+    public void RepairCurrentWeapon(int amount)
+    {
+        if (currentWeapon != null)
+        {
+            currentWeapon.RepairDurability(amount);
+        }
+    }
+
+    /// <summary>
+    /// å®Œå…¨ä¿®å¾©ç•¶å‰æ­¦å™¨
+    /// </summary>
+    public void FullRepairCurrentWeapon()
+    {
+        if (currentWeapon != null)
+        {
+            currentWeapon.FullRepair();
+        }
+    }
+
+    /// <summary>
+    /// ç²å–ç•¶å‰æ­¦å™¨çš„è€ä¹…åº¦ä¿¡æ¯
+    /// </summary>
+    /// <returns>è€ä¹…åº¦ä¿¡æ¯ (ç•¶å‰è€ä¹…åº¦, æœ€å¤§è€ä¹…åº¦, è€ä¹…åº¦ç™¾åˆ†æ¯”)</returns>
+    public (int current, int max, float percentage) GetWeaponDurabilityInfo()
+    {
+        if (currentWeapon == null)
+        {
+            return (0, 0, 0f);
+        }
+        
+        return (currentWeapon.CurrentDurability, currentWeapon.MaxDurability, currentWeapon.DurabilityPercentage);
     }
 }

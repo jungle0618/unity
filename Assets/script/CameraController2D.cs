@@ -2,20 +2,20 @@ using UnityEngine;
 
 public class CameraController2D : MonoBehaviour
 {
-    [Header("©T©wÁY©ñ (¬Û¾÷¤j¤p©T©w)")]
-    public float fixedOrthographicSize = 5f; // ¬Û¾÷©T©wªº orthographicSize¡]¸}¥»¤£·|§ïÅÜ¡^
+    [Header("å›ºå®šç¸®æ”¾ (ç›¸æ©Ÿå¤§å°å›ºå®š)")]
+    public float fixedOrthographicSize = 5f; // ç›¸æ©Ÿå›ºå®šçš„ orthographicSizeï¼ˆè…³æœ¬ä¸æœƒæ”¹è®Šï¼‰
 
-    [Header("¤ô¥­°lÂÜ (¥Ñ player ¨M©w)")]
-    public Transform player;                 // «ü¦V player ªº transform¡]¦b Inspector «ü©w¡^
-    [Tooltip("¤ô¥­°lÂÜ¥­·Æ³t«×¡A­È¶V¤j°lÂÜ¶V§Ö¡]¹ê»Ú¬O¦b Lerp ¤W­¼ Time.deltaTime¡^¡C")]
+    [Header("æ°´å¹³è¿½è¹¤ (ç”± player æ±ºå®š)")]
+    public Transform player;                 // æŒ‡å‘ player çš„ transformï¼ˆåœ¨ Inspector æŒ‡å®šï¼‰
+    [Tooltip("æ°´å¹³è¿½è¹¤å¹³æ»‘é€Ÿåº¦ï¼Œå€¼è¶Šå¤§è¿½è¹¤è¶Šå¿«ï¼ˆå¯¦éš›æ˜¯åœ¨ Lerp ä¸Šä¹˜ Time.deltaTimeï¼‰ã€‚")]
     public float horizontalLerpSpeed = 10f;
 
-    [Header("ºu½ü««ª½²¾°Ê")]
-    public float scrollMoveSpeed = 5f;       // ºu½ü±±¨î¤W¤U²¾°Ê³t«×¡]world units per wheel-step¡^
-    public bool invertScroll = false;        // ¤Ï¦Vºu½ü¤è¦V¿ï¶µ
+    [Header("æ»¾è¼ªå‚ç›´ç§»å‹•")]
+    public float scrollMoveSpeed = 5f;       // æ»¾è¼ªæ§åˆ¶ä¸Šä¸‹ç§»å‹•é€Ÿåº¦ï¼ˆworld units per wheel-stepï¼‰
+    public bool invertScroll = false;        // åå‘æ»¾è¼ªæ–¹å‘é¸é …
 
-    [Header("²¾°ÊÃä¬É­­¨î¡]¥i¿ï¡^")]
-    public bool useBounds = false;           // ¬O§_¨Ï¥ÎÃä¬É­­¨î
+    [Header("ç§»å‹•é‚Šç•Œé™åˆ¶ï¼ˆå¯é¸ï¼‰")]
+    public bool useBounds = false;           // æ˜¯å¦ä½¿ç”¨é‚Šç•Œé™åˆ¶
     public Vector2 minBounds = new Vector2(-10, -10);
     public Vector2 maxBounds = new Vector2(10, 10);
 
@@ -27,26 +27,26 @@ public class CameraController2D : MonoBehaviour
 
         if (cam == null)
         {
-            Debug.LogError("CameraController2D ¥²¶·±¾¦b¤@­Ó Camera ¤W¡C");
+            Debug.LogError("CameraController2D å¿…é ˆæ›åœ¨ä¸€å€‹ Camera ä¸Šã€‚");
             enabled = false;
             return;
         }
 
         if (cam.orthographic == false)
         {
-            Debug.LogWarning("³o­Ó¸}¥»¬O¬°¥¿¥æ¬Û¾÷¡]Orthographic¡^³]­pªº¡A«ØÄ³¤Á´«¨ì 2D ¼Ò¦¡¡C");
+            Debug.LogWarning("é€™å€‹è…³æœ¬æ˜¯ç‚ºæ­£äº¤ç›¸æ©Ÿï¼ˆOrthographicï¼‰è¨­è¨ˆçš„ï¼Œå»ºè­°åˆ‡æ›åˆ° 2D æ¨¡å¼ã€‚");
         }
 
-        // ±N orthographicSize ©T©w
+        // å°‡ orthographicSize å›ºå®š
         cam.orthographicSize = fixedOrthographicSize;
     }
 
     void Update()
     {
-        // ¤ô¥­¥Ñ player ¨M©w¡]¥­·Æ¡^
+        // æ°´å¹³ç”± player æ±ºå®šï¼ˆå¹³æ»‘ï¼‰
         FollowPlayerHorizontal();
 
-        // ºu½ü±±¨î¤W¤U
+        // æ»¾è¼ªæ§åˆ¶ä¸Šä¸‹
         HandleVerticalScroll();
     }
 
@@ -55,7 +55,7 @@ public class CameraController2D : MonoBehaviour
         if (player == null) return;
 
         float targetX = player.position.x;
-        // ¥­·Æ°lÂÜ¡]simple Lerp¡^
+        // å¹³æ»‘è¿½è¹¤ï¼ˆsimple Lerpï¼‰
         float t = Mathf.Clamp01(horizontalLerpSpeed * Time.deltaTime);
         float newX = Mathf.Lerp(transform.position.x, targetX, t);
 
@@ -79,7 +79,7 @@ public class CameraController2D : MonoBehaviour
             ClampCameraToBounds();
     }
 
-    // ¨Ì¬Û¾÷ viewport ¤j¤p»PÃä¬É°µ clamp¡]Á×§K¬Û¾÷²¾¥XÃä¬É¡^
+    // ä¾ç›¸æ©Ÿ viewport å¤§å°èˆ‡é‚Šç•Œåš clampï¼ˆé¿å…ç›¸æ©Ÿç§»å‡ºé‚Šç•Œï¼‰
     void ClampCameraToBounds()
     {
         float halfHeight = cam.orthographicSize;
@@ -92,7 +92,7 @@ public class CameraController2D : MonoBehaviour
 
         Vector3 pos = transform.position;
 
-        // ­YÃä¬É¤Ó¤p¡]¤ñ¬Û¾÷µø¤fÁÙ¤p¡^¡A«h§â¬Û¾÷©T©w¦bÃä¬É¤¤¤ß
+        // è‹¥é‚Šç•Œå¤ªå°ï¼ˆæ¯”ç›¸æ©Ÿè¦–å£é‚„å°ï¼‰ï¼Œå‰‡æŠŠç›¸æ©Ÿå›ºå®šåœ¨é‚Šç•Œä¸­å¿ƒ
         if (minX > maxX)
             pos.x = (minBounds.x + maxBounds.x) * 0.5f;
         else
@@ -106,7 +106,7 @@ public class CameraController2D : MonoBehaviour
         transform.position = new Vector3(pos.x, pos.y, transform.position.z);
     }
 
-    // ­«¸m¬Û¾÷¨ì­ì©l¦ì¸m©M©T©w¤j¤p
+    // é‡ç½®ç›¸æ©Ÿåˆ°åˆå§‹ä½ç½®å’Œå›ºå®šå¤§å°
     public void ResetCamera()
     {
         float z = transform.position.z;
@@ -115,4 +115,3 @@ public class CameraController2D : MonoBehaviour
         cam.orthographicSize = fixedOrthographicSize;
     }
 }
-

@@ -2,10 +2,13 @@ using UnityEngine;
 
 public class Knife : Weapon
 {
-    private void Awake()
+    protected override void Awake()
     {
+        base.Awake(); // èª¿ç”¨çˆ¶é¡çš„Awakeæ–¹æ³•ä¾†åˆå§‹åŒ–è€ä¹…åº¦
         attackRange = 1.2f;
         attackCooldown = 0.3f;
+        maxDurability = 50; // å°åˆ€è€ä¹…åº¦è¼ƒä½
+        durabilityLossPerAttack = 2; // æ¯æ¬¡æ”»æ“Šæ¸›å°‘2é»è€ä¹…åº¦
     }
 
     protected override void PerformAttack(Vector2 origin, GameObject attacker)
@@ -14,20 +17,20 @@ public class Knife : Weapon
         foreach (var hit in hits)
         {
             if (hit == null) continue;
-            if (hit.gameObject == attacker) continue; // ¸õ¹L§ğÀ»ªÌ¥»¤H
+            if (hit.gameObject == attacker) continue; // è·³éæ”»æ“Šè€…æœ¬äºº
 
             var enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
             {
-                enemy.Die(); // ©Î enemy.TakeDamage(...)
+                enemy.Die(); // æˆ– enemy.TakeDamage(...)
                 continue;
             }
 
             var player = hit.GetComponent<PlayerController>();
             if (player != null)
             {
-                // ­Y attacker ¬Oª±®a¡A¥i¯à¬Oª±®a¤¬¥´©Î friendly fire
-                // ³B²zª±®a¨üÀ»ÅŞ¿è
+                // è‹¥ attacker æ˜¯ç©å®¶ï¼Œå¯èƒ½æ˜¯ç©å®¶äº’æ‰“æˆ– friendly fire
+                // è™•ç†ç©å®¶å—æ“Šé‚è¼¯
             }
         }
     }

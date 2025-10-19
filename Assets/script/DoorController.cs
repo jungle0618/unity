@@ -5,21 +5,21 @@ using UnityEngine.Tilemaps;
 public class DoorManager : MonoBehaviour
 {
     [Header("Tilemaps")]
-    public Tilemap visualTilemap;    // Åã¥Ü¥Î
-    public Tilemap collisionTilemap; // ©ñ collider tile ªº Tilemap¡]»P visual ¹ï»ô¡^
+    public Tilemap visualTilemap;    // é¡¯ç¤ºç”¨
+    public Tilemap collisionTilemap; // æ”¾ collider tile çš„ tilemapï¼ˆèˆ‡ visual å°é½Šï¼‰
 
     [Header("Tiles")]
     public TileBase doorClosedVisual;
     public TileBase doorOpenVisual;
-    public TileBase doorClosedCollider; // ³o¬O¦³ collider ªº Tile¡]©ñ¦b collisionTilemap¡^
-    // ­Y¶}ªù®É­n²¾°£ collider¡Aª½±µ§â collisionTilemap ªº¸Ó®æ³]¬° null
+    public TileBase doorClosedCollider; // é€™æ˜¯æœ‰ collider çš„ tileï¼ˆæ”¾åœ¨ collision tilemapï¼‰
+    // è‹¥é–‹é–€æ™‚è¦ç§»é™¤ colliderï¼Œç›´æ¥æŠŠ collision tilemap çš„è©²æ ¼è¨­ç‚º null
 
-    //¡]¥i¿ï¡^¨Æ¥ı±½´y©Ò¦³ªù®æ¦ì¸m
+    //ï¼ˆå¯é¸ï¼‰äº‹å…ˆæƒææ‰€æœ‰é–€æ ¼ä½ç½®
     private HashSet<Vector3Int> doorCells = new HashSet<Vector3Int>();
 
     void Start()
     {
-        // ±½´y visualTilemap ½d³ò¡A§ä¥X¤@¶}©l¬O doorClosedVisual ªº®æ¤l
+        // æƒæ visual tilemap ç¯„åœï¼Œæ‰¾å‡ºä¸€é–‹å§‹æ˜¯ doorClosedVisual çš„æ ¼å­
         var bounds = visualTilemap.cellBounds;
         for (int x = bounds.xMin; x < bounds.xMax; x++)
             for (int y = bounds.yMin; y < bounds.yMax; y++)
@@ -34,24 +34,24 @@ public class DoorManager : MonoBehaviour
 
     public void ToggleDoorAtCell(Vector3Int cell)
     {
-        // ¥u¦³¦b§Ú­Ì¬ö¿ıªºªù¦ì¸m©Î visual ½T»{¬Oªù¤~°µ¤Á´«
+        // åªæœ‰åœ¨æˆ‘å€‘è¨˜éŒ„çš„é–€ä½ç½®æˆ– visual ç¢ºèªæ˜¯é–€æ‰åšåˆ‡æ›
         if (!doorCells.Contains(cell) && visualTilemap.GetTile(cell) != doorClosedVisual && visualTilemap.GetTile(cell) != doorOpenVisual)
             return;
 
         var current = visualTilemap.GetTile(cell);
         if (current == doorClosedVisual)
         {
-            // ¶}ªù¡G´« visual¡A²¾°£ collision tile
+            // é–‹é–€ï¼šæ› visualï¼Œç§»é™¤ collision tile
             visualTilemap.SetTile(cell, doorOpenVisual);
             collisionTilemap.SetTile(cell, null);
         }
         else
         {
-            // Ãöªù¡G´« visual¡A©ñ¤W collision tile
+            // é—œé–€ï¼šæ› visualï¼Œæ”¾ä¸Š collision tile
             visualTilemap.SetTile(cell, doorClosedVisual);
             collisionTilemap.SetTile(cell, doorClosedCollider);
         }
-        // ­Y¨Ï¥Î CompositeCollider2D + TilemapCollider2D¡ATilemap ·|¦Û°Ê­«·s¥Í¦¨¸I¼²§Îª¬
+        // è‹¥ä½¿ç”¨ CompositeCollider2D + tilemapCollider2Dï¼Œtilemap æœƒè‡ªå‹•é‡æ–°ç”Ÿæˆç¢°æ’å½¢ç‹€
     }
 
     public void ToggleDoorAtWorldPos(Vector3 worldPos)

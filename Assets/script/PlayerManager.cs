@@ -11,6 +11,6 @@ public class PlayerManager : MonoBehaviour
 
     public Vector3 EulerAngles
     {
-        get { return playerTransform.eulerAngles; } // �ק惡�B
+        get { return playerTransform.eulerAngles; } // 旋轉角度
     }
 }

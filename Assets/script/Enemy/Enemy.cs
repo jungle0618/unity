@@ -5,7 +5,7 @@ using static UnityEngine.GraphicsBuffer;
 /// <summary>
 /// Enemy 主控制器：整合各個組件，處理 AI 邏輯 (優化版本)
 /// 職責：協調各組件、處理狀態轉換、對外接口
-/// 優化：降低更新頻率，增加武器系統，批次處理
+/// 優化：最大更新頻率，增加武器系統，批次處理
 /// </summary>
 [RequireComponent(typeof(EnemyMovement), typeof(EnemyDetection), typeof(EnemyVisualizer))]
 public class Enemy : MonoBehaviour
@@ -23,7 +23,7 @@ public class Enemy : MonoBehaviour
     [Tooltip("敵人會在這個距離內嘗試攻擊（實際攻擊範圍由武器決定）")]
     [SerializeField] private float attackDetectionRange = 3f;
 
-    // 性能優化變數
+    // 效能優化變數
     private float aiUpdateInterval = 0.15f;
     private float lastAIUpdateTime = 0f;
     private float lastAttackTime = 0f;
@@ -35,6 +35,10 @@ public class Enemy : MonoBehaviour
     private bool cachedCanSeePlayer;
     private float cacheUpdateTime = 0f;
     private const float CACHE_UPDATE_INTERVAL = 0.1f;
+
+    // Patrol locations
+    private Vector3[] patrolLocations;
+    private int currentPatrolIndex = 0;
 
     // 公共屬性
     public EnemyState CurrentState => stateMachine?.CurrentState ?? EnemyState.Dead;
@@ -199,6 +203,16 @@ public class Enemy : MonoBehaviour
             detection.SetTarget(playerTarget);
         }
 
+        // 初始化patrol locations
+        InitializePatrolLocations();
+
+        // 設定敵人位置到第一個location
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            transform.position = patrolLocations[0];
+            cachedPosition = patrolLocations[0];
+        }
+
         if (stateMachine != null)
         {
             stateMachine.ChangeState(EnemyState.Patrol);
@@ -239,6 +253,61 @@ public class Enemy : MonoBehaviour
     }
 
     /// <summary>
+    /// 設定patrol locations
+    /// </summary>
+    public void SetPatrolLocations(Vector3[] locations)
+    {
+        patrolLocations = locations;
+        currentPatrolIndex = 0;
+        
+        // 更新movement組件的patrol points
+        if (movement != null && locations != null && locations.Length > 0)
+        {
+            Transform[] patrolTransforms = new Transform[locations.Length];
+            for (int i = 0; i < locations.Length; i++)
+            {
+                GameObject patrolPoint = new GameObject($"PatrolPoint_{i}");
+                patrolPoint.transform.position = locations[i];
+                patrolTransforms[i] = patrolPoint.transform;
+            }
+            movement.SetPatrolPoints(patrolTransforms);
+        }
+    }
+
+    /// <summary>
+    /// 初始化patrol locations（由EnemyManager設定）
+    /// </summary>
+    private void InitializePatrolLocations()
+    {
+        // Patrol locations現在由EnemyManager在SpawnEnemy時設定
+        // 這裡不需要做任何事情
+    }
+
+    /// <summary>
+    /// 取得當前patrol location
+    /// </summary>
+    public Vector3 GetCurrentPatrolLocation()
+    {
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            return patrolLocations[currentPatrolIndex];
+        }
+        return transform.position;
+    }
+
+    /// <summary>
+    /// 取得第一個patrol location（spawn point）
+    /// </summary>
+    public Vector3 GetFirstPatrolLocation()
+    {
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            return patrolLocations[0];
+        }
+        return transform.position;
+    }
+
+    /// <summary>
     /// 強制改變狀態（供外部系統使用）
     /// </summary>
     public void ForceChangeState(EnemyState newState)
@@ -272,6 +341,45 @@ public class Enemy : MonoBehaviour
         }
 
         return attackSucceeded;
+    }
+
+    /// <summary>
+    /// 設定FOV倍數（用於危險等級調整）
+    /// </summary>
+    public void SetFovMultiplier(float multiplier)
+    {
+        if (detection != null)
+        {
+            // 這裡需要根據EnemyDetection的實際API來調整
+            // 假設有SetViewRange方法
+            // detection.SetViewRange(detection.ViewRange * multiplier);
+            Debug.Log($"{gameObject.name}: FOV倍數設定為 {multiplier}");
+        }
+    }
+
+    /// <summary>
+    /// 設定移動速度倍數（用於危險等級調整）
+    /// </summary>
+    public void SetSpeedMultiplier(float multiplier)
+    {
+        if (movement != null)
+        {
+            // 這裡需要根據EnemyMovement的實際API來調整
+            // 假設有SetSpeed方法
+            // movement.SetSpeed(movement.Speed * multiplier);
+            Debug.Log($"{gameObject.name}: 速度倍數設定為 {multiplier}");
+        }
+    }
+
+    /// <summary>
+    /// 設定傷害減少（用於危險等級調整）
+    /// </summary>
+    public void SetDamageReduction(float reduction)
+    {
+        // 這裡可以設定敵人受到的傷害減少
+        // 例如：在Enemy類中添加一個damageReduction字段
+        // damageReduction = reduction;
+        Debug.Log($"{gameObject.name}: 傷害減少設定為 {reduction:P0}");
     }
 
     #endregion
@@ -314,13 +422,25 @@ public class Enemy : MonoBehaviour
             return;
         }
 
-        movement.PerformPatrol();
+        // 沿著locations移動
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+            
+            // 檢查是否到達當前location
+            if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+            {
+                currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+            }
+        }
+        else
+        {
+            movement.PerformPatrol();
+        }
     }
 
     private void HandleAlertState()
     {
-        movement.StopMovement();
-
         if (cachedCanSeePlayer)
         {
             stateMachine.ChangeState(EnemyState.Chase);
@@ -328,6 +448,24 @@ public class Enemy : MonoBehaviour
         else if (stateMachine.IsAlertTimeUp())
         {
             stateMachine.ChangeState(EnemyState.Patrol);
+        }
+        else
+        {
+            // 在Alert狀態時也沿著locations移動
+            if (patrolLocations != null && patrolLocations.Length > 0)
+            {
+                movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+                
+                // 檢查是否到達當前location
+                if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+                {
+                    currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                }
+            }
+            else
+            {
+                movement.StopMovement();
+            }
         }
     }
 
@@ -369,11 +507,24 @@ public class Enemy : MonoBehaviour
 
     private void HandleReturnState()
     {
-        Vector2 returnTarget = movement.GetReturnTarget();
+        Vector2 returnTarget;
+        
+        // 優先使用第一個patrol location作為返回目標
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            returnTarget = patrolLocations[0];
+        }
+        else
+        {
+            returnTarget = movement.GetReturnTarget();
+        }
+        
         movement.MoveTowards(returnTarget, 1f);
 
         if (movement.HasArrivedAt(returnTarget))
         {
+            // 重置patrol index到第一個location
+            currentPatrolIndex = 0;
             stateMachine.ChangeState(EnemyState.Patrol);
         }
     }
@@ -440,6 +591,59 @@ public class Enemy : MonoBehaviour
         {
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(transform.position, weaponHolder.CurrentWeapon.AttackRange);
+        }
+
+        // 顯示patrol locations
+        DrawPatrolLocations();
+    }
+
+    private void OnDrawGizmos()
+    {
+        // 在非選中狀態下也顯示patrol locations（較淡的顏色）
+        Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
+        DrawPatrolLocations();
+    }
+
+    private void DrawPatrolLocations()
+    {
+        if (patrolLocations != null && patrolLocations.Length > 0)
+        {
+            // 繪製patrol locations
+            for (int i = 0; i < patrolLocations.Length; i++)
+            {
+                Vector3 pos = patrolLocations[i];
+                
+                // 第一個位置（spawn point）用不同顏色
+                if (i == 0)
+                {
+                    Gizmos.color = Color.blue;
+                    Gizmos.DrawWireSphere(pos, 0.5f);
+                }
+                else
+                {
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawWireSphere(pos, 0.3f);
+                }
+
+                // 繪製連線
+                if (i < patrolLocations.Length - 1)
+                {
+                    Gizmos.color = Color.cyan;
+                    Gizmos.DrawLine(pos, patrolLocations[i + 1]);
+                }
+                else
+                {
+                    // 最後一個點連回第一個點
+                    Gizmos.color = Color.cyan;
+                    Gizmos.DrawLine(pos, patrolLocations[0]);
+                }
+
+                // 顯示編號
+#if UNITY_EDITOR
+                UnityEditor.Handles.color = Color.white;
+                UnityEditor.Handles.Label(pos + Vector3.up * 0.8f, $"P{i + 1}");
+#endif
+            }
         }
     }
 

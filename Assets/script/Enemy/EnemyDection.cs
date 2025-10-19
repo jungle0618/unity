@@ -1,24 +1,24 @@
 using UnityEngine;
 
 /// <summary>
-/// ¼Ä¤H°»´ú¨t²Î
-/// - µø³¥°»´ú¡B¶ZÂ÷§PÂ_
-/// - ¥i¿ï¡G¦Û°Ê­±¦V¥Ø¼Ğ
+/// æ•µäººåµæ¸¬ç³»çµ±
+/// - è¦–é‡åµæ¸¬ã€è·é›¢åˆ¤æ–·
+/// - å¯é¸ï¼šè‡ªå‹•é¢å‘ç›®æ¨™
 /// </summary>
 public class EnemyDetection : MonoBehaviour
 {
-    [Header("°»´ú°Ñ¼Æ")]
+    [Header("åµæ¸¬åƒæ•¸")]
     [SerializeField] private EnemyStateMachine stateMachine;
     [SerializeField] private float viewRange = 8f;
     [SerializeField] private float viewAngle = 90f;
     [SerializeField] private float chaseRange = 15f;
 
-    [Header("»ÙÃªª«°»´ú")]
+    [Header("éšœç¤™ç‰©åµæ¸¬")]
     [SerializeField] private LayerMask obstacleLayerMask = -1;
     [SerializeField] private bool useRaycastDetection = false;
 
-    [Header("±ÛÂà³]©w")]
-    [SerializeField] private bool lookAtTarget = false; // ¬O§_¦Û°Ê­±¦Vª±®a
+    [Header("æ—‹è½‰è¨­å®š")]
+    [SerializeField] private bool lookAtTarget = false; // æ˜¯å¦è‡ªå‹•é¢å‘ç©å®¶
 
     public float ViewRange => viewRange;
     public float ViewAngle => viewAngle;
@@ -29,7 +29,7 @@ public class EnemyDetection : MonoBehaviour
 
 
     /// <summary>
-    /// ³]©w°»´ú¥Ø¼Ğ
+    /// è¨­å®šåµæ¸¬ç›®æ¨™
     /// </summary>
     public void SetTarget(Transform playerTarget)
     {
@@ -39,7 +39,7 @@ public class EnemyDetection : MonoBehaviour
     public Transform GetTarget() => target;
 
     /// <summary>
-    /// ÀË¬d¬O§_¥i¥H¬İ¨ìª±®a
+    /// æª¢æŸ¥æ˜¯å¦å¯ä»¥çœ‹åˆ°ç©å®¶
     /// </summary>
     public bool CanSeePlayer()
     {
@@ -48,31 +48,37 @@ public class EnemyDetection : MonoBehaviour
     }
 
     /// <summary>
-    /// ÀË¬d¬O§_¥i¥H¬İ¨ì«ü©w¥Ø¼Ğ
+    /// æª¢æŸ¥æ˜¯å¦å¯ä»¥çœ‹åˆ°æŒ‡å®šç›®æ¨™
     /// </summary>
     public bool CanSeeTarget(Vector2 targetPos)
     {
         Vector2 currentPos = transform.position;
         Vector2 dirToTarget = targetPos - currentPos;
 
-        // ¶ZÂ÷ÀË¬d
+        // è·é›¢æª¢æŸ¥
         if (dirToTarget.magnitude > viewRange)
             return false;
 
-        // ¨¤«×ÀË¬d¡G¥H transform.rotation ¬°°ò·Ç
+        // è§’åº¦æª¢æŸ¥ï¼šä»¥ transform.rotation ç‚ºåŸºæº–
         float angle = Vector2.Angle(transform.right, dirToTarget.normalized);
         if (angle > viewAngle * 0.5f)
             return false;
 
-        // »ÙÃªª«ÀË¬d
+        // éšœç¤™ç‰©æª¢æŸ¥
         if (useRaycastDetection && IsBlockedByObstacle(currentPos, targetPos))
             return false;
+
+        // è‡ªå‹•é¢å‘ç›®æ¨™
+        if (lookAtTarget && dirToTarget.magnitude > 0.1f)
+        {
+            LookAtTarget(dirToTarget);
+        }
 
         return true;
     }
 
     /// <summary>
-    /// ÀË¬d¥Ø¼Ğ¬O§_¶W¥X°lÀ»½d³ò
+    /// æª¢æŸ¥ç›®æ¨™æ˜¯å¦è¶…å‡ºè¿½æ“Šç¯„åœ
     /// </summary>
     public bool IsTargetOutOfChaseRange()
     {
@@ -112,4 +118,20 @@ public class EnemyDetection : MonoBehaviour
     public bool HasValidTarget() => target != null;
 
     public void ClearTarget() => target = null;
+
+    /// <summary>
+    /// é¢å‘ç›®æ¨™æ–¹å‘
+    /// </summary>
+    private void LookAtTarget(Vector2 directionToTarget)
+    {
+        if (directionToTarget.magnitude < 0.1f) return;
+
+        float angle = Mathf.Atan2(directionToTarget.y, directionToTarget.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
+    /// <summary>
+    /// è¨­å®šæ˜¯å¦è‡ªå‹•é¢å‘ç›®æ¨™
+    /// </summary>
+    public void SetLookAtTarget(bool enabled) => lookAtTarget = enabled;
 }
