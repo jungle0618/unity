@@ -25,6 +25,7 @@ public class Knife : Weapon
             var enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
             {
+                Debug.Log("[Knife] Hit enemy: " + enemy.gameObject.name);
                 enemy.Die(); // 或 enemy.TakeDamage(...)
                 continue;
             }

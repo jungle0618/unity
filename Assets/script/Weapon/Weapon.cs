@@ -26,7 +26,7 @@ public abstract class Weapon : MonoBehaviour
         currentDurability = maxDurability;
     }
 
-    public bool CanAttack() => Time.time >= lastAttackTime + attackCooldown && !IsBroken;
+    public virtual bool CanAttack() => Time.time >= lastAttackTime + attackCooldown && !IsBroken;
 
     public bool TryPerformAttack(Vector2 origin, GameObject attacker)
     {
