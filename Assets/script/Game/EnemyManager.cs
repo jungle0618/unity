@@ -699,19 +699,6 @@ public class EnemyManager : MonoBehaviour
         maxActiveEnemies = Mathf.Max(1, newMax);
     }
 
-    /// <summary>
-    /// 設定所有活躍敵人的FOV倍數
-    /// </summary>
-    public void SetAllEnemiesFovMultiplier(float multiplier)
-    {
-        foreach (var enemy in activeEnemies)
-        {
-            if (enemy != null && !enemy.IsDead)
-            {
-                enemy.SetFovMultiplier(multiplier);
-            }
-        }
-    }
 
     /// <summary>
     /// 設定所有活躍敵人的移動速度倍數

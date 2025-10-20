@@ -16,17 +16,18 @@ public class Enemy : MonoBehaviour
     private EnemyVisualizer visualizer;
     private EnemyStateMachine stateMachine;
     private WeaponHolder weaponHolder;
+    private EnemyAttackController attackController;
 
     [Header("AI 參數")]
     [SerializeField] private float alertTime = 2f;
     [SerializeField] private float attackCooldown = 1f;
     [Tooltip("敵人會在這個距離內嘗試攻擊（實際攻擊範圍由武器決定）")]
     [SerializeField] private float attackDetectionRange = 3f;
+    [SerializeField] private bool lookAtPlayerInChase = false; // 追擊時是否面向玩家
 
     // 效能優化變數
     private float aiUpdateInterval = 0.15f;
     private float lastAIUpdateTime = 0f;
-    private float lastAttackTime = 0f;
     private bool isInitialized = false;
 
     // 快取變數以減少 GC 分配
@@ -80,40 +81,8 @@ public class Enemy : MonoBehaviour
             UpdateAI();
             lastAIUpdateTime = Time.time;
         }
-        UpdateRotation();
     }
-    [SerializeField] private float idleRotationInterval = 2f; // 每隔幾秒旋轉一次
-    [SerializeField] private float idleRotationAngle = 30f;   // 每次旋轉的角度
-
-    private float idleRotationTimer = 0f;
-
-    private void UpdateRotation()
-    {
-        if (stateMachine == null) return;
-
-        if (stateMachine.CurrentState == EnemyState.Chase)
-        {
-            // Chase 狀態 → 面向玩家
-            Vector2 directionToPlayer = cachedDirectionToPlayer.normalized;
-            float angle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle);
-        }
-        else
-        {
-            // 非 Chase 狀態 → 間隔旋轉
-            idleRotationTimer += Time.deltaTime;
-            if (idleRotationTimer >= idleRotationInterval)
-            {
-                idleRotationTimer = 0f;
-
-                // 隨機順時針或逆時針
-                float randomAngle = (Random.value > 0.5f ? 1f : -1f) * idleRotationAngle;
-
-                // 應用旋轉
-                transform.Rotate(0f, 0f, randomAngle);
-            }
-        }
-    }
+    
 
 
 
@@ -128,11 +97,17 @@ public class Enemy : MonoBehaviour
         detection = GetComponent<EnemyDetection>();
         visualizer = GetComponent<EnemyVisualizer>();
         weaponHolder = GetComponent<WeaponHolder>();
+        attackController = GetComponent<EnemyAttackController>();
 
         // 如果沒有 WeaponHolder，嘗試添加一個
         if (weaponHolder == null)
         {
             weaponHolder = gameObject.AddComponent<WeaponHolder>();
+        }
+        if (attackController == null)
+        {
+            attackController = gameObject.AddComponent<EnemyAttackController>();
+            attackController.SetAttackCooldown(attackCooldown);
         }
 
         // 初始化狀態機
@@ -320,27 +295,8 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public bool TryAttackPlayer(Transform playerTransform)
     {
-        if (weaponHolder == null || playerTransform == null) return false;
-
-        // 檢查攻擊冷卻時間
-        if (Time.time - lastAttackTime < attackCooldown) return false;
-
-        // 更新武器朝向玩家
-        Vector2 directionToPlayer = (playerTransform.position - transform.position).normalized;
-        weaponHolder.UpdateWeaponDirection(directionToPlayer);
-
-        // 檢查武器是否可以攻擊（包含距離檢查等）
-        if (!weaponHolder.CanAttack()) return false;
-
-        // 嘗試攻擊 - 讓 WeaponHolder 處理所有攻擊邏輯
-        bool attackSucceeded = weaponHolder.TryAttack(gameObject);
-
-        if (attackSucceeded)
-        {
-            lastAttackTime = Time.time;
-        }
-
-        return attackSucceeded;
+        if (attackController == null) return false;
+        return attackController.TryAttackPlayer(playerTransform);
     }
 
     /// <summary>
@@ -427,6 +383,13 @@ public class Enemy : MonoBehaviour
         {
             movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
             
+            // 更新視野方向跟隨移動方向
+            Vector2 movementDirection = movement.GetMovementDirection();
+            if (movementDirection.magnitude > 0.1f)
+            {
+                detection.SetViewDirection(movementDirection);
+            }
+            
             // 檢查是否到達當前location
             if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
             {
@@ -436,6 +399,13 @@ public class Enemy : MonoBehaviour
         else
         {
             movement.PerformPatrol();
+            
+            // 更新視野方向跟隨移動方向
+            Vector2 movementDirection = movement.GetMovementDirection();
+            if (movementDirection.magnitude > 0.1f)
+            {
+                detection.SetViewDirection(movementDirection);
+            }
         }
     }
 
@@ -455,6 +425,13 @@ public class Enemy : MonoBehaviour
             if (patrolLocations != null && patrolLocations.Length > 0)
             {
                 movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+                
+                // 更新視野方向跟隨移動方向
+                Vector2 movementDirection = movement.GetMovementDirection();
+                if (movementDirection.magnitude > 0.1f)
+                {
+                    detection.SetViewDirection(movementDirection);
+                }
                 
                 // 檢查是否到達當前location
                 if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
@@ -480,7 +457,18 @@ public class Enemy : MonoBehaviour
         if (cachedCanSeePlayer)
         {
             Vector2 targetPos = cachedPosition + cachedDirectionToPlayer;
-            movement.ChaseTarget(targetPos);
+            
+            // 根據設定決定是否面向玩家
+            if (lookAtPlayerInChase)
+            {
+                // 直接朝向玩家移動
+                movement.ChaseTarget(targetPos);
+            }
+            else
+            {
+                // 使用帶朝向控制的追擊方法，讓敵人朝向跟隨路徑方向
+                movement.ChaseTargetWithRotation(targetPos, detection);
+            }
 
             // 更新武器朝向玩家
             if (weaponHolder != null)

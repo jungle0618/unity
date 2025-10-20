@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 public static class SceneLoader {
     public enum Scene {
         MainMenuScene,
-        SampleScene,  // Changed from GameScene to match actual scene name
+        GameScene,    // 遊戲場景名稱
         LoadingScene
     }
 

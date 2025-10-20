@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 /// <summary>
 /// GameManager - Central game management system
@@ -133,7 +134,7 @@ public class GameManager : MonoBehaviour
             // Clear references since we're in menu (no gameplay managers here)
             ClearGameplayReferences();
         }
-        else if (scene.name == "GameScene" || scene.name == "SampleScene")
+        else if (scene.name == "GameScene")
         {
             // Find references in the game scene
             RefreshSystemReferences();
@@ -160,6 +161,9 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("[GameManager] EnemyManager not found in scene!");
         else
             Debug.Log("[GameManager] EnemyManager found and registered");
+            
+        // 監聽玩家死亡事件
+        SetupPlayerDeathListener();
     }
     
     /// <summary>
@@ -167,9 +171,59 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ClearGameplayReferences()
     {
+        // 取消玩家死亡事件監聽
+        PlayerController playerController = FindFirstObjectByType<PlayerController>();
+        if (playerController != null)
+        {
+            playerController.OnPlayerDied -= HandlePlayerDeath;
+        }
+        
         playerManager = null;
         enemyManager = null;
         // Don't clear spawnPointManager if it uses DontDestroyOnLoad
+    }
+    
+    /// <summary>
+    /// 設定玩家死亡事件監聽
+    /// </summary>
+    private void SetupPlayerDeathListener()
+    {
+        // 尋找 PlayerController 並監聽死亡事件
+        PlayerController playerController = FindFirstObjectByType<PlayerController>();
+        if (playerController != null)
+        {
+            playerController.OnPlayerDied += HandlePlayerDeath;
+            Debug.Log("[GameManager] Player death listener registered");
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] PlayerController not found - cannot register death listener");
+        }
+    }
+    
+    /// <summary>
+    /// 處理玩家死亡
+    /// </summary>
+    private void HandlePlayerDeath()
+    {
+        Debug.Log("[GameManager] Player died - ending game and returning to main menu");
+        
+        // 觸發遊戲結束
+        GameOver();
+        
+        // 延遲回到主畫面，讓玩家看到死亡效果
+        StartCoroutine(ReturnToMainMenuAfterDelay(2f));
+    }
+    
+    /// <summary>
+    /// 延遲回到主畫面
+    /// </summary>
+    private System.Collections.IEnumerator ReturnToMainMenuAfterDelay(float delay)
+    {
+        yield return new WaitForSecondsRealtime(delay); // 使用 Realtime 因為遊戲已暫停
+        
+        Debug.Log("[GameManager] Returning to main menu after player death");
+        ReturnToMainMenu();
     }
 
     /// <summary>
@@ -310,7 +364,7 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Restarting game...");
         // Set time scale back to normal
         Time.timeScale = 1f;
-        SceneLoader.Load(SceneLoader.Scene.SampleScene);  // Changed from GameScene to SampleScene
+        SceneLoader.Load(SceneLoader.Scene.GameScene);  // 使用正確的場景名稱
     }
 
     /// <summary>
@@ -390,6 +444,16 @@ public class GameManager : MonoBehaviour
         {
             Time.timeScale = timescale;
         }
+    }
+
+    /// <summary>
+    /// 測試玩家死亡流程（僅用於測試）
+    /// </summary>
+    [ContextMenu("Test Player Death")]
+    public void TestPlayerDeath()
+    {
+        Debug.Log("[GameManager] Testing player death flow...");
+        HandlePlayerDeath();
     }
 
     private void OnDestroy()

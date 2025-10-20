@@ -9,6 +9,7 @@ public class PlayerController : MonoBehaviour
     private Rigidbody2D rb;
     private Vector2 moveInput;
     private InputSystem_Actions inputActions;
+    private bool isCameraMode = false;
 
     [Header("除錯移除錯動除錯設除錯定除錯")]
     [SerializeField] private float moveSpeed = 5f;
@@ -32,11 +33,22 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private int currentHealth;
     [SerializeField] private float invulnerabilityTime = 1f;
     private float lastDamageTime = -999f;
+    
+    [Header("蹲下設定")]
+    [SerializeField] private bool isSquatting = false;
+    [SerializeField] private float squatSpeedMultiplier = 0.5f; // 蹲下時移動速度減半
+    
+    [Header("邊緣限制設定")]
+    [SerializeField] private bool useEdgeLimits = true;        // 是否使用邊緣限制
+    [SerializeField] private float normalEdgeDistance = 1f;    // 平常狀態：角色離攝影機邊緣至少要有幾格
+    [SerializeField] private float alertEdgeDistance = 3f;     // 警戒狀態：角色離攝影機邊緣至少要有幾格
+    
 
     // 除錯滑除錯鼠除錯/除錯指除錯標除錯相除錯關除錯
     private Vector2 currentPointerScreenPos;
     private Vector2 lastValidAimDirection = Vector2.right; // 除錯預除錯設除錯向除錯右除錯
     private Camera playerCamera;
+    private CameraController2D cameraController;
 
     // 除錯武除錯器除錯更除錯新除錯 除錯-除錯 除錯限除錯制除錯更除錯新除錯頻除錯率除錯
     private float weaponUpdateTime = 0f;
@@ -48,6 +60,9 @@ public class PlayerController : MonoBehaviour
     public float HealthPercentage => maxHealth > 0 ? (float)currentHealth / maxHealth : 0f;
     public bool IsDead => currentHealth <= 0;
     public bool IsInvulnerable => Time.time < lastDamageTime + invulnerabilityTime;
+    
+    // 蹲下相關屬性
+    public bool IsSquatting => isSquatting;
 
     public event System.Action<int, int> OnHealthChanged; // 當前血量, 最大血量
     public event System.Action OnPlayerDied; // 玩家死亡事件
@@ -57,14 +72,17 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         inputActions = new InputSystem_Actions();
         weaponHolder = GetComponent<WeaponHolder>();
-
         // 除錯獲除錯取除錯攝除錯影除錯機除錯參除錯考除錯
         playerCamera = Camera.main;
         if (playerCamera == null)
             playerCamera = FindFirstObjectByType<Camera>();
+            
+        // 獲取攝影機控制器
+        cameraController = FindFirstObjectByType<CameraController2D>();
 
         // 初始化血量
         currentHealth = maxHealth;
+        
     }
 
     private void OnEnable()
@@ -78,10 +96,15 @@ public class PlayerController : MonoBehaviour
 
         inputActions.Player1.Point.performed += OnPointPerformed;
         inputActions.Player1.Click.performed += OnClickPerformed;
-        inputActions.Player1.Open.performed += OnOpenPerformed;
+        inputActions.Player1.Action.performed += OnActionPerformed;
 
         inputActions.Player1.Run.performed += OnRunPerformed;
         inputActions.Player1.Run.canceled += OnRunCanceled;
+        
+        inputActions.Player1.Squat.performed += OnSquatPerformed;
+        
+        inputActions.Player1.MoveCamera.performed += OnMoveCameraPerformed;
+        inputActions.Player1.MoveCamera.canceled += OnMoveCameraCanceled;
     }
 
     private void OnDisable()
@@ -93,10 +116,15 @@ public class PlayerController : MonoBehaviour
 
         inputActions.Player1.Point.performed -= OnPointPerformed;
         inputActions.Player1.Click.performed -= OnClickPerformed;
-        inputActions.Player1.Open.performed -= OnOpenPerformed;
+        inputActions.Player1.Action.performed -= OnActionPerformed;
 
         inputActions.Player1.Run.performed -= OnRunPerformed;
         inputActions.Player1.Run.canceled -= OnRunCanceled;
+        
+        inputActions.Player1.Squat.performed -= OnSquatPerformed;
+        
+        inputActions.Player1.MoveCamera.performed -= OnMoveCameraPerformed;
+        inputActions.Player1.MoveCamera.canceled -= OnMoveCameraCanceled;
 
         inputActions.Disable();
     }
@@ -126,14 +154,32 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMovement()
     {
+        // 如果按下 Space 鍵（攝影機移動模式），玩家不移動
+        if (isCameraMode)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+        
+        // 處理蹲下輸入
+        HandleSquatInput();
+        
         float currentSpeed = isRunning ? runSpeed : moveSpeed;
+        
+        // 蹲下時移動速度減半
+        if (isSquatting)
+        {
+            currentSpeed *= squatSpeedMultiplier;
+        }
 
-        // 除錯鍵除錯盤除錯/除錯搖除錯桿除錯輸除錯入除錯
+        // 只使用 WASD 鍵盤輸入進行移動
         if (moveInput.sqrMagnitude > 0.0001f)
         {
-            rb.linearVelocity = moveInput * currentSpeed;
+            // 檢查邊緣限制
+            Vector2 limitedMoveInput = ApplyEdgeLimits(moveInput);
+            rb.linearVelocity = limitedMoveInput * currentSpeed;
 
-            // 除錯如除錯果除錯武除錯器除錯跟除錯隨除錯移除錯動除錯且除錯沒除錯有除錯使除錯用除錯滑除錯鼠除錯瞄除錯準除錯
+            // 武器跟隨移動方向
             if (weaponFollowMovement && !useMouseAiming)
             {
                 lastValidAimDirection = moveInput.normalized;
@@ -251,11 +297,11 @@ public class PlayerController : MonoBehaviour
         isRunning = false;
     }
 
-    private void OnOpenPerformed(InputAction.CallbackContext ctx)
+    private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
         // 獲取玩家前方的位置
         Vector3 openPosition = transform.position + (Vector3)lastValidAimDirection * 1.5f;
-        Debug.Log("OnOpenPerformed: " + openPosition);
+        Debug.Log("OnActionPerformed: " + openPosition);
         // 呼叫DoorController來開啟門
         if (DoorController.Instance != null)
         {
@@ -438,7 +484,8 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private void Die()
     {
-        if (IsDead) return;
+        // 檢查是否已經處理過死亡（避免重複觸發）
+        if (gameObject.activeSelf == false) return;
 
         Debug.Log("玩家死亡！");
         OnPlayerDied?.Invoke();
@@ -459,6 +506,120 @@ public class PlayerController : MonoBehaviour
         gameObject.SetActive(true);
         Debug.Log("玩家復活！");
     }
+    
+    /// <summary>
+    /// 處理蹲下輸入
+    /// </summary>
+    private void HandleSquatInput()
+    {
+        // 蹲下輸入現在由 OnSquatPerformed 處理
+        // 這裡保留空方法以保持一致性
+    }
+    
+    /// <summary>
+    /// 蹲下輸入事件處理
+    /// </summary>
+    private void OnSquatPerformed(InputAction.CallbackContext ctx)
+    {
+        ToggleSquat();
+    }
+    
+    /// <summary>
+    /// 攝影機移動模式開始
+    /// </summary>
+    private void OnMoveCameraPerformed(InputAction.CallbackContext ctx)
+    {
+        isCameraMode = true;
+    }
+    
+    /// <summary>
+    /// 攝影機移動模式結束
+    /// </summary>
+    private void OnMoveCameraCanceled(InputAction.CallbackContext ctx)
+    {
+        isCameraMode = false;
+    }
+    
+    /// <summary>
+    /// 切換蹲下狀態
+    /// </summary>
+    public void ToggleSquat()
+    {
+        isSquatting = !isSquatting;
+        Debug.Log($"玩家蹲下狀態: {isSquatting}");
+    }
+    
+    /// <summary>
+    /// 設定蹲下狀態
+    /// </summary>
+    public void SetSquatting(bool squatting)
+    {
+        isSquatting = squatting;
+        Debug.Log($"玩家蹲下狀態設定為: {isSquatting}");
+    }
+    
 
+    #endregion
+    
+    #region 邊緣限制
+    
+    /// <summary>
+    /// 應用邊緣限制，防止玩家移動到攝影機邊緣外
+    /// </summary>
+    private Vector2 ApplyEdgeLimits(Vector2 moveInput)
+    {
+        if (!useEdgeLimits || playerCamera == null) return moveInput;
+        
+        // 計算攝影機視口邊界
+        float halfHeight = playerCamera.orthographicSize;
+        float halfWidth = playerCamera.aspect * halfHeight;
+        
+        Vector3 cameraPos = playerCamera.transform.position;
+        Vector2 playerPos = transform.position;
+        
+        // 計算攝影機邊界
+        float leftEdge = cameraPos.x - halfWidth;
+        float rightEdge = cameraPos.x + halfWidth;
+        float bottomEdge = cameraPos.y - halfHeight;
+        float topEdge = cameraPos.y + halfHeight;
+        
+        // 計算玩家相對於攝影機邊緣的位置
+        float playerDistanceFromLeft = playerPos.x - leftEdge;
+        float playerDistanceFromRight = rightEdge - playerPos.x;
+        float playerDistanceFromBottom = playerPos.y - bottomEdge;
+        float playerDistanceFromTop = topEdge - playerPos.y;
+        
+        // 獲取當前邊緣距離限制
+        float currentEdgeDistance = normalEdgeDistance; // 可以根據遊戲狀態調整
+        
+        Vector2 limitedInput = moveInput;
+        
+        // 水平限制
+        if (moveInput.x < 0 && playerDistanceFromLeft <= currentEdgeDistance)
+        {
+            // 向左移動但已經接近左邊緣
+            limitedInput.x = 0;
+        }
+        else if (moveInput.x > 0 && playerDistanceFromRight <= currentEdgeDistance)
+        {
+            // 向右移動但已經接近右邊緣
+            limitedInput.x = 0;
+        }
+        
+        // 垂直限制
+        if (moveInput.y < 0 && playerDistanceFromBottom <= currentEdgeDistance)
+        {
+            // 向下移動但已經接近下邊緣
+            limitedInput.y = 0;
+        }
+        else if (moveInput.y > 0 && playerDistanceFromTop <= currentEdgeDistance)
+        {
+            // 向上移動但已經接近上邊緣
+            limitedInput.y = 0;
+        }
+        
+        return limitedInput;
+    }
+    
     #endregion
 }

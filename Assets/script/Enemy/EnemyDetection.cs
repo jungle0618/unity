@@ -4,6 +4,7 @@ using UnityEngine;
 /// 敵人偵測系統
 /// - 視野偵測、距離判斷
 /// - 可選：自動面向目標
+/// - 與 DangerousManager 串接危險係數更新
 /// </summary>
 public class EnemyDetection : MonoBehaviour
 {
@@ -19,14 +20,29 @@ public class EnemyDetection : MonoBehaviour
 
     [Header("旋轉設定")]
     [SerializeField] private bool lookAtTarget = false; // 是否自動面向玩家
+    [SerializeField] private bool lookAtTargetInChase = false; // 追擊時是否面向玩家
 
     public float ViewRange => viewRange;
     public float ViewAngle => viewAngle;
     public float ChaseRange => chaseRange;
 
     private Transform target;
+    private DangerousManager dangerousManager;
 
+    private void Awake()
+    {
+        dangerousManager = FindObjectOfType<DangerousManager>();
+    }
 
+    private void Update()
+    {
+        // 每幀彙報距離與可視狀態給 DangerousManager
+        if (dangerousManager == null) return;
+
+        bool canSee = CanSeePlayer();
+        float distance = GetDistanceToTarget();
+        dangerousManager.ReportEnemyPerception(distance, canSee);
+    }
 
     /// <summary>
     /// 設定偵測目標
@@ -68,8 +84,8 @@ public class EnemyDetection : MonoBehaviour
         if (useRaycastDetection && IsBlockedByObstacle(currentPos, targetPos))
             return false;
 
-        // 自動面向目標
-        if (lookAtTarget && dirToTarget.magnitude > 0.1f)
+        // 自動面向目標（只在非追擊狀態時）
+        if (lookAtTarget && dirToTarget.magnitude > 0.1f && !IsInChaseState())
         {
             LookAtTarget(dirToTarget);
         }
@@ -134,4 +150,37 @@ public class EnemyDetection : MonoBehaviour
     /// 設定是否自動面向目標
     /// </summary>
     public void SetLookAtTarget(bool enabled) => lookAtTarget = enabled;
+
+    /// <summary>
+    /// 設定視野方向（用於巡邏時跟隨移動方向）
+    /// </summary>
+    public void SetViewDirection(Vector2 direction)
+    {
+        if (direction.magnitude < 0.1f) return;
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
+    /// <summary>
+    /// 獲取當前視野方向
+    /// </summary>
+    public Vector2 GetViewDirection()
+    {
+        return transform.right;
+    }
+
+    /// <summary>
+    /// 檢查是否在追擊狀態
+    /// </summary>
+    private bool IsInChaseState()
+    {
+        if (stateMachine == null) return false;
+        return stateMachine.CurrentState == EnemyState.Chase;
+    }
+
+    /// <summary>
+    /// 設定追擊時是否面向目標
+    /// </summary>
+    public void SetLookAtTargetInChase(bool enabled) => lookAtTargetInChase = enabled;
 }
