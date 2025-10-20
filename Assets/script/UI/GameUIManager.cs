@@ -11,11 +11,13 @@ public class GameUIManager : MonoBehaviour
     [Header("UI References")]
     [SerializeField] private PlayerHealthUI playerHealthUI;
     [SerializeField] private DangerousUI dangerousUI;
+    [SerializeField] private WeaponAmmoUI weaponAmmoUI; // Add weapon ammo UI reference
     
     [Header("UI Panels")]
     [SerializeField] private GameObject healthPanel;
     [SerializeField] private GameObject dangerPanel;
     [SerializeField] private GameObject gameOverPanel;
+    [SerializeField] private GameObject weaponPanel; // Add weapon panel
     
     [Header("Game Over UI")]
     [SerializeField] private TextMeshProUGUI gameOverText;
@@ -25,7 +27,8 @@ public class GameUIManager : MonoBehaviour
     [Header("Settings")]
     [SerializeField] private bool showHealthUI = true;
     [SerializeField] private bool showDangerUI = true;
-    
+    [SerializeField] private bool showWeaponUI = true; // Add weapon UI setting
+
     private PlayerController playerController;
     private DangerousManager dangerousManager;
     
@@ -82,6 +85,12 @@ public class GameUIManager : MonoBehaviour
             Debug.Log("危險等級UI已初始化");
         }
         
+        // 設定武器彈藥UI
+        if (weaponAmmoUI != null)
+        {
+            Debug.Log("武器彈藥UI已初始化");
+        }
+        
         // 設定按鈕事件
         if (restartButton != null)
         {
@@ -96,6 +105,7 @@ public class GameUIManager : MonoBehaviour
         // 初始顯示狀態
         SetHealthUIVisible(showHealthUI);
         SetDangerUIVisible(showDangerUI);
+        SetWeaponUIVisible(showWeaponUI);
         SetGameOverUIVisible(false);
     }
     
@@ -149,6 +159,22 @@ public class GameUIManager : MonoBehaviour
         if (dangerousUI != null)
         {
             dangerousUI.gameObject.SetActive(visible);
+        }
+    }
+    
+    /// <summary>
+    /// 設定武器UI可見性
+    /// </summary>
+    public void SetWeaponUIVisible(bool visible)
+    {
+        if (weaponPanel != null)
+        {
+            weaponPanel.SetActive(visible);
+        }
+        
+        if (weaponAmmoUI != null)
+        {
+            weaponAmmoUI.gameObject.SetActive(visible);
         }
     }
     
@@ -214,5 +240,14 @@ public class GameUIManager : MonoBehaviour
     {
         showDangerUI = !showDangerUI;
         SetDangerUIVisible(showDangerUI);
+    }
+    
+    /// <summary>
+    /// 切換武器UI顯示
+    /// </summary>
+    public void ToggleWeaponUI()
+    {
+        showWeaponUI = !showWeaponUI;
+        SetWeaponUIVisible(showWeaponUI);
     }
 }

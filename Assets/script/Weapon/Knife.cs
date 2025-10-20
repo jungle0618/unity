@@ -22,35 +22,19 @@ public class Knife : Weapon
             // log all hit objects
             Debug.Log($"Knife hit: {hit.gameObject.name}");
 
-            // 檢查是否擊中敵人（當玩家攻擊時）
             var enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
             {
-                Debug.Log($"Knife 擊中敵人: {enemy.gameObject.name}");
-                enemy.Die(); // 敵人被玩家攻擊時死亡
+                Debug.Log("[Knife] Hit enemy: " + enemy.gameObject.name);
+                enemy.Die(); // 或 enemy.TakeDamage(...)
                 continue;
             }
 
-            // 檢查是否擊中玩家（當敵人攻擊時）
             var player = hit.GetComponent<PlayerController>();
             if (player != null)
             {
-                Debug.Log($"Knife 擊中玩家: {player.gameObject.name}");
-                
-                // 檢查攻擊者是否是敵人
-                var enemyAttacker = attacker.GetComponent<Enemy>();
-                if (enemyAttacker != null)
-                {
-                    // 敵人攻擊玩家，造成傷害
-                    int damage = 20; // 小刀傷害
-                    player.TakeDamage(damage, "Enemy Knife Attack");
-                    Debug.Log($"敵人對玩家造成 {damage} 點傷害");
-                }
-                else
-                {
-                    // 玩家攻擊玩家（friendly fire 或其他情況）
-                    Debug.Log("玩家攻擊玩家 - 可能是 friendly fire");
-                }
+                // 若 attacker 是玩家，可能是玩家互打或 friendly fire
+                // 處理玩家受擊邏輯
             }
         }
     }

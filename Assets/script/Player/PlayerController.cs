@@ -105,6 +105,9 @@ public class PlayerController : MonoBehaviour
         
         inputActions.Player1.MoveCamera.performed += OnMoveCameraPerformed;
         inputActions.Player1.MoveCamera.canceled += OnMoveCameraCanceled;
+        
+        // Subscribe to weapon switching input
+        inputActions.Player1.SwitchWeapon.performed += OnSwitchWeaponPerformed;
     }
 
     private void OnDisable()
@@ -125,6 +128,9 @@ public class PlayerController : MonoBehaviour
         
         inputActions.Player1.MoveCamera.performed -= OnMoveCameraPerformed;
         inputActions.Player1.MoveCamera.canceled -= OnMoveCameraCanceled;
+        
+        // Unsubscribe from weapon switching input
+        inputActions.Player1.SwitchWeapon.performed -= OnSwitchWeaponPerformed;
 
         inputActions.Disable();
     }
@@ -318,6 +324,15 @@ public class PlayerController : MonoBehaviour
         else
         {
             Debug.LogWarning("DoorController 實例不存在");
+        }
+    }
+
+    private void OnSwitchWeaponPerformed(InputAction.CallbackContext ctx)
+    {
+        // 切換武器邏輯
+        if (weaponHolder != null)
+        {
+            weaponHolder.SwitchToNextWeapon();
         }
     }
 
@@ -623,3 +638,4 @@ public class PlayerController : MonoBehaviour
     
     #endregion
 }
+

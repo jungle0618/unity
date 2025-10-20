@@ -1,136 +1,152 @@
+using System;
 using UnityEngine;
 
-public class Gun : Weapon
+/// <summary>
+/// Gun weapon that shoots bullets at enemies within range
+/// Implements IAmmoWeapon for ammunition system
+/// </summary>
+public class Gun : Weapon, IAmmoWeapon
 {
-    [Header("槍械設定")]
-    [SerializeField] private int damage = 30;
-    [SerializeField] private float bulletSpeed = 20f;
+    [Header("Gun Settings")]
     [SerializeField] private GameObject bulletPrefab;
-    [SerializeField] private Transform firePoint;
+    [SerializeField] private float bulletSpeed = 15f;
+    [SerializeField] private Transform firePoint; // Optional: spawn point for bullets
     
+    [Header("Ammunition")]
+    [SerializeField] private int maxAmmo = 30;
+    [SerializeField] private int ammoPerShot = 1;
+    private int _currentAmmo;
+
+    [Header("Visual Effects")]
+    [SerializeField] private ParticleSystem muzzleFlash; // Optional: muzzle flash effect
+
+    // IAmmoWeapon implementation
+    public int CurrentAmmo => _currentAmmo;
+    public int MaxAmmo => maxAmmo;
+    public int AmmoPerShot => ammoPerShot;
+    public bool HasAmmo => _currentAmmo >= ammoPerShot;
+
+    // Events for ammo changes
+    public event Action<int, int> OnAmmoChanged; // current, max
+
     protected override void Awake()
     {
-        base.Awake(); // 調用父類的Awake方法來初始化耐久度
-        attackRange = 10f; // 槍的射程較遠
-        attackCooldown = 0.5f; // 射擊間隔
-        maxDurability = 100; // 槍的耐久度
-        durabilityLossPerAttack = 1; // 每次射擊減少1點耐久度
+        base.Awake();
         
-        // 如果沒有設定發射點，使用武器本身的位置
-        if (firePoint == null)
-            firePoint = transform;
+        // Initialize gun stats
+        attackRange = 0f; // Guns should not have melee range, bullets will handle range
+        attackCooldown = 0.5f; // Fire rate
+        maxDurability = 100;
+        durabilityLossPerAttack = 1;
+        
+        // Initialize ammo
+        _currentAmmo = maxAmmo;
+        Debug.Log("[Gun] Initialized with ammo: " + _currentAmmo + "/" + maxAmmo);
+    }
+
+    public override bool CanAttack()
+    {
+        return base.CanAttack() && HasAmmo;
     }
 
     protected override void PerformAttack(Vector2 origin, GameObject attacker)
     {
-        // 計算射擊方向
-        Vector2 shootDirection = GetShootDirection(origin, attacker);
-        
-        // 創建子彈
-        CreateBullet(origin, shootDirection, attacker);
-        
-        Debug.Log($"槍械射擊: 方向 {shootDirection}, 攻擊者 {attacker.name}");
-    }
-    
-    private Vector2 GetShootDirection(Vector2 origin, GameObject attacker)
-    {
-        // 如果是玩家射擊，使用滑鼠方向
-        var playerController = attacker.GetComponent<PlayerController>();
-        if (playerController != null)
+        // Check if we have ammo
+        if (!HasAmmo)
         {
-            // 獲取滑鼠世界位置
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                Vector3 mouseWorldPos = cam.ScreenToWorldPoint(Input.mousePosition);
-                mouseWorldPos.z = 0f;
-                return ((Vector2)mouseWorldPos - origin).normalized;
-            }
-        }
-        
-        // 如果是敵人射擊，朝向玩家
-        var enemy = attacker.GetComponent<Enemy>();
-        if (enemy != null)
-        {
-            // 尋找最近的玩家
-            PlayerController player = FindFirstObjectByType<PlayerController>();
-            if (player != null)
-            {
-                return ((Vector2)player.transform.position - origin).normalized;
-            }
-        }
-        
-        // 預設方向（向右）
-        return Vector2.right;
-    }
-    
-    private void CreateBullet(Vector2 origin, Vector2 direction, GameObject attacker)
-    {
-        // 如果沒有子彈預製體，使用射線檢測
-        if (bulletPrefab == null)
-        {
-            PerformRaycastAttack(origin, direction, attacker);
+            Debug.Log("[Gun] Out of ammo!");
             return;
         }
-        
-        // 創建子彈物件
-        GameObject bullet = Instantiate(bulletPrefab, origin, Quaternion.identity);
-        
-        // 設定子彈方向
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-        bullet.transform.rotation = Quaternion.Euler(0f, 0f, angle);
-        
-        // 設定子彈速度
-        Rigidbody2D bulletRb = bullet.GetComponent<Rigidbody2D>();
-        if (bulletRb != null)
+
+        // Consume ammo
+        _currentAmmo -= ammoPerShot;
+        OnAmmoChanged?.Invoke(_currentAmmo, maxAmmo);
+
+        // Get shooting direction from gun's rotation
+        Vector2 shootDirection = transform.right; // Gun should be rotated to face target
+
+        // Spawn bullet
+        SpawnBullet(origin, shootDirection, attacker);
+
+        // Play muzzle flash if available
+        if (muzzleFlash != null)
         {
-            bulletRb.linearVelocity = direction * bulletSpeed;
+            muzzleFlash.Play();
         }
-        
-        // 設定子彈傷害和攻擊者
-        BulletController bulletController = bullet.GetComponent<BulletController>();
-        if (bulletController != null)
+
+        Debug.Log($"[Gun] Fired! Ammo: {_currentAmmo}/{maxAmmo}");
+    }
+
+    private void SpawnBullet(Vector2 origin, Vector2 direction, GameObject owner)
+    {
+        if (bulletPrefab == null)
         {
-            bulletController.SetDamage(damage);
-            bulletController.SetAttacker(attacker);
+            Debug.LogError("[Gun] Bullet prefab not assigned!");
+            return;
+        }
+
+        // Determine spawn position (use firePoint if available, otherwise use gun position)
+        var spawnPosition = firePoint != null ? firePoint.position : (Vector3)origin;
+
+        // Instantiate bullet
+        var bulletObj = Instantiate(bulletPrefab, spawnPosition, Quaternion.identity);
+        
+        // Initialize bullet
+        var bullet = bulletObj.GetComponent<Bullet>();
+        if (bullet != null)
+        {
+            bullet.Initialize(direction, owner);
+        }
+        else
+        {
+            Debug.LogError("[Gun] Bullet prefab doesn't have Bullet component!");
+            Destroy(bulletObj);
         }
     }
-    
-    private void PerformRaycastAttack(Vector2 origin, Vector2 direction, GameObject attacker)
+
+    /// <summary>
+    /// Reload ammunition
+    /// </summary>
+    public void Reload(int amount)
     {
-        // 使用射線檢測進行攻擊
-        RaycastHit2D hit = Physics2D.Raycast(origin, direction, attackRange);
+        if (amount <= 0) return;
+
+        int oldAmmo = _currentAmmo;
+        _currentAmmo = Mathf.Min(maxAmmo, _currentAmmo + amount);
         
-        if (hit.collider != null)
+        OnAmmoChanged?.Invoke(_currentAmmo, maxAmmo);
+        Debug.Log($"[Gun] Reloaded {_currentAmmo - oldAmmo} bullets. Total: {_currentAmmo}/{maxAmmo}");
+    }
+
+    /// <summary>
+    /// Fully reload ammunition
+    /// </summary>
+    public void FullReload()
+    {
+        _currentAmmo = maxAmmo;
+        OnAmmoChanged?.Invoke(_currentAmmo, maxAmmo);
+        Debug.Log($"[Gun] Fully reloaded! Ammo: {_currentAmmo}/{maxAmmo}");
+    }
+
+    /// <summary>
+    /// Get ammo information
+    /// </summary>
+    public (int current, int max, float percentage) GetAmmoInfo()
+    {
+        float percentage = maxAmmo > 0 ? (float)_currentAmmo / maxAmmo : 0f;
+        return (_currentAmmo, maxAmmo, percentage);
+    }
+
+    // Override to add ammo check warning
+    public new bool TryPerformAttack(Vector2 origin, GameObject attacker)
+    {
+        if (!HasAmmo)
         {
-            Debug.Log($"槍械射線擊中: {hit.collider.gameObject.name}");
-            
-            // 檢查是否擊中敵人
-            var enemy = hit.collider.GetComponent<Enemy>();
-            if (enemy != null)
-            {
-                Debug.Log($"槍械擊中敵人: {enemy.gameObject.name}");
-                enemy.Die();
-                return;
-            }
-            
-            // 檢查是否擊中玩家
-            var player = hit.collider.GetComponent<PlayerController>();
-            if (player != null)
-            {
-                Debug.Log($"槍械擊中玩家: {player.gameObject.name}");
-                
-                // 檢查攻擊者是否是敵人
-                var enemyAttacker = attacker.GetComponent<Enemy>();
-                if (enemyAttacker != null)
-                {
-                    player.TakeDamage(damage, "Enemy Gun Attack");
-                    Debug.Log($"敵人對玩家造成 {damage} 點傷害");
-                }
-            }
+            Debug.LogWarning("[Gun] Cannot attack - out of ammo!");
+            return false;
         }
-        
-        // 繪製射線（除錯用）
-        Debug.DrawRay(origin, direction * attackRange, Color.red, 0.1f);
+
+        return base.TryPerformAttack(origin, attacker);
     }
 }
+

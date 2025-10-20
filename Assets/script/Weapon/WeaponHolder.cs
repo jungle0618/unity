@@ -1,14 +1,17 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// WeaponHolder（加強版）
 /// 確保不會重複複製武器，並支援 prefab / 已存在 child 的情況
+/// 支援多武器切換系統
 /// </summary>
 public class WeaponHolder : MonoBehaviour
 {
-    [Header("Weapon (Prefab)")]
-    [SerializeField] private GameObject weaponPrefab;
+    [Header("Weapon Prefabs")]
+    [SerializeField] private GameObject[] weaponPrefabs; // Array of weapon prefabs for switching
+    [SerializeField] private GameObject weaponPrefab; // Legacy single weapon support
 
     [Header("Behavior")]
     [SerializeField] private bool equipOnStart = true; // 一開始是否自動裝備 prefab
@@ -17,7 +20,9 @@ public class WeaponHolder : MonoBehaviour
     [SerializeField] private float attackAngle = 30f;
     [SerializeField] private float attackDuration = 0.15f;
 
-    // runtime reference (不要序列化，避免多個 holder 指向同一 instance)
+    // Weapon management
+    private List<Weapon> availableWeapons = new List<Weapon>(); // All instantiated weapons
+    private int currentWeaponIndex = 0;
     private Weapon currentWeapon;
 
     // 記錄是哪個 prefab 用來裝備（方便避免重複 Instantiate 同一 prefab）
@@ -32,12 +37,41 @@ public class WeaponHolder : MonoBehaviour
     private float originalRotation = 0f;
 
     public Weapon CurrentWeapon => currentWeapon;
+    public int CurrentWeaponIndex => currentWeaponIndex;
+    public int WeaponCount => availableWeapons.Count;
+    
     public event Action<Vector2, float, GameObject> OnAttackPerformed;
     public event Action<int, int> OnWeaponDurabilityChanged; // 當前耐久度, 最大耐久度
     public event Action OnWeaponBroken; // 武器損壞事件
+    public event Action<Weapon> OnWeaponChanged; // 武器切換事件
 
     private void Start()
     {
+        // Initialize weapons from prefabs array
+        if (weaponPrefabs != null && weaponPrefabs.Length > 0)
+        {
+            foreach (var prefab in weaponPrefabs)
+            {
+                if (prefab != null)
+                {
+                    var weapon = InstantiateWeapon(prefab);
+                    if (weapon != null)
+                    {
+                        availableWeapons.Add(weapon);
+                        weapon.gameObject.SetActive(false); // Hide initially
+                    }
+                }
+            }
+            
+            // Equip first weapon
+            if (availableWeapons.Count > 0 && equipOnStart)
+            {
+                SwitchToWeapon(0);
+            }
+            return;
+        }
+        
+        // Legacy support: single weapon prefab
         // 若場景編輯時已把 Weapon 放在本物件底下（child），就先採用它，避免再 Instantiate
         if (currentWeapon == null)
         {
@@ -46,6 +80,7 @@ public class WeaponHolder : MonoBehaviour
             {
                 // 使用現有的 child instance 作為 currentWeapon
                 SetWeapon(childWeapon);
+                availableWeapons.Add(childWeapon);
                 // 無法知道它是由哪個 prefab 產生，所以把 equippedPrefab 設為 null（表示 runtime instance）
                 equippedPrefab = null;
                 return;
@@ -266,6 +301,59 @@ public class WeaponHolder : MonoBehaviour
     }
 
     /// <summary>
+    /// 切換到下一個武器（循環切換）
+    /// </summary>
+    /// <returns>切換是否成功</returns>
+    public bool SwitchToNextWeapon()
+    {
+        if (availableWeapons.Count <= 1) return false;
+
+        int nextIndex = (currentWeaponIndex + 1) % availableWeapons.Count;
+        return SwitchToWeapon(nextIndex);
+    }
+
+    /// <summary>
+    /// 切換到上一個武器（循環切換）
+    /// </summary>
+    /// <returns>切換是否成功</returns>
+    public bool SwitchToPreviousWeapon()
+    {
+        if (availableWeapons.Count <= 1) return false;
+
+        int prevIndex = (currentWeaponIndex - 1 + availableWeapons.Count) % availableWeapons.Count;
+        return SwitchToWeapon(prevIndex);
+    }
+
+    /// <summary>
+    /// 切換武器
+    /// </summary>
+    /// <param name="index">目標武器的索引</param>
+    /// <returns>切換是否成功</returns>
+    public bool SwitchToWeapon(int index)
+    {
+        if (index < 0 || index >= availableWeapons.Count) return false;
+
+        // 先��用當前武器（如果有的話）
+        if (currentWeapon != null)
+        {
+            currentWeapon.gameObject.SetActive(false);
+        }
+
+        currentWeaponIndex = index;
+        currentWeapon = availableWeapons[currentWeaponIndex];
+
+        // 啟用並重置新武器
+        currentWeapon.gameObject.SetActive(true);
+        currentWeapon.transform.SetParent(this.transform, worldPositionStays: false);
+        currentWeapon.transform.localPosition = Vector3.zero;
+        currentWeapon.transform.localRotation = Quaternion.identity;
+        currentWeapon.transform.localScale = Vector3.one;
+
+        OnWeaponChanged?.Invoke(currentWeapon);
+        return true;
+    }
+
+    /// <summary>
     /// 處理武器耐久度變化事件
     /// </summary>
     private void OnWeaponDurabilityChangedHandler(int currentDurability, int maxDurability)
@@ -317,5 +405,28 @@ public class WeaponHolder : MonoBehaviour
         }
         
         return (currentWeapon.CurrentDurability, currentWeapon.MaxDurability, currentWeapon.DurabilityPercentage);
+    }
+
+    /// <summary>
+    /// 從 prefab 實例化武器（內部使用）
+    /// </summary>
+    /// <param name="prefab">武器 prefab</param>
+    /// <returns>實例化的 Weapon 組件</returns>
+    private Weapon InstantiateWeapon(GameObject prefab)
+    {
+        GameObject weaponGO = Instantiate(prefab, this.transform);
+        weaponGO.transform.localPosition = Vector3.zero;
+        weaponGO.transform.localRotation = Quaternion.identity;
+        weaponGO.transform.localScale = Vector3.one;
+
+        var weapon = weaponGO.GetComponent<Weapon>();
+        if (weapon == null)
+        {
+            Debug.LogWarning($"InstantiateWeapon: prefab {prefab.name} does not contain a Weapon component.");
+            Destroy(weaponGO);
+            return null;
+        }
+
+        return weapon;
     }
 }
