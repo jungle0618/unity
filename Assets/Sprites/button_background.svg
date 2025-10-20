@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="30.793655mm"
+   height="12mm"
+   viewBox="0 0 30.793655 12"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   sodipodi:docname="button_background.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#000000"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showguides="false"
+     inkscape:zoom="8.5023008"
+     inkscape:cx="59.689726"
+     inkscape:cy="34.284837"
+     inkscape:window-width="2560"
+     inkscape:window-height="1411"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="use253-5" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-40,-39.999999)">
+    <g
+       id="panel_009"
+       transform="matrix(0.26458333,0,0,0.26458333,77.258332,50.270833)">
+      <g
+         id="g253">
+        <g
+           id="use253">
+          <g
+             id="panel_009-4"
+             transform="translate(-13.821064,73)">
+            <g
+               id="g253-5">
+              <g
+                 id="use253-5">
+                <path
+                   fill="#ffffff"
+                   stroke="none"
+                   d="m -18.171469,-111.8189 v 1.88976 H -119.43872 v -1.88976 h -7.55911 v 7.55906 h 1.88977 v 30.236219 h -1.88977 v 7.559054 h 7.55911 v -1.889763 h 101.267251 v 1.889763 h 7.559107 v -7.559054 h -1.889773 v -30.236219 h 1.889773 v -7.55906 h -7.559107 m 1.889788,5.66929 v -3.77953 h 3.779546 v 3.77953 h -3.779546 m -1.889788,-1.88976 v 3.77953 h 3.779561 v 30.236219 h -3.779561 v 3.779527 H -119.43872 v -3.779527 h -3.77955 v -30.236219 h 3.77955 v -3.77953 h 101.267251 m 5.669334,35.905513 v 3.779527 h -3.779546 v -3.779527 h 3.779546 M -125.10806,-106.14961 v -3.77953 h 3.77956 v 3.77953 h -3.77956 m 3.77956,34.015753 v 3.779527 h -3.77956 v -3.779527 h 3.77956 m 105.046819,-30.236223 h -3.779561 v -3.77953 h -97.487708 v 3.77953 h -3.77955 v 26.456696 h 3.77955 v 3.779527 h 97.487708 v -3.779527 h 3.779561 z"
+                   id="path2"
+                   sodipodi:nodetypes="ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                   style="stroke-width:0.944882" />
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -69,12 +69,6 @@ public class PlayerController : MonoBehaviour
 
     private void OnEnable()
     {
-        // 確保inputActions已初始化
-        if (inputActions == null)
-        {
-            inputActions = new InputSystem_Actions();
-        }
-
         inputActions.Enable();
 
         inputActions.Player1.Move.performed += OnMovePerformed;
@@ -92,23 +86,19 @@ public class PlayerController : MonoBehaviour
 
     private void OnDisable()
     {
-        // 確保inputActions不為null
-        if (inputActions != null)
-        {
-            inputActions.Player1.Move.performed -= OnMovePerformed;
-            inputActions.Player1.Move.canceled -= OnMoveCanceled;
+        inputActions.Player1.Move.performed -= OnMovePerformed;
+        inputActions.Player1.Move.canceled -= OnMoveCanceled;
 
-            inputActions.Player1.Attack.performed -= OnAttackPerformed;
+        inputActions.Player1.Attack.performed -= OnAttackPerformed;
 
-            inputActions.Player1.Point.performed -= OnPointPerformed;
-            inputActions.Player1.Click.performed -= OnClickPerformed;
-            inputActions.Player1.Open.performed -= OnOpenPerformed;
+        inputActions.Player1.Point.performed -= OnPointPerformed;
+        inputActions.Player1.Click.performed -= OnClickPerformed;
+        inputActions.Player1.Open.performed -= OnOpenPerformed;
 
-            inputActions.Player1.Run.performed -= OnRunPerformed;
-            inputActions.Player1.Run.canceled -= OnRunCanceled;
+        inputActions.Player1.Run.performed -= OnRunPerformed;
+        inputActions.Player1.Run.canceled -= OnRunCanceled;
 
-            inputActions.Disable();
-        }
+        inputActions.Disable();
     }
 
     private void Update()
@@ -247,7 +237,7 @@ public class PlayerController : MonoBehaviour
         if (weaponHolder == null) return;
 
         UpdateWeaponDirection();
-        Debug.Log("OnAttackPerformed");
+        Debug.Log("[PlayerController] OnAttackPerformed");
         weaponHolder.TryAttack(gameObject);
     }
 

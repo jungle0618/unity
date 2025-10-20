@@ -18,6 +18,9 @@ public class Knife : Weapon
         {
             if (hit == null) continue;
             if (hit.gameObject == attacker) continue; // 跳過攻擊者本人
+            
+            // log all hit objects
+            Debug.Log($"Knife hit: {hit.gameObject.name}");
 
             var enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
