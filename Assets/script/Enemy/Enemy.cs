@@ -6,16 +6,26 @@ using static UnityEngine.GraphicsBuffer;
 /// Enemy 主控制器：整合各個組件，處理 AI 邏輯 (優化版本)
 /// 職責：協調各組件、處理狀態轉換、對外接口
 /// 優化：最大更新頻率，增加武器系統，批次處理
+/// 繼承 BaseEntity 以統一架構
 /// </summary>
 [RequireComponent(typeof(EnemyMovement), typeof(EnemyDetection), typeof(EnemyVisualizer))]
-public class Enemy : MonoBehaviour
+public class Enemy : BaseEntity<EnemyState>
 {
-    // 組件引用
-    private EnemyMovement movement;
-    private EnemyDetection detection;
-    private EnemyVisualizer visualizer;
-    private EnemyStateMachine stateMachine;
-    private WeaponHolder weaponHolder;
+    // 組件引用（使用屬性來訪問具體類型，避免序列化衝突）
+    private EnemyMovement enemyMovement => movement as EnemyMovement;
+    private EnemyDetection enemyDetection => detection as EnemyDetection;
+    private EnemyVisualizer enemyVisualizer => visualizer as EnemyVisualizer;
+    // 狀態機需要單獨存儲，因為它是在運行時創建的，不是組件
+    [System.NonSerialized] private EnemyStateMachine enemyStateMachineInstance;
+    private EnemyStateMachine enemyStateMachine => enemyStateMachineInstance ?? (enemyStateMachineInstance = stateMachine as EnemyStateMachine);
+    private EnemyAttackController attackController;
+    
+    // 基類已經有這些，但我們需要具體類型的引用
+    // BaseMovement, BaseDetection, BaseVisualizer 已由基類管理
+
+    [Header("血量設定")]
+    [SerializeField] private int maxHealth = 100;
+    [SerializeField] private int currentHealth;
 
     [Header("AI 參數")]
     [SerializeField] private float alertTime = 2f;
@@ -26,7 +36,6 @@ public class Enemy : MonoBehaviour
     // 效能優化變數
     private float aiUpdateInterval = 0.15f;
     private float lastAIUpdateTime = 0f;
-    private float lastAttackTime = 0f;
     private bool isInitialized = false;
 
     // 快取變數以減少 GC 分配
@@ -40,38 +49,105 @@ public class Enemy : MonoBehaviour
     private Vector3[] patrolLocations;
     private int currentPatrolIndex = 0;
 
+    // 追擊相關變數
+    private Vector2 lastSeenPlayerPosition;
+    private bool hasLastSeenPosition = false;
+    private float lastSeenTime = 0f;
+    private float searchTime = 3f; // 在最後看到位置搜索的時間
+    private bool hasReachedSearchLocation = false; // 是否已到達搜索位置
+
+    // 視覺化控制
+    private bool canVisualize = true; // 是否可以視覺化（由 EnemyManager 控制）
+
     // 公共屬性
-    public EnemyState CurrentState => stateMachine?.CurrentState ?? EnemyState.Dead;
-    public bool IsDead => stateMachine?.IsDead ?? true;
-    public Vector2 Position => cachedPosition;
+    public EnemyState CurrentState => enemyStateMachine?.CurrentState ?? EnemyState.Dead;
+    public int CurrentHealth => currentHealth;
+    public int MaxHealth => maxHealth;
+    public float HealthPercentage => maxHealth > 0 ? (float)currentHealth / maxHealth : 0f;
+    // IsDead 和 Position 已由基類 BaseEntity 提供，無需重複定義
+    
+    // 血量變化事件
+    public event System.Action<int, int> OnHealthChanged; // 當前血量, 最大血量
+    
+    /// <summary>
+    /// 設定是否可以視覺化（由 EnemyManager 調用）
+    /// </summary>
+    public void SetCanVisualize(bool canVisualize)
+    {
+        this.canVisualize = canVisualize;
+        
+        // 通知 Visualizer 更新狀態
+        if (enemyVisualizer != null)
+        {
+            enemyVisualizer.SetCanVisualize(canVisualize);
+        }
+        
+        // 處理武器的 renderer，防止看的到武器看不到人
+        if (itemHolder != null && itemHolder.CurrentWeapon != null)
+        {
+            SpriteRenderer weaponRenderer = itemHolder.CurrentWeapon.GetComponent<SpriteRenderer>();
+            if (weaponRenderer != null)
+            {
+                weaponRenderer.enabled = canVisualize;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 獲取是否可以視覺化
+    /// </summary>
+    public bool GetCanVisualize()
+    {
+        return canVisualize;
+    }
+    
+    // 保留 cachedPosition 用於內部優化（性能優化）
 
     // 事件
     public System.Action<Enemy> OnEnemyDied;
 
     #region Unity 生命週期
 
-    private void Awake()
+    protected override void Awake()
     {
-        InitializeComponents();
+        // 重要：必須在 base.Awake() 之前初始化狀態機
+        // 因為 base.Awake() 會調用 ValidateComponents() 來檢查狀態機是否存在
+        enemyStateMachineInstance = new EnemyStateMachine(alertTime);
+        base.stateMachine = enemyStateMachineInstance; // 賦值給基類引用
+        
+        base.Awake(); // 調用基類 Awake，初始化基類的組件引用
+        
+        // 獲取具體類型的組件引用（用於訪問 Enemy 特有的方法）
+        movement = GetComponent<EnemyMovement>();
+        detection = GetComponent<EnemyDetection>();
+        visualizer = GetComponent<EnemyVisualizer>();
+        
+        InitializeEnemyComponents();
     }
 
-    private void Start()
+    protected override void Start()
     {
+        base.Start(); // 調用基類 Start
+        
         // 確保初始化完成後再開始 AI
-        if (stateMachine != null && isInitialized)
+        if (enemyStateMachine != null && isInitialized)
         {
-            stateMachine.ChangeState(EnemyState.Patrol);
+            enemyStateMachine.ChangeState(EnemyState.Patrol);
         }
     }
 
-    private void Update()
+    protected override void Update()
     {
+        base.Update(); // 調用基類 Update
+        
         // 更新快取位置
         UpdateCachedData();
     }
 
-    private void FixedUpdate()
+    protected override void FixedUpdate()
     {
+        base.FixedUpdate(); // 調用基類 FixedUpdate（會調用 FixedUpdateEntity）
+        
         if (IsDead || !isInitialized) return;
 
         // 使用自定義更新間隔而非每幀更新
@@ -80,40 +156,14 @@ public class Enemy : MonoBehaviour
             UpdateAI();
             lastAIUpdateTime = Time.time;
         }
-        UpdateRotation();
     }
-    [SerializeField] private float idleRotationInterval = 2f; // 每隔幾秒旋轉一次
-    [SerializeField] private float idleRotationAngle = 30f;   // 每次旋轉的角度
-
-    private float idleRotationTimer = 0f;
-
-    private void UpdateRotation()
+    
+    protected override void FixedUpdateEntity()
     {
-        if (stateMachine == null) return;
-
-        if (stateMachine.CurrentState == EnemyState.Chase)
-        {
-            // Chase 狀態 → 面向玩家
-            Vector2 directionToPlayer = cachedDirectionToPlayer.normalized;
-            float angle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle);
-        }
-        else
-        {
-            // 非 Chase 狀態 → 間隔旋轉
-            idleRotationTimer += Time.deltaTime;
-            if (idleRotationTimer >= idleRotationInterval)
-            {
-                idleRotationTimer = 0f;
-
-                // 隨機順時針或逆時針
-                float randomAngle = (Random.value > 0.5f ? 1f : -1f) * idleRotationAngle;
-
-                // 應用旋轉
-                transform.Rotate(0f, 0f, randomAngle);
-            }
-        }
+        // 基類的 FixedUpdateEntity 會更新狀態機
+        // 這裡不需要額外實現，因為 UpdateAI 在 FixedUpdate 中調用
     }
+    
 
 
 
@@ -121,55 +171,73 @@ public class Enemy : MonoBehaviour
 
     #region 初始化
 
-    private void InitializeComponents()
+    /// <summary>
+    /// 初始化 Enemy 特有組件（在基類初始化之後調用）
+    /// </summary>
+    private void InitializeEnemyComponents()
     {
-        // 獲取組件
-        movement = GetComponent<EnemyMovement>();
-        detection = GetComponent<EnemyDetection>();
-        visualizer = GetComponent<EnemyVisualizer>();
-        weaponHolder = GetComponent<WeaponHolder>();
+        // ItemHolder 已由基類初始化
+        attackController = GetComponent<EnemyAttackController>();
 
-        // 如果沒有 WeaponHolder，嘗試添加一個
-        if (weaponHolder == null)
+        // 初始化 Visualizer 的初始狀態
+        if (enemyVisualizer != null)
         {
-            weaponHolder = gameObject.AddComponent<WeaponHolder>();
+            enemyVisualizer.SetCanVisualize(canVisualize);
         }
 
-        // 初始化狀態機
-        stateMachine = new EnemyStateMachine(alertTime);
-
-        // 設定組件關聯
-        if (visualizer != null)
+        // 如果沒有 EnemyAttackController，嘗試添加一個
+        if (attackController == null)
         {
-            visualizer.SetStateMachine(stateMachine);
+            attackController = gameObject.AddComponent<EnemyAttackController>();
+            attackController.SetAttackCooldown(attackCooldown);
+        }
+
+        // 狀態機已在 Awake 中初始化，這裡只需設定組件關聯
+        // 設定組件關聯
+        if (enemyVisualizer != null && enemyStateMachineInstance != null)
+        {
+            enemyVisualizer.SetStateMachine(enemyStateMachineInstance);
         }
 
         // 監聽狀態變更事件
-        if (stateMachine != null)
+        if (enemyStateMachineInstance != null)
         {
-            stateMachine.OnStateChanged += OnStateChanged;
+            enemyStateMachineInstance.OnStateChanged += OnStateChanged;
         }
 
         // 初始化快取數據
         cachedPosition = transform.position;
 
         // 驗證必要組件
-        ValidateComponents();
+        ValidateEnemyComponents();
+    }
+    
+    /// <summary>
+    /// 初始化實體（實現基類抽象方法）
+    /// </summary>
+    protected override void InitializeEntity()
+    {
+        // 基礎初始化已完成（在 Awake 中）
+        // 這裡只需要標記為已初始化
+        // 實際的目標設定和位置設定由 Initialize(Transform) 方法處理
     }
 
-    private void ValidateComponents()
+    /// <summary>
+    /// 驗證 Enemy 特有組件
+    /// </summary>
+    private void ValidateEnemyComponents()
     {
-        if (movement == null)
+        if (enemyMovement == null)
             Debug.LogError($"{gameObject.name}: Missing EnemyMovement component!");
 
-        if (detection == null)
+        if (enemyDetection == null)
             Debug.LogError($"{gameObject.name}: Missing EnemyDetection component!");
 
-        if (visualizer == null)
+        if (enemyVisualizer == null)
             Debug.LogWarning($"{gameObject.name}: Missing EnemyVisualizer component!");
 
-        if (weaponHolder == null)
-            Debug.LogWarning($"{gameObject.name}: Missing WeaponHolder component!");
+        if (enemyStateMachine == null)
+            Debug.LogError($"{gameObject.name}: Failed to initialize EnemyStateMachine!");
     }
 
     private void UpdateCachedData()
@@ -179,10 +247,10 @@ public class Enemy : MonoBehaviour
             cachedPosition = transform.position;
 
             // 只在需要時更新偵測資訊
-            if (detection != null && !IsDead)
+            if (enemyDetection != null && !IsDead)
             {
-                cachedCanSeePlayer = detection.CanSeePlayer();
-                cachedDirectionToPlayer = detection.GetDirectionToTarget();
+                cachedCanSeePlayer = enemyDetection.CanSeePlayer();
+                cachedDirectionToPlayer = enemyDetection.GetDirectionToTarget();
             }
 
             cacheUpdateTime = Time.time;
@@ -198,9 +266,15 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public void Initialize(Transform playerTarget)
     {
-        if (detection != null)
+        // 初始化生命值
+        currentHealth = maxHealth;
+        
+        // 觸發血量變化事件，初始化 Visualizer 的顏色
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+
+        if (enemyDetection != null)
         {
-            detection.SetTarget(playerTarget);
+            enemyDetection.SetTarget(playerTarget);
         }
 
         // 初始化patrol locations
@@ -213,9 +287,9 @@ public class Enemy : MonoBehaviour
             cachedPosition = patrolLocations[0];
         }
 
-        if (stateMachine != null)
+        if (enemyStateMachine != null)
         {
-            stateMachine.ChangeState(EnemyState.Patrol);
+            enemyStateMachine.ChangeState(EnemyState.Patrol);
         }
 
         isInitialized = true;
@@ -231,25 +305,66 @@ public class Enemy : MonoBehaviour
     }
 
     /// <summary>
-    /// 敵人死亡
+    /// 敵人受到傷害
     /// </summary>
-    public void Die()
+    /// <param name="damage">傷害值</param>
+    /// <param name="source">傷害來源</param>
+    public void TakeDamage(int damage, string source = "")
     {
         if (IsDead) return;
 
-        stateMachine?.ChangeState(EnemyState.Dead);
-        movement?.StopMovement();
+        // 扣除生命值
+        currentHealth -= damage;
+        currentHealth = Mathf.Max(0, currentHealth);
+
+        if (!string.IsNullOrEmpty(source))
+        {
+            Debug.Log($"敵人 {gameObject.name} 受到 {damage} 點傷害 (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
+        }
+        
+        // 觸發血量變化事件
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+
+        // 生命值歸零時死亡
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    /// <summary>
+    /// 敵人死亡（覆寫基類方法）
+    /// </summary>
+    public override void Die()
+    {
+        if (IsDead) return;
+
+        enemyStateMachine?.ChangeState(EnemyState.Dead);
+        movement?.StopMovement(); // 基類方法，使用基類欄位
 
         // 通知外部
         OnEnemyDied?.Invoke(this);
+        Debug.LogError($"{gameObject.name}: Dropping all items1");
+        DropAllItems();
+    }
+    
+    /// <summary>
+    /// 死亡處理（覆寫基類方法）
+    /// </summary>
+    protected override void OnDeath()
+    {
+        
+        
+        // Enemy 特定的死亡邏輯已在 Die() 中處理
+        // 基類的 Die() 已經處理了停止移動，這裡可以添加其他清理邏輯
     }
 
     /// <summary>
     /// 設定巡邏點
     /// </summary>
-    public void SetPatrolPoints(Transform[] points)
+        public void SetPatrolPoints(Transform[] points)
     {
-        movement?.SetPatrolPoints(points);
+        enemyMovement?.SetPatrolPoints(points);
     }
 
     /// <summary>
@@ -261,7 +376,7 @@ public class Enemy : MonoBehaviour
         currentPatrolIndex = 0;
         
         // 更新movement組件的patrol points
-        if (movement != null && locations != null && locations.Length > 0)
+        if (enemyMovement != null && locations != null && locations.Length > 0)
         {
             Transform[] patrolTransforms = new Transform[locations.Length];
             for (int i = 0; i < locations.Length; i++)
@@ -270,7 +385,7 @@ public class Enemy : MonoBehaviour
                 patrolPoint.transform.position = locations[i];
                 patrolTransforms[i] = patrolPoint.transform;
             }
-            movement.SetPatrolPoints(patrolTransforms);
+            enemyMovement.SetPatrolPoints(patrolTransforms);
         }
     }
 
@@ -316,31 +431,12 @@ public class Enemy : MonoBehaviour
     }
 
     /// <summary>
-    /// 嘗試攻擊玩家 - 完全由 WeaponHolder 處理攻擊邏輯
+    /// 嘗試攻擊玩家 - 完全由 ItemHolder 處理攻擊邏輯
     /// </summary>
     public bool TryAttackPlayer(Transform playerTransform)
     {
-        if (weaponHolder == null || playerTransform == null) return false;
-
-        // 檢查攻擊冷卻時間
-        if (Time.time - lastAttackTime < attackCooldown) return false;
-
-        // 更新武器朝向玩家
-        Vector2 directionToPlayer = (playerTransform.position - transform.position).normalized;
-        weaponHolder.UpdateWeaponDirection(directionToPlayer);
-
-        // 檢查武器是否可以攻擊（包含距離檢查等）
-        if (!weaponHolder.CanAttack()) return false;
-
-        // 嘗試攻擊 - 讓 WeaponHolder 處理所有攻擊邏輯
-        bool attackSucceeded = weaponHolder.TryAttack(gameObject);
-
-        if (attackSucceeded)
-        {
-            lastAttackTime = Time.time;
-        }
-
-        return attackSucceeded;
+        if (attackController == null) return false;
+        return attackController.TryAttackPlayer(playerTransform);
     }
 
     /// <summary>
@@ -348,11 +444,11 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public void SetFovMultiplier(float multiplier)
     {
-        if (detection != null)
+        if (enemyDetection != null)
         {
             // 這裡需要根據EnemyDetection的實際API來調整
             // 假設有SetViewRange方法
-            // detection.SetViewRange(detection.ViewRange * multiplier);
+            // enemyDetection.SetViewRange(enemyDetection.ViewRange * multiplier);
             Debug.Log($"{gameObject.name}: FOV倍數設定為 {multiplier}");
         }
     }
@@ -362,11 +458,11 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public void SetSpeedMultiplier(float multiplier)
     {
-        if (movement != null)
+        if (enemyMovement != null)
         {
             // 這裡需要根據EnemyMovement的實際API來調整
             // 假設有SetSpeed方法
-            // movement.SetSpeed(movement.Speed * multiplier);
+            // enemyMovement.SetSpeed(enemyMovement.Speed * multiplier);
             Debug.Log($"{gameObject.name}: 速度倍數設定為 {multiplier}");
         }
     }
@@ -388,13 +484,13 @@ public class Enemy : MonoBehaviour
 
     private void UpdateAI()
     {
-        if (stateMachine == null || detection == null || movement == null) return;
+        if (enemyStateMachine == null || enemyDetection == null || enemyMovement == null) return;
 
         // 更新計時器
-        stateMachine.UpdateAlertTimer();
+        enemyStateMachine.UpdateAlertTimer();
 
         // 根據當前狀態執行對應邏輯
-        switch (stateMachine.CurrentState)
+        switch (enemyStateMachine.CurrentState)
         {
             case EnemyState.Patrol:
                 HandlePatrolState();
@@ -408,6 +504,10 @@ public class Enemy : MonoBehaviour
                 HandleChaseState();
                 break;
 
+            case EnemyState.Search:
+                HandleSearchState();
+                break;
+
             case EnemyState.Return:
                 HandleReturnState();
                 break;
@@ -418,24 +518,44 @@ public class Enemy : MonoBehaviour
     {
         if (cachedCanSeePlayer)
         {
-            stateMachine.ChangeState(EnemyState.Alert);
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Alert);
+            }
             return;
         }
 
         // 沿著locations移動
-        if (patrolLocations != null && patrolLocations.Length > 0)
+        if (enemyMovement != null)
         {
-            movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
-            
-            // 檢查是否到達當前location
-            if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+            if (patrolLocations != null && patrolLocations.Length > 0)
             {
-                currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                enemyMovement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+                
+                // 更新視野方向跟隨移動方向
+                Vector2 movementDirection = enemyMovement.GetMovementDirection();
+                if (movementDirection.magnitude > 0.1f && enemyDetection != null)
+                {
+                    enemyDetection.SetViewDirection(movementDirection);
+                }
+                
+                // 檢查是否到達當前location
+                if (enemyMovement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+                {
+                    currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                }
             }
-        }
-        else
-        {
-            movement.PerformPatrol();
+            else
+            {
+                enemyMovement.PerformPatrol();
+                
+                // 更新視野方向跟隨移動方向
+                Vector2 movementDirection = enemyMovement.GetMovementDirection();
+                if (movementDirection.magnitude > 0.1f && enemyDetection != null)
+                {
+                    enemyDetection.SetViewDirection(movementDirection);
+                }
+            }
         }
     }
 
@@ -443,53 +563,106 @@ public class Enemy : MonoBehaviour
     {
         if (cachedCanSeePlayer)
         {
-            stateMachine.ChangeState(EnemyState.Chase);
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Chase);
+            }
         }
-        else if (stateMachine.IsAlertTimeUp())
+        else if (enemyStateMachine != null && enemyStateMachine.IsAlertTimeUp())
         {
-            stateMachine.ChangeState(EnemyState.Patrol);
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Patrol);
+            }
         }
         else
         {
             // 在Alert狀態時也沿著locations移動
-            if (patrolLocations != null && patrolLocations.Length > 0)
+            if (enemyMovement != null)
             {
-                movement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
-                
-                // 檢查是否到達當前location
-                if (movement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+                if (patrolLocations != null && patrolLocations.Length > 0)
                 {
-                    currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                    enemyMovement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+                    
+                    // 更新視野方向跟隨移動方向
+                    Vector2 movementDirection = enemyMovement.GetMovementDirection();
+                    if (movementDirection.magnitude > 0.1f && enemyDetection != null)
+                    {
+                        enemyDetection.SetViewDirection(movementDirection);
+                    }
+                    
+                    // 檢查是否到達當前location
+                    if (enemyMovement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+                    {
+                        currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                    }
                 }
-            }
-            else
-            {
-                movement.StopMovement();
+                else
+                {
+                    enemyMovement.StopMovement();
+                }
             }
         }
     }
 
     private void HandleChaseState()
     {
-        if (detection.IsTargetOutOfChaseRange())
+        if (enemyDetection != null && enemyDetection.IsTargetOutOfChaseRange())
         {
-            stateMachine.ChangeState(EnemyState.Return);
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Return);
+            }
+            return;
+        }
+
+        // 檢查是否撞牆或卡住，如果是則轉到搜索狀態
+        if (enemyMovement != null && enemyMovement.IsStuckOrHittingWall())
+        {
+            Debug.Log($"{gameObject.name}: 追擊時撞牆，轉到搜索狀態");
+            hasReachedSearchLocation = false; // 重置到達標記
+
+            hasLastSeenPosition = true;
+            lastSeenTime = Time.time;
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Search);
+            }
             return;
         }
 
         if (cachedCanSeePlayer)
         {
+            // 記錄玩家位置
+            Transform target = enemyDetection.GetTarget();
+            if (target != null)
+            {
+                lastSeenPlayerPosition = target.position;
+                hasLastSeenPosition = true;
+                lastSeenTime = Time.time;
+            }
+
             Vector2 targetPos = cachedPosition + cachedDirectionToPlayer;
-            movement.ChaseTarget(targetPos);
+            
+            // 在追擊時，敵人朝向玩家方向
+            if (movement != null)
+            {
+                enemyMovement.ChaseTarget(targetPos);
+            }
+            
+            // 設定敵人朝向玩家
+            if (enemyDetection != null)
+            {
+                enemyDetection.SetViewDirection(cachedDirectionToPlayer);
+            }
 
             // 更新武器朝向玩家
-            if (weaponHolder != null)
+            if (itemHolder != null)
             {
-                weaponHolder.UpdateWeaponDirection(cachedDirectionToPlayer);
+                itemHolder.UpdateWeaponDirection(cachedDirectionToPlayer);
             }
 
             // 檢查是否在攻擊偵測範圍內，然後嘗試攻擊
-            Transform target = detection.GetTarget();
             if (target != null)
             {
                 float distanceToTarget = Vector2.Distance(cachedPosition, target.position);
@@ -501,7 +674,110 @@ public class Enemy : MonoBehaviour
         }
         else
         {
-            stateMachine.ChangeState(EnemyState.Alert);
+            // 沒看到玩家，如果有最後看到的位置，轉到搜索狀態
+            if (hasLastSeenPosition)
+            {
+                hasReachedSearchLocation = false; // 重置到達標記
+                if (stateMachine != null)
+                {
+                    enemyStateMachine.ChangeState(EnemyState.Search);
+                }
+            }
+            else
+            {
+                if (enemyStateMachine != null)
+                {
+                    enemyStateMachine.ChangeState(EnemyState.Alert);
+                }
+            }
+        }
+    }
+
+    private void HandleSearchState()
+    {
+        // 檢查是否超出追擊範圍
+        if (enemyDetection != null && enemyDetection.IsTargetOutOfChaseRange())
+        {
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Return);
+            }
+            return;
+        }
+
+        // 如果重新看到玩家，更新最後看到的位置並重新計算路徑
+        if (cachedCanSeePlayer)
+        {
+            Transform target = enemyDetection != null ? enemyDetection.GetTarget() : null;
+            if (target != null)
+            {
+                // 更新最後看到的位置
+                lastSeenPlayerPosition = target.position;
+                hasLastSeenPosition = true;
+                lastSeenTime = Time.time;
+                
+                // 清除路徑，強制重新計算到新位置的路徑
+                if (movement != null)
+                {
+                    enemyMovement.ClearPath();
+                }
+                
+                Debug.Log($"{gameObject.name}: 搜索時看到玩家，更新目標位置到 {lastSeenPlayerPosition}");
+            }
+        }
+
+        // 檢查是否還有最後看到的位置
+        if (!hasLastSeenPosition)
+        {
+            Debug.Log($"{gameObject.name}: 沒有最後看到玩家的位置，轉到警戒狀態");
+            if (enemyStateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Alert);
+            }
+            return;
+        }
+
+        // 移動到最後看到玩家的位置，朝向跟隨路徑方向
+        if (movement != null)
+        {
+            enemyMovement.ChaseTargetWithRotation(lastSeenPlayerPosition, enemyDetection);
+        }
+
+        // 檢查是否到達最後看到的位置
+        if (Vector2.Distance(cachedPosition, lastSeenPlayerPosition) < 1f)
+        {
+            if (!hasReachedSearchLocation)
+            {
+                // 剛到達搜索位置，標記已到達
+                hasReachedSearchLocation = true;
+                Debug.Log($"{gameObject.name}: 已到達搜索位置，開始搜索玩家");
+            }
+        }
+
+        // 只有在到達搜索位置後才能進行狀態轉換
+        if (hasReachedSearchLocation)
+        {
+            // 檢查搜索時間是否過期
+            if (Time.time - lastSeenTime > searchTime)
+            {
+                hasLastSeenPosition = false;
+                hasReachedSearchLocation = false;
+                if (stateMachine != null)
+                {
+                    enemyStateMachine.ChangeState(EnemyState.Alert);
+                }
+                return;
+            }
+
+            // 如果重新看到玩家，轉到追擊狀態
+            if (cachedCanSeePlayer)
+            {
+                if (stateMachine != null)
+                {
+                    enemyStateMachine.ChangeState(EnemyState.Chase);
+                }
+                return;
+            }
         }
     }
 
@@ -514,18 +790,28 @@ public class Enemy : MonoBehaviour
         {
             returnTarget = patrolLocations[0];
         }
+        else if (movement != null)
+        {
+            returnTarget = enemyMovement.GetReturnTarget();
+        }
         else
         {
-            returnTarget = movement.GetReturnTarget();
+            returnTarget = cachedPosition; // 如果沒有movement組件，保持在原地
         }
         
-        movement.MoveTowards(returnTarget, 1f);
+        if (enemyMovement != null)
+        {
+            enemyMovement.MoveTowards(returnTarget, 1f);
+        }
 
-        if (movement.HasArrivedAt(returnTarget))
+        if (enemyMovement != null && enemyMovement.HasArrivedAt(returnTarget))
         {
             // 重置patrol index到第一個location
             currentPatrolIndex = 0;
-            stateMachine.ChangeState(EnemyState.Patrol);
+            if (stateMachine != null)
+            {
+                enemyStateMachine.ChangeState(EnemyState.Patrol);
+            }
         }
     }
 
@@ -549,6 +835,10 @@ public class Enemy : MonoBehaviour
             case EnemyState.Chase:
                 // 可以在此處播放追擊音效或動畫
                 break;
+
+            case EnemyState.Search:
+                // 可以在此處播放搜索音效或動畫
+                break;
         }
 
         // 降低日誌頻率
@@ -568,11 +858,15 @@ public class Enemy : MonoBehaviour
 
     #region 清理
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
-        if (stateMachine != null)
+        // 調用基類的 OnDestroy 進行基礎清理
+        base.OnDestroy();
+        
+        // 處理 Enemy 特定的清理邏輯
+        if (enemyStateMachineInstance != null)
         {
-            stateMachine.OnStateChanged -= OnStateChanged;
+            enemyStateMachineInstance.OnStateChanged -= OnStateChanged;
         }
     }
 
@@ -587,10 +881,25 @@ public class Enemy : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, attackDetectionRange);
 
         // 如果有武器，顯示武器的實際攻擊範圍
-        if (weaponHolder != null && weaponHolder.CurrentWeapon != null)
+        if (itemHolder != null && itemHolder.CurrentWeapon != null)
         {
             Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(transform.position, weaponHolder.CurrentWeapon.AttackRange);
+            float range = 0f;
+            
+            // 根據武器類型取得攻擊範圍
+            if (itemHolder.CurrentWeapon is MeleeWeapon meleeWeapon)
+            {
+                range = meleeWeapon.AttackRange;
+            }
+            else if (itemHolder.CurrentWeapon is RangedWeapon rangedWeapon)
+            {
+                range = rangedWeapon.AttackRange;
+            }
+            
+            if (range > 0f)
+            {
+                Gizmos.DrawWireSphere(transform.position, range);
+            }
         }
 
         // 顯示patrol locations

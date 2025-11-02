@@ -1,15 +1,10 @@
 using UnityEngine;
 
-public class Knife : Weapon
+/// <summary>
+/// 刀子 - 近戰武器
+/// </summary>
+public class Knife : MeleeWeapon
 {
-    protected override void Awake()
-    {
-        base.Awake(); // 調用父類的Awake方法來初始化耐久度
-        attackRange = 1.2f;
-        attackCooldown = 0.3f;
-        maxDurability = 50; // 小刀耐久度較低
-        durabilityLossPerAttack = 2; // 每次攻擊減少2點耐久度
-    }
 
     protected override void PerformAttack(Vector2 origin, GameObject attacker)
     {
@@ -25,15 +20,22 @@ public class Knife : Weapon
             var enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
             {
-                enemy.Die(); // 或 enemy.TakeDamage(...)
+                Debug.Log($"[Knife] Hit enemy: {enemy.gameObject.name} for {attackDamage} damage");
+                enemy.TakeDamage(attackDamage, "Player Knife");
                 continue;
             }
 
-            var player = hit.GetComponent<PlayerController>();
+            var player = hit.GetComponent<Player>();
             if (player != null)
             {
-                // 若 attacker 是玩家，可能是玩家互打或 friendly fire
-                // 處理玩家受擊邏輯
+                // 檢查攻擊者是否是敵人
+                var enemyAttacker = attacker.GetComponent<Enemy>();
+                if (enemyAttacker != null)
+                {
+                    Debug.Log($"[Knife] Enemy {enemyAttacker.gameObject.name} attacked player for {attackDamage} damage");
+                    player.TakeDamage(attackDamage, "Enemy Knife");
+                }
+                continue;
             }
         }
     }

@@ -4,7 +4,7 @@ using TMPro;
 
 /// <summary>
 /// 武器耐久度UI顯示器
-/// 可以訂閱WeaponHolder的耐久度事件來顯示武器耐久度
+/// 可以訂閱ItemHolder的耐久度事件來顯示武器耐久度
 /// </summary>
 public class WeaponDurabilityUI : MonoBehaviour
 {
@@ -20,44 +20,64 @@ public class WeaponDurabilityUI : MonoBehaviour
     [SerializeField] private float lowDurabilityThreshold = 0.3f;
     [SerializeField] private float mediumDurabilityThreshold = 0.6f;
     
-    [Header("Target Weapon Holder")]
-    [SerializeField] private WeaponHolder weaponHolder;
+    [Header("Target Item Holder")]
+    [SerializeField] private ItemHolder itemHolder;
     
     private void Start()
     {
-        // 如果沒有指定weaponHolder，嘗試從父物件或場景中找到
-        if (weaponHolder == null)
+        // 如果沒有指定itemHolder，嘗試從父物件或場景中找到
+        if (itemHolder == null)
         {
-            weaponHolder = GetComponentInParent<WeaponHolder>();
-            if (weaponHolder == null)
+            itemHolder = GetComponentInParent<ItemHolder>();
+            if (itemHolder == null)
             {
-                weaponHolder = FindFirstObjectByType<WeaponHolder>();
+                itemHolder = FindFirstObjectByType<ItemHolder>();
             }
         }
         
-        // 訂閱耐久度事件
-        if (weaponHolder != null)
+        // 訂閱耐久度事件（僅當當前物品是武器時）
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged += OnDurabilityChanged;
-            weaponHolder.OnWeaponBroken += OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged += OnDurabilityChanged;
+            itemHolder.OnWeaponBroken += OnWeaponBroken;
+            itemHolder.OnItemChanged += OnItemChanged;
             
             // 初始化顯示
-            var durabilityInfo = weaponHolder.GetWeaponDurabilityInfo();
+            var durabilityInfo = itemHolder.GetWeaponDurabilityInfo();
             UpdateDurabilityDisplay(durabilityInfo.current, durabilityInfo.max);
         }
         else
         {
-            Debug.LogWarning("WeaponDurabilityUI: 找不到WeaponHolder組件！");
+            Debug.LogWarning("WeaponDurabilityUI: 找不到ItemHolder組件！");
         }
     }
     
     private void OnDestroy()
     {
         // 取消訂閱事件
-        if (weaponHolder != null)
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged -= OnDurabilityChanged;
-            weaponHolder.OnWeaponBroken -= OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged -= OnDurabilityChanged;
+            itemHolder.OnWeaponBroken -= OnWeaponBroken;
+            itemHolder.OnItemChanged -= OnItemChanged;
+        }
+    }
+    
+    /// <summary>
+    /// 處理物品切換事件
+    /// </summary>
+    private void OnItemChanged(Item item)
+    {
+        // 如果切換到武器，更新顯示
+        if (itemHolder != null && itemHolder.IsCurrentItemWeapon)
+        {
+            var durabilityInfo = itemHolder.GetWeaponDurabilityInfo();
+            UpdateDurabilityDisplay(durabilityInfo.current, durabilityInfo.max);
+        }
+        else
+        {
+            // 不是武器，隱藏UI
+            UpdateDurabilityDisplay(0, 0);
         }
     }
     
@@ -134,28 +154,38 @@ public class WeaponDurabilityUI : MonoBehaviour
     }
     
     /// <summary>
-    /// 設定目標WeaponHolder
+    /// 設定目標ItemHolder
     /// </summary>
-    public void SetWeaponHolder(WeaponHolder holder)
+    public void SetItemHolder(ItemHolder holder)
     {
         // 取消訂閱舊的holder
-        if (weaponHolder != null)
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged -= OnDurabilityChanged;
-            weaponHolder.OnWeaponBroken -= OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged -= OnDurabilityChanged;
+            itemHolder.OnWeaponBroken -= OnWeaponBroken;
+            itemHolder.OnItemChanged -= OnItemChanged;
         }
         
-        weaponHolder = holder;
+        itemHolder = holder;
         
         // 訂閱新的holder
-        if (weaponHolder != null)
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged += OnDurabilityChanged;
-            weaponHolder.OnWeaponBroken += OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged += OnDurabilityChanged;
+            itemHolder.OnWeaponBroken += OnWeaponBroken;
+            itemHolder.OnItemChanged += OnItemChanged;
             
             // 更新顯示
-            var durabilityInfo = weaponHolder.GetWeaponDurabilityInfo();
+            var durabilityInfo = itemHolder.GetWeaponDurabilityInfo();
             UpdateDurabilityDisplay(durabilityInfo.current, durabilityInfo.max);
         }
+    }
+    
+    /// <summary>
+    /// 設定目標WeaponHolder（向後兼容方法）
+    /// </summary>
+    public void SetWeaponHolder(ItemHolder holder)
+    {
+        SetItemHolder(holder);
     }
 }

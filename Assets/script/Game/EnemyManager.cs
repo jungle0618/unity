@@ -2,6 +2,9 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 /// <summary>
 /// EnemyManager 類別：專注於敵人的整體管理 (優化版本)
 /// 職責：生成、回收、效能優化、全域控制
@@ -12,8 +15,12 @@ public class EnemyManager : MonoBehaviour
     [Header("敵人設定")]
     [SerializeField] private GameObject enemyPrefab;
     [SerializeField] private Transform player;
-    [SerializeField] private int maxActiveEnemies = 15; // 最大數量
-    [SerializeField] private int poolSize = 30; // 最大 pool 大小
+    [SerializeField] private int maxActiveEnemies = 36; // 最大數量 - 設定為所有敵人數量
+    [SerializeField] private int poolSize = 50; // 最大 pool 大小 - 增加以容納所有敵人
+
+    [Header("敵人武器設定")]
+    [SerializeField] private GameObject[] enemyWeaponPrefabs; // 敵人可用的武器 Prefabs
+    [SerializeField] private bool autoEquipWeapons = false; // 是否自動為敵人裝備武器
 
     [Header("Patrol Data 設定")]
     [SerializeField] private TextAsset patrolDataFile;
@@ -27,6 +34,10 @@ public class EnemyManager : MonoBehaviour
 
     [Header("除錯資訊")]
     [SerializeField] private bool showDebugInfo = false;
+
+    [Header("玩家偵測整合")]
+    [SerializeField] private bool enablePlayerDetection = true; // 啟用玩家偵測系統
+    [SerializeField] private bool autoRegisterWithPlayerDetection = true; // 自動註冊到玩家偵測系統
 
     // 敵人管理 - 使用 HashSet 提升查找效率
     private Queue<Enemy> enemyPool = new Queue<Enemy>();
@@ -57,12 +68,18 @@ public class EnemyManager : MonoBehaviour
     public int DeadEnemyCount => deadEnemies.Count;
     public int TotalEnemyCount => ActiveEnemyCount + PooledEnemyCount + culledEnemies.Count + DeadEnemyCount;
 
+    // 玩家偵測系統引用
+    private PlayerDetection playerDetection;
+
     #region Unity 生命週期
 
     private void Start()
     {
         // 載入patrol data
         LoadPatrolData();
+        
+        // 初始化玩家偵測系統
+        InitializePlayerDetection();
         
         InitializeManager();
     }
@@ -151,8 +168,8 @@ public class EnemyManager : MonoBehaviour
                 
                 // 顯示編號
 #if UNITY_EDITOR
-                UnityEditor.Handles.color = Color.white;
-                UnityEditor.Handles.Label(pos + Vector3.up * 0.8f, $"E{enemyIndex + 1}P{i + 1}");
+                Handles.color = Color.white;
+                Handles.Label(pos + Vector3.up * 0.8f, $"E{enemyIndex + 1}P{i + 1}");
 #endif
             }
         }
@@ -212,24 +229,30 @@ public class EnemyManager : MonoBehaviour
             }
             
             // 轉換為陣列格式，移除空的patrol points
-            int maxEnemyIndex = enemyPatrolDict.Keys.Count > 0 ? enemyPatrolDict.Keys.Max() : -1;
-            for (int i = 0; i <= maxEnemyIndex; i++)
+            // 按照敵人索引順序排列，確保索引連續性
+            var sortedEnemyIndices = enemyPatrolDict.Keys.OrderBy(x => x).ToList();
+            
+            for (int i = 0; i < sortedEnemyIndices.Count; i++)
             {
-                if (enemyPatrolDict.ContainsKey(i))
+                int enemyIndex = sortedEnemyIndices[i];
+                if (enemyPatrolDict.ContainsKey(enemyIndex))
                 {
                     // 移除Vector3.zero的patrol points
-                    List<Vector3> validPatrolPoints = enemyPatrolDict[i].Where(p => p != Vector3.zero).ToList();
-                    enemyPatrolData.Add(validPatrolPoints.ToArray());
-                }
-                else
-                {
-                    // 如果某個敵人沒有patrol data，創建預設的
-                    Vector3[] defaultPatrol = new Vector3[3];
-                    for (int j = 0; j < 3; j++)
+                    List<Vector3> validPatrolPoints = enemyPatrolDict[enemyIndex].Where(p => p != Vector3.zero).ToList();
+                    if (validPatrolPoints.Count > 0)
                     {
-                        defaultPatrol[j] = new Vector3(i * 10f + j * 3f, 0f, 0f);
+                        enemyPatrolData.Add(validPatrolPoints.ToArray());
+                        Debug.Log($"EnemyManager: Loaded {validPatrolPoints.Count} patrol points for enemy {enemyIndex}");
                     }
-                    enemyPatrolData.Add(defaultPatrol);
+                    else
+                    {
+                        // 如果沒有有效的patrol points，創建預設的
+                        Vector3[] defaultPatrol = new Vector3[2];
+                        defaultPatrol[0] = new Vector3(enemyIndex * 10f, 0f, 0f);
+                        defaultPatrol[1] = new Vector3(enemyIndex * 10f + 5f, 0f, 0f);
+                        enemyPatrolData.Add(defaultPatrol);
+                        Debug.LogWarning($"EnemyManager: No valid patrol points for enemy {enemyIndex}, created default patrol");
+                    }
                 }
             }
             
@@ -291,6 +314,28 @@ public class EnemyManager : MonoBehaviour
     {
         return enemyPatrolData.Count;
     }
+    
+    /// <summary>
+    /// 獲取所有敵人的生成點資訊（用於除錯）
+    /// </summary>
+    public void LogAllEnemySpawnPoints()
+    {
+        Debug.Log("=== 所有敵人生成點資訊 ===");
+        for (int i = 0; i < enemyPatrolData.Count; i++)
+        {
+            Vector3[] patrolPoints = GetEnemyPatrolPoints(i);
+            if (patrolPoints != null && patrolPoints.Length > 0)
+            {
+                string patrolInfo = string.Join(" -> ", patrolPoints.Select(p => $"({p.x:F1},{p.y:F1})"));
+                Debug.Log($"敵人 {i}: 生成點 {patrolPoints[0]} | 巡邏路線: {patrolInfo}");
+            }
+            else
+            {
+                Debug.LogWarning($"敵人 {i}: 沒有有效的巡邏點");
+            }
+        }
+        Debug.Log($"總共 {enemyPatrolData.Count} 個敵人");
+    }
 
     #endregion
 
@@ -303,6 +348,18 @@ public class EnemyManager : MonoBehaviour
         SubscribeToPlayerEvents();
         StartManagement();
 
+        // 延遲生成初始敵人，確保池初始化完成
+        StartCoroutine(DelayedSpawnInitialEnemies());
+    }
+    
+    /// <summary>
+    /// 延遲生成初始敵人（確保池初始化完成）
+    /// </summary>
+    private IEnumerator DelayedSpawnInitialEnemies()
+    {
+        // 等待池初始化完成（至少 0.2 秒，確保所有敵人 Awake/Start 都執行完）
+        yield return new WaitForSeconds(0.2f);
+        
         SpawnInitialEnemies();
     }
 
@@ -326,6 +383,15 @@ public class EnemyManager : MonoBehaviour
             }
         }
 
+        // 檢查敵人 prefab 是否有必要的組件
+        Enemy enemyComponent = enemyPrefab.GetComponent<Enemy>();
+        if (enemyComponent == null)
+        {
+            Debug.LogError("EnemyManager: Enemy prefab missing Enemy component!");
+            enabled = false;
+            return;
+        }
+
         updateWait = new WaitForSeconds(updateInterval);
         aiUpdateWait = new WaitForSeconds(aiUpdateInterval);
         cachedPlayerPosition = player.position;
@@ -333,17 +399,42 @@ public class EnemyManager : MonoBehaviour
 
     private void InitializePool()
     {
+        // 使用協程來分批初始化，避免一次性創建太多物件導致卡頓
+        StartCoroutine(InitializePoolCoroutine());
+    }
+    
+    /// <summary>
+    /// 協程初始化池（分批創建敵人）
+    /// </summary>
+    private IEnumerator InitializePoolCoroutine()
+    {
+        int enemiesCreated = 0;
+        
         for (int i = 0; i < poolSize; i++)
         {
             CreatePooledEnemy();
+            enemiesCreated++;
+            
+            // 每創建 10 個敵人等待一幀，避免卡頓
+            if (enemiesCreated % 10 == 0)
+            {
+                yield return null;
+            }
         }
-
-        Debug.Log($"EnemyManager: Initialized pool with {poolSize} enemies");
+        
+        // 等待所有敵人初始化完成（多等幾幀確保 Awake/Start 都執行完）
+        yield return new WaitForSeconds(0.1f);
+        
+        Debug.Log($"EnemyManager: Initialized pool with {enemyPool.Count} enemies");
     }
 
     private Enemy CreatePooledEnemy()
     {
         GameObject enemyGO = Instantiate(enemyPrefab);
+        
+        // 先啟用以觸發 Awake 和 Start，確保所有組件正確初始化
+        enemyGO.SetActive(true);
+        
         Enemy enemy = enemyGO.GetComponent<Enemy>();
 
         if (enemy == null)
@@ -353,15 +444,29 @@ public class EnemyManager : MonoBehaviour
             return null;
         }
 
-        // 除錯設除錯定除錯事除錯件除錯監除錯聽除錯
+        // 設定事件監聽（需要在 Awake 之後，因為 Awake 中會初始化組件）
         enemy.OnEnemyDied += HandleEnemyDied;
 
-
-        // 除錯暫除錯時除錯停除錯用除錯
-        enemyGO.SetActive(false);
+        // 先加入池，然後延遲禁用（確保 GetPooledEnemy 可以立即取到）
         enemyPool.Enqueue(enemy);
+        
+        // 等待一幀確保所有初始化完成（Awake 和 Start 都已執行）後再禁用
+        StartCoroutine(DeactivateAfterFrame(enemyGO));
 
         return enemy;
+    }
+    
+    /// <summary>
+    /// 等待一幀後禁用敵人（用於確保初始化完成）
+    /// </summary>
+    private IEnumerator DeactivateAfterFrame(GameObject enemyGO)
+    {
+        yield return null; // 等待一幀，確保 Awake 和 Start 都執行完畢
+        
+        if (enemyGO != null)
+        {
+            enemyGO.SetActive(false);
+        }
     }
 
 
@@ -380,12 +485,13 @@ public class EnemyManager : MonoBehaviour
         }
 
         Enemy enemy = GetPooledEnemy();
-        if (enemy == null) return;
+        if (enemy == null)
+        {
+            if (showDebugInfo)
+                Debug.LogWarning("EnemyManager: No enemy available in pool!");
+            return;
+        }
 
-        // 設定位置並初始化
-        enemy.transform.position = position;
-        enemy.gameObject.SetActive(true);
-        
         // 分配patrol points
         Vector3[] patrolPoints;
         if (enemyIndex >= 0 && enemyIndex < enemyPatrolData.Count)
@@ -399,14 +505,84 @@ public class EnemyManager : MonoBehaviour
             int randomIndex = Random.Range(0, enemyPatrolData.Count);
             patrolPoints = GetEnemyPatrolPoints(randomIndex);
         }
-        Debug.Log($"EnemyManager: Enemy index: [{string.Join(", ", patrolPoints)}]");
+        
+        if (patrolPoints == null || patrolPoints.Length == 0)
+        {
+            Debug.LogError($"EnemyManager: No valid patrol points for enemy index {enemyIndex}");
+            ReturnEnemyToPool(enemy);
+            return;
+        }
+        
+        // 檢查敵人組件是否已初始化（通過基類的公共屬性檢查）
+        if (enemy.Movement == null || enemy.Detection == null)
+        {
+            Debug.LogError($"EnemyManager: Enemy components not initialized! Movement: {enemy.Movement != null}, Detection: {enemy.Detection != null}");
+            ReturnEnemyToPool(enemy);
+            return;
+        }
+        
+        // 驗證並自動裝備武器（如果需要）
+        if (enemy.ItemHolder != null)
+        {
+            if (enemy.ItemHolder.ItemCount == 0)
+            {
+                if (autoEquipWeapons && enemyWeaponPrefabs != null && enemyWeaponPrefabs.Length > 0)
+                {
+                    // 自動裝備隨機武器
+                    GameObject weaponPrefab = enemyWeaponPrefabs[Random.Range(0, enemyWeaponPrefabs.Length)];
+                    enemy.ItemHolder.EquipFromPrefab(weaponPrefab);
+                    
+                    if (showDebugInfo)
+                    {
+                        Debug.Log($"EnemyManager: 自動為 {enemy.name} 裝備武器 {weaponPrefab.name}");
+                    }
+                }
+                else if (!autoEquipWeapons)
+                {
+                    Debug.LogWarning($"EnemyManager: Enemy {enemy.name} has ItemHolder but no items assigned! 請在 Enemy Prefab 的 ItemHolder 中設定 Item Prefabs，或在 EnemyManager 啟用 Auto Equip Weapons。");
+                }
+            }
+        }
+        
+        // 先設定 patrol locations
         enemy.SetPatrolLocations(patrolPoints);
-        enemy.Initialize(player);
+        
+        // 啟用敵人（會觸發 OnEnable，但不會觸發 Awake/Start，因為它們只在首次創建時執行）
+        enemy.gameObject.SetActive(true);
+        
+        // 初始化敵人（這會將敵人移動到第一個 patrol point）
+        // Enemy.Initialize() 會設定目標、位置和狀態
+        if (enemy != null && enemy.gameObject.activeInHierarchy)
+        {
+            enemy.Initialize(player);
+            
+            if (showDebugInfo)
+            {
+                Debug.Log($"EnemyManager: Initialized enemy at {enemy.transform.position}");
+            }
+        }
+        else
+        {
+            Debug.LogError($"EnemyManager: Failed to initialize enemy - enemy is null or not active!");
+            ReturnEnemyToPool(enemy);
+            return;
+        }
 
         activeEnemies.Add(enemy);
 
         // 設定 AI 更新間隔（錯開更新時間以分散 CPU 負載）
         enemy.SetAIUpdateInterval(aiUpdateInterval + Random.Range(0f, aiUpdateInterval * 0.5f));
+        
+        // 註冊到玩家偵測系統
+        if (enablePlayerDetection && autoRegisterWithPlayerDetection && playerDetection != null)
+        {
+            playerDetection.AddEnemy(enemy);
+        }
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"EnemyManager: Spawned enemy at {enemy.transform.position} with {patrolPoints.Length} patrol points");
+        }
     }
 
     private Enemy GetPooledEnemy()
@@ -444,23 +620,27 @@ public class EnemyManager : MonoBehaviour
             return;
         }
 
-        // 使用預設的spawn位置，並為每個敵人分配對應的patrol points
-        Vector3[] defaultSpawnPositions = {
-            new Vector3(0, 0, 0),
-            new Vector3(5, 0, 0),
-            new Vector3(-5, 0, 0),
-            new Vector3(0, 5, 0),
-            new Vector3(0, -5, 0)
-        };
+        // 生成所有可用的敵人
+        int enemiesToSpawn = Mathf.Min(maxActiveEnemies, enemyPatrolData.Count);
         
-        int enemiesToSpawn = Mathf.Min(maxActiveEnemies, defaultSpawnPositions.Length, enemyPatrolData.Count);
+        Debug.Log($"EnemyManager: Attempting to spawn ALL {enemiesToSpawn} enemies from {enemyPatrolData.Count} available patrol data sets");
 
         for (int i = 0; i < enemiesToSpawn; i++)
         {
-            SpawnEnemy(defaultSpawnPositions[i], i); // 傳入敵人索引
+            // 使用敵人索引 i，敵人會自動移動到對應 patrol data 的第一個位置
+            SpawnEnemy(Vector3.zero, i); // position 參數會被忽略，因為敵人會移動到 patrol point
+            
+            if (showDebugInfo)
+            {
+                Vector3[] patrolPoints = GetEnemyPatrolPoints(i);
+                Debug.Log($"EnemyManager: Spawning enemy {i} at {patrolPoints[0]} with {patrolPoints.Length} patrol points");
+            }
         }
 
-        Debug.Log($"EnemyManager: Spawned {activeEnemies.Count} enemies with patrol data from file");
+        Debug.Log($"EnemyManager: Successfully spawned ALL {activeEnemies.Count} enemies with patrol data from file");
+        
+        // 顯示所有敵人的生成點資訊
+        LogAllEnemySpawnPoints();
     }
 
     #endregion
@@ -586,17 +766,17 @@ public class EnemyManager : MonoBehaviour
     private void SubscribeToPlayerEvents()
     {
         if (player == null) return;
-        var wh = player.GetComponent<WeaponHolder>();
-        if (wh != null)
-            wh.OnAttackPerformed += HandlePlayerAttack;
+        var ih = player.GetComponent<ItemHolder>();
+        if (ih != null)
+            ih.OnAttackPerformed += HandlePlayerAttack;
     }
 
     private void UnsubscribeFromPlayerEvents()
     {
         if (player == null) return;
-        var wh = player.GetComponent<WeaponHolder>();
-        if (wh != null)
-            wh.OnAttackPerformed -= HandlePlayerAttack;
+        var ih = player.GetComponent<ItemHolder>();
+        if (ih != null)
+            ih.OnAttackPerformed -= HandlePlayerAttack;
     }
 
     private void HandlePlayerAttack(Vector2 attackCenter, float attackRange, GameObject attacker)
@@ -643,11 +823,61 @@ public class EnemyManager : MonoBehaviour
         activeEnemies.Remove(deadEnemy);
         culledEnemies.Remove(deadEnemy);
 
+        // 從玩家偵測系統移除
+        if (enablePlayerDetection && playerDetection != null)
+        {
+            playerDetection.RemoveEnemy(deadEnemy);
+        }
+
         // 除錯加除錯入除錯死除錯亡除錯列除錯表除錯（除錯用除錯於除錯統除錯計除錯）除錯
         if (!deadEnemies.Contains(deadEnemy))
         {
             deadEnemies.Add(deadEnemy);
         }
+    }
+
+    #endregion
+
+    #region 敵人視覺化控制（由 PlayerDetection 觸發）
+
+    /// <summary>
+    /// 當敵人可見性改變時調用（由 PlayerDetection 調用）
+    /// 處理敵人及其武器的所有視覺化組件（Renderer, SpriteRenderer, Visualizer）
+    /// </summary>
+    public void OnEnemyVisibilityChanged(Enemy enemy, bool isVisible)
+    {
+        if (enemy == null) return;
+        
+        // 禁用所有 Renderer 組件（包括 SpriteRenderer, MeshRenderer, LineRenderer 等）
+        // 使用 GetComponentsInChildren 包含所有子物件（包括武器）
+        Renderer[] allRenderers = enemy.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in allRenderers)
+        {
+            if (renderer != null)
+            {
+                renderer.enabled = isVisible;
+            }
+        }
+        
+        // 禁用 Visualizer 組件（控制 Gizmos 繪製等視覺化邏輯）
+        BaseVisualizer visualizer = enemy.GetComponent<BaseVisualizer>();
+        if (visualizer != null)
+        {
+            visualizer.enabled = isVisible;
+        }
+        
+        // 根據可見性設定是否可以執行視覺化邏輯（會自動處理武器的 renderer 和視覺化狀態）
+        enemy.SetCanVisualize(isVisible);
+    }
+
+    /// <summary>
+    /// 設定單個敵人是否可以執行視覺化邏輯（只影響 Gizmos 等，不影響 SpriteRenderer）
+    /// </summary>
+    public void SetEnemyVisualization(Enemy enemy, bool canVisualize)
+    {
+        if (enemy == null) return;
+        
+        enemy.SetCanVisualize(canVisualize);
     }
 
     #endregion
@@ -699,19 +929,6 @@ public class EnemyManager : MonoBehaviour
         maxActiveEnemies = Mathf.Max(1, newMax);
     }
 
-    /// <summary>
-    /// 設定所有活躍敵人的FOV倍數
-    /// </summary>
-    public void SetAllEnemiesFovMultiplier(float multiplier)
-    {
-        foreach (var enemy in activeEnemies)
-        {
-            if (enemy != null && !enemy.IsDead)
-            {
-                enemy.SetFovMultiplier(multiplier);
-            }
-        }
-    }
 
     /// <summary>
     /// 設定所有活躍敵人的移動速度倍數
@@ -760,6 +977,127 @@ public class EnemyManager : MonoBehaviour
             Debug.Log($"EnemyManager - Active: {activeEnemies.Count}, Culled: {culledEnemies.Count}, " +
                      $"Dead: {deadEnemies.Count}, Pooled: {enemyPool.Count}");
         }
+    }
+
+    #endregion
+
+    #region 玩家偵測系統整合
+
+    /// <summary>
+    /// 初始化玩家偵測系統
+    /// </summary>
+    private void InitializePlayerDetection()
+    {
+        if (!enablePlayerDetection) return;
+        
+        // 查找玩家偵測組件
+        if (player != null)
+        {
+            playerDetection = player.GetComponent<PlayerDetection>();
+            if (playerDetection == null)
+            {
+                Debug.LogWarning("[EnemyManager] 找不到 PlayerDetection 組件，玩家偵測功能將被停用");
+                enablePlayerDetection = false;
+                return;
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[EnemyManager] 找不到玩家引用，玩家偵測功能將被停用");
+            enablePlayerDetection = false;
+            return;
+        }
+        
+        Debug.Log("[EnemyManager] 玩家偵測系統初始化完成");
+    }
+    
+    /// <summary>
+    /// 設定玩家偵測系統
+    /// </summary>
+    public void SetPlayerDetection(bool enabled, bool autoRegister = true)
+    {
+        enablePlayerDetection = enabled;
+        autoRegisterWithPlayerDetection = autoRegister;
+        
+        if (enabled && playerDetection == null)
+        {
+            InitializePlayerDetection();
+        }
+        
+        Debug.Log($"[EnemyManager] 玩家偵測系統設定 - 啟用: {enabled}, 自動註冊: {autoRegister}");
+    }
+    
+    /// <summary>
+    /// 獲取玩家偵測系統引用
+    /// </summary>
+    public PlayerDetection GetPlayerDetection()
+    {
+        return playerDetection;
+    }
+    
+    /// <summary>
+    /// 強制更新所有敵人的可見性
+    /// </summary>
+    public void ForceUpdateEnemyVisibility()
+    {
+        if (enablePlayerDetection && playerDetection != null)
+        {
+            playerDetection.ForceUpdateAllEnemies();
+        }
+    }
+    
+    /// <summary>
+    /// 獲取可見敵人數量
+    /// </summary>
+    public int GetVisibleEnemyCount()
+    {
+        if (enablePlayerDetection && playerDetection != null)
+        {
+            return playerDetection.VisibleEnemyCount;
+        }
+        return activeEnemies.Count; // 如果沒有偵測系統，返回所有活躍敵人
+    }
+    
+    /// <summary>
+    /// 獲取隱藏敵人數量
+    /// </summary>
+    public int GetHiddenEnemyCount()
+    {
+        if (enablePlayerDetection && playerDetection != null)
+        {
+            return playerDetection.HiddenEnemyCount;
+        }
+        return 0; // 如果沒有偵測系統，沒有隱藏敵人
+    }
+    
+    /// <summary>
+    /// 重新生成所有敵人（用於除錯或重新開始）
+    /// </summary>
+    public void RespawnAllEnemies()
+    {
+        // 清除所有現有敵人
+        KillAllEnemies();
+        
+        // 等待一幀讓死亡事件處理完成
+        StartCoroutine(RespawnAfterDelay());
+    }
+    
+    /// <summary>
+    /// 生成所有敵人（用於手動觸發）
+    /// </summary>
+    public void SpawnAllEnemies()
+    {
+        SpawnInitialEnemies();
+    }
+    
+    private IEnumerator RespawnAfterDelay()
+    {
+        yield return null; // 等待一幀
+        
+        // 重新生成敵人
+        SpawnInitialEnemies();
+        
+        Debug.Log($"EnemyManager: Respawned {activeEnemies.Count} enemies");
     }
 
     #endregion

@@ -15,8 +15,8 @@ public class MainMenuUI : MonoBehaviour
 
     private void OnStartButtonClicked()
     {
-        Debug.Log("[MainMenuUI] Start Button Clicked, loading SampleScene...");
-        SceneLoader.Load(SceneLoader.Scene.SampleScene);
+        Debug.Log("[MainMenuUI] Start Button Clicked, loading GameScene...");
+        SceneLoader.Load(SceneLoader.Scene.GameScene);
     }
 
     private void OnQuitButtonClicked()

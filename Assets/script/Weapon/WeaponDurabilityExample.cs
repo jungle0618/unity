@@ -7,7 +7,7 @@ using UnityEngine;
 public class WeaponDurabilityExample : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private WeaponHolder weaponHolder;
+    [SerializeField] private ItemHolder itemHolder;
     
     [Header("Debug Controls")]
     [SerializeField] private KeyCode repairKey = KeyCode.R;
@@ -18,10 +18,10 @@ public class WeaponDurabilityExample : MonoBehaviour
     private void Start()
     {
         // 訂閱武器耐久度事件
-        if (weaponHolder != null)
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged += OnWeaponDurabilityChanged;
-            weaponHolder.OnWeaponBroken += OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged += OnWeaponDurabilityChanged;
+            itemHolder.OnWeaponBroken += OnWeaponBroken;
         }
     }
     
@@ -43,10 +43,10 @@ public class WeaponDurabilityExample : MonoBehaviour
     private void OnDestroy()
     {
         // 取消訂閱事件
-        if (weaponHolder != null)
+        if (itemHolder != null)
         {
-            weaponHolder.OnWeaponDurabilityChanged -= OnWeaponDurabilityChanged;
-            weaponHolder.OnWeaponBroken -= OnWeaponBroken;
+            itemHolder.OnWeaponDurabilityChanged -= OnWeaponDurabilityChanged;
+            itemHolder.OnWeaponBroken -= OnWeaponBroken;
         }
     }
     
@@ -55,9 +55,9 @@ public class WeaponDurabilityExample : MonoBehaviour
     /// </summary>
     public void RepairWeapon()
     {
-        if (weaponHolder != null)
+        if (itemHolder != null && itemHolder.IsCurrentItemWeapon)
         {
-            weaponHolder.RepairCurrentWeapon(repairAmount);
+            itemHolder.RepairCurrentWeapon(repairAmount);
             Debug.Log($"修復武器 {repairAmount} 點耐久度");
         }
     }
@@ -67,9 +67,9 @@ public class WeaponDurabilityExample : MonoBehaviour
     /// </summary>
     public void DamageWeapon()
     {
-        if (weaponHolder != null && weaponHolder.CurrentWeapon != null)
+        if (itemHolder != null && itemHolder.IsCurrentItemWeapon && itemHolder.CurrentWeapon != null)
         {
-            weaponHolder.CurrentWeapon.ReduceDurability(damageAmount);
+            itemHolder.CurrentWeapon.ReduceDurability(damageAmount);
             Debug.Log($"武器耐久度減少 {damageAmount} 點");
         }
     }
@@ -79,9 +79,9 @@ public class WeaponDurabilityExample : MonoBehaviour
     /// </summary>
     public void FullRepairWeapon()
     {
-        if (weaponHolder != null)
+        if (itemHolder != null && itemHolder.IsCurrentItemWeapon)
         {
-            weaponHolder.FullRepairCurrentWeapon();
+            itemHolder.FullRepairCurrentWeapon();
             Debug.Log("武器已完全修復");
         }
     }
@@ -124,9 +124,9 @@ public class WeaponDurabilityExample : MonoBehaviour
     /// </summary>
     public void LogWeaponDurabilityInfo()
     {
-        if (weaponHolder != null)
+        if (itemHolder != null && itemHolder.IsCurrentItemWeapon)
         {
-            var info = weaponHolder.GetWeaponDurabilityInfo();
+            var info = itemHolder.GetWeaponDurabilityInfo();
             Debug.Log($"武器耐久度信息: 當前={info.current}, 最大={info.max}, 百分比={info.percentage:P0}");
         }
     }

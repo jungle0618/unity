@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 /// <summary>
 /// GameManager - Central game management system
@@ -133,7 +134,7 @@ public class GameManager : MonoBehaviour
             // Clear references since we're in menu (no gameplay managers here)
             ClearGameplayReferences();
         }
-        else if (scene.name == "GameScene" || scene.name == "SampleScene")
+        else if (scene.name == "GameScene")
         {
             // Find references in the game scene
             RefreshSystemReferences();
@@ -160,6 +161,9 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("[GameManager] EnemyManager not found in scene!");
         else
             Debug.Log("[GameManager] EnemyManager found and registered");
+            
+        // 監聽玩家死亡事件
+        SetupPlayerDeathListener();
     }
     
     /// <summary>
@@ -167,9 +171,86 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ClearGameplayReferences()
     {
+        // 取消玩家死亡和勝利事件監聽
+        Player player = FindFirstObjectByType<Player>();
+        if (player != null)
+        {
+            player.OnPlayerDied -= HandlePlayerDeath;
+            player.OnPlayerWon -= HandlePlayerWin;
+        }
+        
         playerManager = null;
         enemyManager = null;
         // Don't clear spawnPointManager if it uses DontDestroyOnLoad
+    }
+    
+    /// <summary>
+    /// 設定玩家死亡事件監聽
+    /// </summary>
+    private void SetupPlayerDeathListener()
+    {
+        // 尋找 Player 並監聽死亡事件
+        Player player = FindFirstObjectByType<Player>();
+        if (player != null)
+        {
+            player.OnPlayerDied += HandlePlayerDeath;
+            player.OnPlayerWon += HandlePlayerWin;
+            Debug.Log("[GameManager] Player death and win listeners registered");
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] Player not found - cannot register listeners");
+        }
+    }
+    
+    /// <summary>
+    /// 處理玩家死亡
+    /// </summary>
+    private void HandlePlayerDeath()
+    {
+        Debug.Log("[GameManager] Player died - ending game and returning to main menu");
+        
+        // 觸發遊戲結束
+        GameOver();
+        
+        // 延遲回到主畫面，讓玩家看到死亡效果
+        StartCoroutine(ReturnToMainMenuAfterDelay(2f));
+    }
+    
+    /// <summary>
+    /// 延遲回到主畫面
+    /// </summary>
+    private System.Collections.IEnumerator ReturnToMainMenuAfterDelay(float delay)
+    {
+        yield return new WaitForSecondsRealtime(delay); // 使用 Realtime 因為遊戲已暫停
+        
+        Debug.Log("[GameManager] Returning to main menu after player death");
+        ReturnToMainMenu();
+    }
+    
+    /// <summary>
+    /// 處理玩家勝利
+    /// </summary>
+    public void HandlePlayerWin()
+    {
+        Debug.Log("[GameManager] Player won! Target eliminated and player returned to spawn point");
+        
+        // 觸發遊戲結束
+        GameOver();
+        
+        // 延遲回到主畫面，讓玩家看到勝利效果
+        StartCoroutine(ReturnToMainMenuAfterWin(3f));
+    }
+    
+    /// <summary>
+    /// 延遲回到主畫面（勝利後）
+    /// </summary>
+    private System.Collections.IEnumerator ReturnToMainMenuAfterWin(float delay)
+    {
+        yield return new WaitForSecondsRealtime(delay);
+        
+        Debug.Log("[GameManager] Returning to main menu after game win");
+        ReturnToMainMenu();
     }
 
     /// <summary>
@@ -310,7 +391,7 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Restarting game...");
         // Set time scale back to normal
         Time.timeScale = 1f;
-        SceneLoader.Load(SceneLoader.Scene.SampleScene);  // Changed from GameScene to SampleScene
+        SceneLoader.Load(SceneLoader.Scene.GameScene);  // 使用正確的場景名稱
     }
 
     /// <summary>
@@ -390,6 +471,26 @@ public class GameManager : MonoBehaviour
         {
             Time.timeScale = timescale;
         }
+    }
+
+    /// <summary>
+    /// 測試玩家死亡流程（僅用於測試）
+    /// </summary>
+    [ContextMenu("Test Player Death")]
+    public void TestPlayerDeath()
+    {
+        Debug.Log("[GameManager] Testing player death flow...");
+        HandlePlayerDeath();
+    }
+    
+    /// <summary>
+    /// 測試玩家勝利流程（僅用於測試）
+    /// </summary>
+    [ContextMenu("Test Player Win")]
+    public void TestPlayerWin()
+    {
+        Debug.Log("[GameManager] Testing player win flow...");
+        HandlePlayerWin();
     }
 
     private void OnDestroy()

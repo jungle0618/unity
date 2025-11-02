@@ -1,23 +1,36 @@
 using System;
 using UnityEngine;
 
-public abstract class Weapon : MonoBehaviour
+/// <summary>
+/// 武器類型
+/// </summary>
+public enum WeaponType
 {
-    [SerializeField] protected float attackRange = 1.5f;
+    Melee,  // 近戰
+    Ranged  // 遠程
+}
+
+/// <summary>
+/// Weapon（武器類別）
+/// 繼承自 Item，是所有武器的基類
+/// </summary>
+public abstract class Weapon : Item
+{
     [SerializeField] protected float attackCooldown = 0.5f;
     [SerializeField] protected int maxDurability = 100;
-    [SerializeField] protected int durabilityLossPerAttack = 1;
+    [SerializeField] protected int attackDamage = 1;
     
     protected float lastAttackTime = -999f;
     protected int currentDurability;
     
-    public float AttackRange => attackRange;
+    public abstract WeaponType Type { get; }
     public int MaxDurability => maxDurability;
     public int CurrentDurability => currentDurability;
     public float DurabilityPercentage => maxDurability > 0 ? (float)currentDurability / maxDurability : 1f;
     public bool IsBroken => currentDurability <= 0;
+    public int AttackDamage => attackDamage;
 
-    public event Action<Vector2, float, GameObject> OnAttackPerformed; // 加上 attacker
+    public event Action<GameObject> OnAttackPerformed; // 攻擊事件
     public event Action<int, int> OnDurabilityChanged; // 當前耐久度, 最大耐久度
     public event Action OnWeaponBroken; // 武器損壞事件
 
@@ -25,8 +38,38 @@ public abstract class Weapon : MonoBehaviour
     {
         currentDurability = maxDurability;
     }
+    
+    /// <summary>
+    /// 裝備武器時調用
+    /// </summary>
+    public override void OnEquip()
+    {
+        base.OnEquip();
+        // 武器裝備時的邏輯
+    }
+    
+    /// <summary>
+    /// 卸下武器時調用
+    /// </summary>
+    public override void OnUnequip()
+    {
+        base.OnUnequip();
+        // 武器卸下時的邏輯
+    }
+    
+    /// <summary>
+    /// 更新武器方向
+    /// </summary>
+    /// <param name="direction">方向向量</param>
+    public override void UpdateDirection(Vector2 direction)
+    {
+        if (direction.sqrMagnitude < 0.01f) return;
+        
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
 
-    public bool CanAttack() => Time.time >= lastAttackTime + attackCooldown && !IsBroken;
+    public virtual bool CanAttack() => Time.time >= lastAttackTime + attackCooldown && !IsBroken;
 
     public bool TryPerformAttack(Vector2 origin, GameObject attacker)
     {
@@ -43,10 +86,10 @@ public abstract class Weapon : MonoBehaviour
         lastAttackTime = Time.time;
         PerformAttack(origin, attacker);
         
-        // 減少耐久度
-        ReduceDurability(durabilityLossPerAttack);
+        // 減少耐久度（統一每次消耗1）
+        ReduceDurability(1);
         
-        OnAttackPerformed?.Invoke(origin, attackRange, attacker);
+        OnAttackPerformed?.Invoke(attacker);
         return true;
     }
 
@@ -66,10 +109,13 @@ public abstract class Weapon : MonoBehaviour
         // 觸發耐久度變化事件
         OnDurabilityChanged?.Invoke(currentDurability, maxDurability);
         
-        // 如果武器損壞，觸發損壞事件
+        // 如果武器損壞，觸發損壞事件並銷毀武器
         if (oldDurability > 0 && currentDurability <= 0)
         {
             OnWeaponBroken?.Invoke();
+            
+            // 延遲銷毀，讓事件處理完成
+            Destroy(gameObject, 0.1f);
         }
     }
 

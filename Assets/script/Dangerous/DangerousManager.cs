@@ -22,6 +22,12 @@ public class DangerousManager : MonoBehaviour
     [SerializeField] private float autoDecreaseInterval = 2f;
     [SerializeField] private int autoDecreaseAmount = 1;
     
+    [Header("距離分段規則 (每秒變化量)")]
+    [SerializeField] private float nearDistanceThreshold = 5f; // 5 格以內
+    [SerializeField] private float midDistanceThreshold = 10f; // 5~10 格
+    [SerializeField] private int nearIncreasePerSecond = 20;   // +20/秒
+    [SerializeField] private int farDecreasePerSecond = 20;    // -20/秒 (10 up)
+    
     // 事件
     public event Action<int, int> OnDangerLevelChanged; // 當前危險指數, 最大危險指數
     public event Action<DangerLevel> OnDangerLevelTypeChanged; // 危險等級變化
@@ -50,6 +56,11 @@ public class DangerousManager : MonoBehaviour
     
     private float lastAutoDecreaseTime;
     
+    // 來自敵人的知覺聚合（本幀）
+    private bool anyEnemySeesPlayer = false;
+    private float minDistanceToPlayer = float.PositiveInfinity;
+    private float dangerFloatAccumulator = 0f; // 用於累積小數部分避免抖動
+    
     private void Awake()
     {
         // 單例模式設定
@@ -76,12 +87,22 @@ public class DangerousManager : MonoBehaviour
     
     private void Update()
     {
-        // 自動減少危險指數
-        if (enableAutoDecrease && Time.time >= lastAutoDecreaseTime + autoDecreaseInterval)
+        // 根據本幀敵人聚合輸入來更新危險係數
+        ApplyAggregatedPerception(Time.deltaTime);
+        
+        // 備用的自動減少（若無任何敵人資訊）
+        if (!anyEnemySeesPlayer && float.IsPositiveInfinity(minDistanceToPlayer))
         {
-            DecreaseDangerLevel(autoDecreaseAmount);
-            lastAutoDecreaseTime = Time.time;
+            if (enableAutoDecrease && Time.time >= lastAutoDecreaseTime + autoDecreaseInterval)
+            {
+                DecreaseDangerLevel(autoDecreaseAmount);
+                lastAutoDecreaseTime = Time.time;
+            }
         }
+        
+        // 重置聚合狀態，供下一幀使用
+        anyEnemySeesPlayer = false;
+        minDistanceToPlayer = float.PositiveInfinity;
     }
     
     /// <summary>
@@ -117,7 +138,7 @@ public class DangerousManager : MonoBehaviour
         // 調試信息
         if (!string.IsNullOrEmpty(source))
         {
-            Debug.Log($"危險指數增加 {amount} 點 (來源: {source})，當前: {currentDangerLevel}/{maxDangerLevel}");
+            //Debug.Log($"危險指數增加 {amount} 點 (來源: {source})，當前: {currentDangerLevel}/{maxDangerLevel}");
         }
     }
     
@@ -154,7 +175,7 @@ public class DangerousManager : MonoBehaviour
         // 調試信息
         if (!string.IsNullOrEmpty(source))
         {
-            Debug.Log($"危險指數減少 {amount} 點 (來源: {source})，當前: {currentDangerLevel}/{maxDangerLevel}");
+            //Debug.Log($"危險指數減少 {amount} 點 (來源: {source})，當前: {currentDangerLevel}/{maxDangerLevel}");
         }
     }
     
@@ -193,7 +214,7 @@ public class DangerousManager : MonoBehaviour
         // 調試信息
         if (!string.IsNullOrEmpty(source))
         {
-            Debug.Log($"危險指數設定為 {currentDangerLevel} (來源: {source})");
+            //Debug.Log($"危險指數設定為 {currentDangerLevel} (來源: {source})");
         }
     }
     
@@ -294,5 +315,83 @@ public class DangerousManager : MonoBehaviour
     {
         autoDecreaseInterval = Mathf.Max(0.1f, interval);
         autoDecreaseAmount = Mathf.Max(1, amount);
+    }
+
+    /// <summary>
+    /// 由敵人偵測回報玩家距離與是否被看見（每幀可呼叫多次，系統會聚合）
+    /// </summary>
+    public void ReportEnemyPerception(float distanceToPlayer, bool canSeePlayer)
+    {
+        if (canSeePlayer)
+        {
+            anyEnemySeesPlayer = true;
+        }
+        
+        if (distanceToPlayer >= 0f && distanceToPlayer < minDistanceToPlayer)
+        {
+            minDistanceToPlayer = distanceToPlayer;
+        }
+    }
+
+    /// <summary>
+    /// 根據聚合的敵人資訊，依規則更新危險係數。
+    /// 規則：
+    /// - 視野內：立即 100
+    /// - 視野外：
+    ///   - 5 格以內：每秒 +20
+    ///   - 5~10 格：不變
+    ///   - 10 以上：每秒 -20
+    /// </summary>
+    private void ApplyAggregatedPerception(float deltaTime)
+    {
+        if (anyEnemySeesPlayer)
+        {
+            SetDangerLevel(maxDangerLevel, "Enemy sees player");
+            return;
+        }
+        
+        // 若沒有任何敵人回報，交由自動減少（已於 Update 內處理）
+        if (float.IsPositiveInfinity(minDistanceToPlayer))
+        {
+            return;
+        }
+        
+        int ratePerSecond = 0;
+        if (minDistanceToPlayer <= nearDistanceThreshold)
+        {
+            ratePerSecond = nearIncreasePerSecond;
+        }
+        else if (minDistanceToPlayer <= midDistanceThreshold)
+        {
+            ratePerSecond = 0;
+        }
+        else
+        {
+            ratePerSecond = -farDecreasePerSecond;
+        }
+        
+        if (ratePerSecond == 0 || deltaTime <= 0f) return;
+        
+        dangerFloatAccumulator += ratePerSecond * deltaTime;
+        int deltaInt = 0;
+        if (dangerFloatAccumulator >= 1f)
+        {
+            deltaInt = Mathf.FloorToInt(dangerFloatAccumulator);
+            dangerFloatAccumulator -= deltaInt;
+        }
+        else if (dangerFloatAccumulator <= -1f)
+        {
+            deltaInt = Mathf.CeilToInt(dangerFloatAccumulator);
+            dangerFloatAccumulator -= deltaInt;
+        }
+        
+        if (deltaInt > 0)
+        {
+            IncreaseDangerLevel(deltaInt, "Distance rule");
+        }
+        else if (deltaInt < 0)
+        {
+            DecreaseDangerLevel(-deltaInt, "Distance rule");
+        }
     }
 }

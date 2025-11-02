@@ -28,28 +28,28 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private float mediumHealthThreshold = 0.6f;
     
     [Header("Target Player")]
-    [SerializeField] private PlayerController playerController;
+    [SerializeField] private Player player;
     
     private Color targetColor;
     private Color currentColor;
     
     private void Start()
     {
-        // 獲取PlayerController
-        if (playerController == null)
+        // 獲取Player
+        if (player == null)
         {
-            playerController = FindFirstObjectByType<PlayerController>();
+            player = FindFirstObjectByType<Player>();
         }
         
-        if (playerController == null)
+        if (player == null)
         {
-            Debug.LogError("PlayerHealthUI: 找不到PlayerController！");
+            Debug.LogError("PlayerHealthUI: 找不到Player！");
             return;
         }
         
         // 訂閱血量變化事件
-        playerController.OnHealthChanged += OnHealthChanged;
-        playerController.OnPlayerDied += OnPlayerDied;
+        player.OnHealthChanged += OnHealthChanged;
+        player.OnPlayerDied += OnPlayerDied;
         
         // 初始化顯示
         UpdateHealthDisplay();
@@ -68,10 +68,10 @@ public class PlayerHealthUI : MonoBehaviour
     private void OnDestroy()
     {
         // 取消訂閱事件
-        if (playerController != null)
+        if (player != null)
         {
-            playerController.OnHealthChanged -= OnHealthChanged;
-            playerController.OnPlayerDied -= OnPlayerDied;
+            player.OnHealthChanged -= OnHealthChanged;
+            player.OnPlayerDied -= OnPlayerDied;
         }
     }
     
@@ -97,9 +97,9 @@ public class PlayerHealthUI : MonoBehaviour
     /// </summary>
     private void UpdateHealthDisplay()
     {
-        if (playerController == null) return;
+        if (player == null) return;
         
-        float healthPercentage = playerController.HealthPercentage;
+        float healthPercentage = player.HealthPercentage;
         
         // 更新滑桿
         if (healthSlider != null)
@@ -112,11 +112,11 @@ public class PlayerHealthUI : MonoBehaviour
         {
             if (showPercentage)
             {
-                healthText.text = $"{playerController.CurrentHealth}/{playerController.MaxHealth} ({healthPercentage:P0})";
+                healthText.text = $"{player.CurrentHealth}/{player.MaxHealth} ({healthPercentage:P0})";
             }
             else
             {
-                healthText.text = $"{playerController.CurrentHealth}/{playerController.MaxHealth}";
+                healthText.text = $"{player.CurrentHealth}/{player.MaxHealth}";
             }
         }
         
@@ -183,22 +183,22 @@ public class PlayerHealthUI : MonoBehaviour
     /// <summary>
     /// 設定目標玩家
     /// </summary>
-    public void SetPlayerController(PlayerController player)
+    public void SetPlayer(Player targetPlayer)
     {
         // 取消訂閱舊的玩家
-        if (playerController != null)
+        if (player != null)
         {
-            playerController.OnHealthChanged -= OnHealthChanged;
-            playerController.OnPlayerDied -= OnPlayerDied;
+            player.OnHealthChanged -= OnHealthChanged;
+            player.OnPlayerDied -= OnPlayerDied;
         }
         
-        playerController = player;
+        player = targetPlayer;
         
         // 訂閱新的玩家
-        if (playerController != null)
+        if (player != null)
         {
-            playerController.OnHealthChanged += OnHealthChanged;
-            playerController.OnPlayerDied += OnPlayerDied;
+            player.OnHealthChanged += OnHealthChanged;
+            player.OnPlayerDied += OnPlayerDied;
             UpdateHealthDisplay();
         }
     }

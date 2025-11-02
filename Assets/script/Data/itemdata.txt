@@ -1,0 +1,12 @@
+# Item Data File
+# Format: ItemIndex,ItemType,x,y,z
+# ItemType: 物品類型名稱（必須與 ItemManager 中的 Item Prefab 名稱對應）
+# 每一行代表一個散落在場景中的物品
+
+# 範例資料（請根據實際需求修改）
+# 武器類物品
+0,Knife,4,30,0
+1,Gun,4,20,0
+
+
+
