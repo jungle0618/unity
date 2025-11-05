@@ -1,133 +1,188 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 /// <summary>
-/// 遊戲UI管理器
-/// 管理遊戲中的所有UI元素，包括血條、危險等級和物品欄顯示
+/// 遊戲UI總協調器
+/// 負責管理 GameScene 中的所有 UI 系統，包括：
+/// - 遊戲進行中的 UI（血條、危險等級、物品欄、地圖）
+/// - 遊戲過程中的功能 UI（暫停選單）
+/// 
+/// 注意：此管理器專用於 GameScene，不適用於其他場景（如 MainMenuScene、LoadingScene）
 /// </summary>
+[DefaultExecutionOrder(300)] // 在所有遊戲系統初始化完成後執行
 public class GameUIManager : MonoBehaviour
 {
-    [Header("UI References")]
-    [SerializeField] private PlayerHealthUI playerHealthUI;
-    [SerializeField] private DangerousUI dangerousUI;
+    [Header("Game UI Managers - 遊戲進行中的 UI")]
+    [SerializeField] private HealthUIManager healthUIManager;          // 血條UI
+    [SerializeField] private DangerUIManager dangerUIManager;          // 危險等級UI
+    [SerializeField] private HotbarUIManager hotbarUIManager;           // 物品欄UI
+    [SerializeField] private TilemapMapUIManager tilemapMapUIManager;  // 地圖UI
     
-    [Header("UI Panels")]
-    [SerializeField] private GameObject healthPanel;
-    [SerializeField] private GameObject dangerPanel;
-    [SerializeField] private GameObject hotbarPanel;
+    [Header("Game Process UI Managers - 遊戲過程中的功能 UI")]
+    [SerializeField] private PauseUIManager pauseUIManager;             // 暫停選單（屬於遊戲過程中的 UI）
     
-    [Header("Item Hotbar Settings")]
-    [SerializeField] private GameObject itemSlotPrefab;      // 物品格子預製體
-    [SerializeField] private Transform slotsContainer;       // 格子容器
-    [SerializeField] private bool autoFindPlayer = true;     // 自動尋找玩家的 ItemHolder
+    [Header("Optional UI Managers")]
+    [SerializeField] private LoadingProgressUIManager loadingProgressUIManager;  // 載入進度（通常在 LoadingScene，可選）
     
-    [Header("Settings")]
+    [Header("Initial Visibility Settings")]
     [SerializeField] private bool showHealthUI = true;
     [SerializeField] private bool showDangerUI = true;
     [SerializeField] private bool showHotbarUI = true;
+    [SerializeField] private bool showMapUI = false;
+    // 注意：暫停選單由 GameManager 自動控制，不需要手動設定
     
-    private Player player;
-    private DangerousManager dangerousManager;
+    [Header("Player Initialization")]
+    [SerializeField] private bool waitForPlayer = true; // 是否等待 Player 生成後再初始化
+    [SerializeField] private bool useEntityManager = true; // 是否使用 EntityManager 獲取 Player
     
-    // 物品欄相關
-    private ItemHolder itemHolder;
-    private List<ItemSlotUI> itemSlots = new List<ItemSlotUI>();
-    private int currentSelectedIndex = -1;
+    private EntityManager entityManager;
+    private bool isInitialized = false;
+    
+    private void Awake()
+    {
+        // 嘗試獲取 EntityManager 引用
+        if (useEntityManager)
+        {
+            entityManager = FindFirstObjectByType<EntityManager>();
+        }
+    }
     
     private void Start()
     {
-        // 獲取必要的組件
-        player = FindFirstObjectByType<Player>();
-        dangerousManager = DangerousManager.Instance;
-        
-        // 獲取 ItemHolder（如果需要）
-        if (player != null && autoFindPlayer)
+        // 如果需要等待 Player，訂閱 EntityManager 事件
+        if (waitForPlayer && useEntityManager && entityManager != null)
         {
-            itemHolder = player.GetComponent<ItemHolder>();
+            // 如果 Player 已經存在，立即初始化
+            if (entityManager.Player != null)
+            {
+                InitializeAllUI();
+            }
+            else
+            {
+                // 訂閱事件，等待 Player 準備就緒
+                entityManager.OnPlayerReady += HandlePlayerReady;
+                Debug.Log("GameUIManager: 等待 Player 生成後再初始化 UI...");
+            }
         }
-        
-        // 初始化UI
-        InitializeUI();
-        
-        // 訂閱事件
-        if (dangerousManager != null)
+        else
         {
-            dangerousManager.OnDangerLevelTypeChanged += OnDangerLevelChanged;
+            // 不需要等待或找不到 EntityManager，直接初始化
+            InitializeAllUI();
         }
+    }
+    
+    /// <summary>
+    /// 處理 Player 準備就緒事件
+    /// </summary>
+    private void HandlePlayerReady()
+    {
+        if (isInitialized) return;
         
-        if (itemHolder != null)
+        InitializeAllUI();
+        
+        // 取消訂閱（只需要一次）
+        if (entityManager != null)
         {
-            itemHolder.OnItemChanged += OnItemChanged;
-            itemHolder.OnWeaponDurabilityChanged += OnWeaponDurabilityChanged;
-            itemHolder.OnWeaponBroken += OnWeaponBroken;
+            entityManager.OnPlayerReady -= HandlePlayerReady;
         }
     }
     
     private void OnDestroy()
     {
-        // 取消訂閱事件
-        if (dangerousManager != null)
+        // 清理事件訂閱
+        if (entityManager != null)
         {
-            dangerousManager.OnDangerLevelTypeChanged -= OnDangerLevelChanged;
-        }
-        
-        if (itemHolder != null)
-        {
-            itemHolder.OnItemChanged -= OnItemChanged;
-            itemHolder.OnWeaponDurabilityChanged -= OnWeaponDurabilityChanged;
-            itemHolder.OnWeaponBroken -= OnWeaponBroken;
+            entityManager.OnPlayerReady -= HandlePlayerReady;
         }
     }
     
     /// <summary>
-    /// 初始化UI
+    /// 初始化所有UI子系統
     /// </summary>
-    private void InitializeUI()
+    private void InitializeAllUI()
     {
-        // 設定血條UI
-        if (playerHealthUI != null)
+        if (isInitialized)
         {
-            playerHealthUI.SetPlayer(player);
+            Debug.LogWarning("GameUIManager: UI 已經初始化過，跳過重複初始化");
+            return;
         }
         
-        // 設定危險等級UI
-        if (dangerousUI != null)
+        Debug.Log("GameUIManager: 開始初始化所有 UI...");
+        
+        // 初始化各個UI管理器
+        if (healthUIManager != null)
         {
-            // DangerousUI會自動獲取DangerousManager.Instance，不需要額外設定
-            Debug.Log("危險等級UI已初始化");
+            healthUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: HealthUIManager 未設定");
         }
         
-        // 初始化物品欄UI
-        InitializeItemHotbar();
+        if (dangerUIManager != null)
+        {
+            dangerUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: DangerUIManager 未設定");
+        }
         
-        // 初始顯示狀態
+        if (hotbarUIManager != null)
+        {
+            hotbarUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: HotbarUIManager 未設定");
+        }
+        
+        if (tilemapMapUIManager != null)
+        {
+            tilemapMapUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: TilemapMapUIManager 未設定");
+        }
+        
+        if (pauseUIManager != null)
+        {
+            pauseUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: PauseUIManager 未設定");
+        }
+        
+        // 可選的載入進度UI（通常在 LoadingScene，不在 GameScene）
+        if (loadingProgressUIManager != null)
+        {
+            loadingProgressUIManager.Initialize();
+        }
+        // 注意：不設定不會顯示警告，因為這是可選的
+        
+        // 設定初始可見性
         SetHealthUIVisible(showHealthUI);
         SetDangerUIVisible(showDangerUI);
         SetHotbarUIVisible(showHotbarUI);
+        SetMapUIVisible(showMapUI);
+        // 暫停選單由 GameManager 自動控制，不需要手動設定
+        
+        isInitialized = true;
+        Debug.Log("GameUIManager: 所有UI已初始化完成");
     }
     
-    /// <summary>
-    /// 處理危險等級變化事件
-    /// </summary>
-    private void OnDangerLevelChanged(DangerousManager.DangerLevel level)
-    {
-        // 可以在這裡添加危險等級變化時的UI效果
-        Debug.Log($"危險等級變化: {dangerousManager.GetDangerLevelDescription(level)}");
-    }
+    #region UI 可見性控制
     
     /// <summary>
     /// 設定血條UI可見性
     /// </summary>
     public void SetHealthUIVisible(bool visible)
     {
-        if (healthPanel != null)
+        showHealthUI = visible;
+        if (healthUIManager != null)
         {
-            healthPanel.SetActive(visible);
-        }
-        
-        if (playerHealthUI != null)
-        {
-            playerHealthUI.gameObject.SetActive(visible);
+            healthUIManager.SetVisible(visible);
         }
     }
     
@@ -136,14 +191,34 @@ public class GameUIManager : MonoBehaviour
     /// </summary>
     public void SetDangerUIVisible(bool visible)
     {
-        if (dangerPanel != null)
+        showDangerUI = visible;
+        if (dangerUIManager != null)
         {
-            dangerPanel.SetActive(visible);
+            dangerUIManager.SetVisible(visible);
         }
-        
-        if (dangerousUI != null)
+    }
+    
+    /// <summary>
+    /// 設定物品欄UI可見性
+    /// </summary>
+    public void SetHotbarUIVisible(bool visible)
+    {
+        showHotbarUI = visible;
+        if (hotbarUIManager != null)
         {
-            dangerousUI.gameObject.SetActive(visible);
+            hotbarUIManager.SetVisible(visible);
+        }
+    }
+    
+    /// <summary>
+    /// 設定地圖UI可見性
+    /// </summary>
+    public void SetMapUIVisible(bool visible)
+    {
+        showMapUI = visible;
+        if (tilemapMapUIManager != null)
+        {
+            tilemapMapUIManager.SetVisible(visible);
         }
     }
     
@@ -152,8 +227,7 @@ public class GameUIManager : MonoBehaviour
     /// </summary>
     public void ToggleHealthUI()
     {
-        showHealthUI = !showHealthUI;
-        SetHealthUIVisible(showHealthUI);
+        SetHealthUIVisible(!showHealthUI);
     }
     
     /// <summary>
@@ -161,207 +235,7 @@ public class GameUIManager : MonoBehaviour
     /// </summary>
     public void ToggleDangerUI()
     {
-        showDangerUI = !showDangerUI;
-        SetDangerUIVisible(showDangerUI);
-    }
-    
-    #region 物品欄UI管理
-    
-    /// <summary>
-    /// 初始化物品快捷欄
-    /// </summary>
-    private void InitializeItemHotbar()
-    {
-        if (itemSlotPrefab == null || slotsContainer == null)
-        {
-            Debug.LogWarning("GameUIManager: 物品欄設定不完整，跳過初始化");
-            return;
-        }
-        
-        // 清空現有格子
-        ClearAllItemSlots();
-        
-        // 動態創建格子（根據 ItemHolder 的物品數量）
-        RefreshAllItemSlots();
-    }
-    
-    /// <summary>
-    /// 清空所有物品格子
-    /// </summary>
-    private void ClearAllItemSlots()
-    {
-        foreach (var slot in itemSlots)
-        {
-            if (slot != null)
-                Destroy(slot.gameObject);
-        }
-        itemSlots.Clear();
-        currentSelectedIndex = -1;
-    }
-    
-    /// <summary>
-    /// 創建新的物品格子
-    /// </summary>
-    private ItemSlotUI CreateItemSlot(int index)
-    {
-        if (itemSlotPrefab == null || slotsContainer == null)
-            return null;
-            
-        GameObject slotObj = Instantiate(itemSlotPrefab, slotsContainer);
-        ItemSlotUI slot = slotObj.GetComponent<ItemSlotUI>();
-        
-        if (slot != null)
-        {
-            slot.Initialize(index);
-        }
-        else
-        {
-            Debug.LogError("GameUIManager: 格子預製體缺少 ItemSlotUI 組件！");
-            Destroy(slotObj);
-        }
-        
-        return slot;
-    }
-    
-    /// <summary>
-    /// 刷新所有物品格子的顯示（動態調整數量）
-    /// </summary>
-    private void RefreshAllItemSlots()
-    {
-        if (itemHolder == null) return;
-        
-        IReadOnlyList<Item> allItems = itemHolder.GetAllItems();
-        int itemCount = allItems.Count;
-        
-        // 調整槽位數量以匹配物品數量
-        while (itemSlots.Count < itemCount)
-        {
-            // 需要更多槽位，創建新的
-            ItemSlotUI newSlot = CreateItemSlot(itemSlots.Count);
-            if (newSlot != null)
-            {
-                itemSlots.Add(newSlot);
-            }
-        }
-        
-        while (itemSlots.Count > itemCount)
-        {
-            // 槽位太多，移除最後一個
-            int lastIndex = itemSlots.Count - 1;
-            if (itemSlots[lastIndex] != null)
-            {
-                Destroy(itemSlots[lastIndex].gameObject);
-            }
-            itemSlots.RemoveAt(lastIndex);
-        }
-        
-        // 如果沒有物品，重置選中索引
-        if (itemCount == 0)
-        {
-            currentSelectedIndex = -1;
-            return;
-        }
-        
-        // 更新每個格子的顯示
-        for (int i = 0; i < itemSlots.Count; i++)
-        {
-            if (i < itemCount)
-            {
-                itemSlots[i].SetItem(allItems[i]);
-                
-                // 設定選中狀態
-                bool isSelected = (i == itemHolder.CurrentItemIndex);
-                itemSlots[i].SetSelected(isSelected);
-                
-                if (isSelected)
-                {
-                    currentSelectedIndex = i;
-                }
-            }
-        }
-    }
-    
-    /// <summary>
-    /// 處理物品切換事件
-    /// </summary>
-    private void OnItemChanged(Item item)
-    {
-        if (itemHolder == null) return;
-        
-        // 檢查槽位數量是否與物品數量一致
-        IReadOnlyList<Item> allItems = itemHolder.GetAllItems();
-        if (itemSlots.Count != allItems.Count)
-        {
-            // 數量不一致，需要完整刷新
-            RefreshAllItemSlots();
-            return;
-        }
-        
-        if (itemSlots.Count == 0) return;
-        
-        int newIndex = itemHolder.CurrentItemIndex;
-        
-        // 取消舊的選中狀態
-        if (currentSelectedIndex >= 0 && currentSelectedIndex < itemSlots.Count)
-        {
-            itemSlots[currentSelectedIndex].SetSelected(false);
-        }
-        
-        // 設定新的選中狀態
-        if (newIndex >= 0 && newIndex < itemSlots.Count)
-        {
-            itemSlots[newIndex].SetSelected(true);
-            currentSelectedIndex = newIndex;
-            
-            // 如果是武器，更新耐久度顯示
-            if (item is Weapon weapon)
-            {
-                itemSlots[newIndex].UpdateWeaponDurability(weapon.CurrentDurability, weapon.MaxDurability);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// 處理武器耐久度變化事件
-    /// </summary>
-    private void OnWeaponDurabilityChanged(int current, int max)
-    {
-        // 更新所有格子中相同武器的耐久度顯示
-        if (itemHolder == null || itemSlots.Count == 0) return;
-        
-        IReadOnlyList<Item> allItems = itemHolder.GetAllItems();
-        
-        // 找出當前武器並更新對應的槽位
-        for (int i = 0; i < allItems.Count && i < itemSlots.Count; i++)
-        {
-            if (allItems[i] is Weapon weapon)
-            {
-                itemSlots[i].UpdateWeaponDurability(weapon.CurrentDurability, weapon.MaxDurability);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// 處理武器損壞事件
-    /// </summary>
-    private void OnWeaponBroken()
-    {
-        Debug.Log("GameUIManager: 武器已損壞");
-        
-        // 注意：不需要手動刷新 UI
-        // 因為 ItemHolder 在移除武器後會觸發 OnItemChanged
-        // OnItemChanged 會檢測到槽位數量不一致並自動刷新
-    }
-    
-    /// <summary>
-    /// 設定物品欄UI可見性
-    /// </summary>
-    public void SetHotbarUIVisible(bool visible)
-    {
-        if (hotbarPanel != null)
-        {
-            hotbarPanel.SetActive(visible);
-        }
+        SetDangerUIVisible(!showDangerUI);
     }
     
     /// <summary>
@@ -369,34 +243,126 @@ public class GameUIManager : MonoBehaviour
     /// </summary>
     public void ToggleHotbarUI()
     {
-        showHotbarUI = !showHotbarUI;
-        SetHotbarUIVisible(showHotbarUI);
+        SetHotbarUIVisible(!showHotbarUI);
     }
     
     /// <summary>
-    /// 設定 ItemHolder（如果需要動態設定）
+    /// 切換地圖UI顯示
     /// </summary>
-    public void SetItemHolder(ItemHolder holder)
+    public void ToggleMapUI()
     {
-        // 取消舊的訂閱
-        if (itemHolder != null)
-        {
-            itemHolder.OnItemChanged -= OnItemChanged;
-            itemHolder.OnWeaponDurabilityChanged -= OnWeaponDurabilityChanged;
-            itemHolder.OnWeaponBroken -= OnWeaponBroken;
+        SetMapUIVisible(!showMapUI);
         }
-        
-        itemHolder = holder;
-        
-        // 訂閱新的事件
-        if (itemHolder != null)
+    
+    #endregion
+    
+    #region 動態設定（可選）
+    
+    /// <summary>
+    /// 設定血條UI管理器
+    /// </summary>
+    public void SetHealthUIManager(HealthUIManager manager)
+    {
+        healthUIManager = manager;
+        if (manager != null)
         {
-            itemHolder.OnItemChanged += OnItemChanged;
-            itemHolder.OnWeaponDurabilityChanged += OnWeaponDurabilityChanged;
-            itemHolder.OnWeaponBroken += OnWeaponBroken;
-            RefreshAllItemSlots();
+            manager.Initialize();
         }
     }
+    
+    /// <summary>
+    /// 設定危險等級UI管理器
+    /// </summary>
+    public void SetDangerUIManager(DangerUIManager manager)
+            {
+        dangerUIManager = manager;
+        if (manager != null)
+            {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
+    /// 設定物品欄UI管理器
+    /// </summary>
+    public void SetHotbarUIManager(HotbarUIManager manager)
+        {
+        hotbarUIManager = manager;
+        if (manager != null)
+            {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
+    /// 設定地圖UI管理器
+    /// </summary>
+    public void SetTilemapMapUIManager(TilemapMapUIManager manager)
+    {
+        tilemapMapUIManager = manager;
+        if (manager != null)
+        {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
+    /// 設定暫停選單UI管理器
+    /// </summary>
+    public void SetPauseUIManager(PauseUIManager manager)
+    {
+        pauseUIManager = manager;
+        if (manager != null)
+        {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
+    /// 設定載入進度UI管理器（可選，通常在 LoadingScene）
+    /// </summary>
+    public void SetLoadingProgressUIManager(LoadingProgressUIManager manager)
+    {
+        loadingProgressUIManager = manager;
+        if (manager != null)
+        {
+            manager.Initialize();
+        }
+    }
+    
+    #endregion
+    
+    #region 訪問器（可選）
+    
+    /// <summary>
+    /// 獲取血條UI管理器
+    /// </summary>
+    public HealthUIManager GetHealthUIManager() => healthUIManager;
+    
+    /// <summary>
+    /// 獲取危險等級UI管理器
+    /// </summary>
+    public DangerUIManager GetDangerUIManager() => dangerUIManager;
+    
+    /// <summary>
+    /// 獲取物品欄UI管理器
+    /// </summary>
+    public HotbarUIManager GetHotbarUIManager() => hotbarUIManager;
+    
+    /// <summary>
+    /// 獲取地圖UI管理器
+    /// </summary>
+    public TilemapMapUIManager GetTilemapMapUIManager() => tilemapMapUIManager;
+    
+    /// <summary>
+    /// 獲取暫停選單UI管理器
+    /// </summary>
+    public PauseUIManager GetPauseUIManager() => pauseUIManager;
+    
+    /// <summary>
+    /// 獲取載入進度UI管理器（可選，通常在 LoadingScene）
+    /// </summary>
+    public LoadingProgressUIManager GetLoadingProgressUIManager() => loadingProgressUIManager;
     
     #endregion
 }

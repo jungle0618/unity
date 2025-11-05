@@ -11,6 +11,10 @@ public class Gun : RangedWeapon
     [SerializeField] private float bulletSpeed = 15f;
     [SerializeField] private Transform firePoint; // Optional: spawn point for bullets
 
+    [Header("Alert Settings")]
+    [Tooltip("開槍時會警報這個範圍內的所有敵人")]
+    [SerializeField] private float alertRange = 15f;
+
     [Header("Visual Effects")]
     [SerializeField] private ParticleSystem muzzleFlash; // Optional: muzzle flash effect
 
@@ -37,6 +41,9 @@ public class Gun : RangedWeapon
         {
             muzzleFlash.Play();
         }
+
+        // Alert nearby enemies when player shoots
+        AlertNearbyEnemies(origin, attacker);
 
         Debug.Log($"[Gun] Fired! Ammo: {_currentAmmo}");
     }
@@ -67,6 +74,30 @@ public class Gun : RangedWeapon
         {
             Debug.LogError("[Gun] Bullet prefab doesn't have Bullet component!");
             Destroy(bulletObj);
+        }
+    }
+
+    /// <summary>
+    /// 警報附近的敵人（開槍時呼叫）
+    /// </summary>
+    private void AlertNearbyEnemies(Vector2 shootPosition, GameObject attacker)
+    {
+        // 只有當攻擊者是玩家時才警報敵人
+        if (attacker == null || !attacker.CompareTag("Player"))
+        {
+            return;
+        }
+
+        // 尋找 EntityManager 並呼叫警報方法
+        EntityManager entityManager = GameObject.FindFirstObjectByType<EntityManager>();
+        if (entityManager != null)
+        {
+            entityManager.AlertNearbyEnemies(shootPosition, alertRange);
+            Debug.Log($"[Gun] Alerted enemies within {alertRange} units");
+        }
+        else
+        {
+            Debug.LogWarning("[Gun] EntityManager not found - cannot alert enemies");
         }
     }
 

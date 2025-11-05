@@ -5,6 +5,7 @@ using UnityEngine;
 /// 危險指數管理器
 /// 負責管理遊戲中的危險指數，提供查詢、增加、減少等功能
 /// </summary>
+[DefaultExecutionOrder(200)] // 在 GameManager (150) 之後執行
 public class DangerousManager : MonoBehaviour
 {
     [Header("危險指數設定")]

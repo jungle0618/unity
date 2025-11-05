@@ -14,6 +14,7 @@ public class PlayerHealthUI : MonoBehaviour
     [SerializeField] private Image healthFillImage;
     [SerializeField] private Image healthBackgroundImage;
     
+    
     [Header("UI Settings")]
     [SerializeField] private bool showPercentage = true;
     [SerializeField] private bool showHealthText = true;
@@ -35,17 +36,38 @@ public class PlayerHealthUI : MonoBehaviour
     
     private void Start()
     {
-        // 獲取Player
-        if (player == null)
+        // 如果已經通過 SetPlayer() 設定了 Player，直接初始化
+        if (player != null)
         {
+            InitializePlayer();
+        }
+        // 否則，等待 HealthUIManager 通過 SetPlayer() 設定
+        // 這確保了正確的執行順序（EntityManager 先初始化 Player）
+        else
+        {
+            // 備用方案：嘗試查找 Player（如果 HealthUIManager 沒有使用）
             player = FindFirstObjectByType<Player>();
+            if (player != null)
+            {
+                InitializePlayer();
+            }
+            else
+            {
+                Debug.LogWarning("PlayerHealthUI: 找不到Player，等待 SetPlayer() 被調用...");
+            }
         }
+    }
+    
+    /// <summary>
+    /// 初始化玩家相關的事件訂閱和顯示
+    /// </summary>
+    private void InitializePlayer()
+    {
+        if (player == null) return;
         
-        if (player == null)
-        {
-            Debug.LogError("PlayerHealthUI: 找不到Player！");
-            return;
-        }
+        // 取消舊的訂閱（如果有）
+        player.OnHealthChanged -= OnHealthChanged;
+        player.OnPlayerDied -= OnPlayerDied;
         
         // 訂閱血量變化事件
         player.OnHealthChanged += OnHealthChanged;
@@ -194,12 +216,10 @@ public class PlayerHealthUI : MonoBehaviour
         
         player = targetPlayer;
         
-        // 訂閱新的玩家
+        // 訂閱新的玩家並初始化
         if (player != null)
         {
-            player.OnHealthChanged += OnHealthChanged;
-            player.OnPlayerDied += OnPlayerDied;
-            UpdateHealthDisplay();
+            InitializePlayer();
         }
     }
 }

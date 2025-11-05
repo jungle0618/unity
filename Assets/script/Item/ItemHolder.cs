@@ -10,10 +10,13 @@ using System.Linq;
 public class ItemHolder : MonoBehaviour
 {
     [Header("Item Prefabs")]
+    [Tooltip("物品 Prefab 數組（可選）。如果為空，物品將通過代碼動態裝備（例如由 EntityManager 裝備）")]
     [SerializeField] private GameObject[] itemPrefabs; // Array of item prefabs for switching
 
     [Header("Behavior")]
     [SerializeField] private bool equipOnStart = true; // 一開始是否自動裝備 prefab
+    [Tooltip("如果物品通過代碼動態裝備（不設置 itemPrefabs），設為 true 可隱藏警告")]
+    [SerializeField] private bool allowDynamicEquipping = true; // 允許動態裝備（不從 itemPrefabs 初始化）
 
     // Item management
     private List<Item> availableItems = new List<Item>(); // All instantiated items
@@ -83,7 +86,12 @@ public class ItemHolder : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"ItemHolder on {gameObject.name}: No item prefabs assigned!");
+            // 如果允許動態裝備，則不顯示警告（因為物品會通過代碼裝備，例如 EntityManager）
+            // 只有在不允許動態裝備且沒有 itemPrefabs 時才警告
+            if (!allowDynamicEquipping)
+            {
+                Debug.LogWarning($"ItemHolder on {gameObject.name}: No item prefabs assigned! If items are equipped dynamically via code, set 'Allow Dynamic Equipping' to true to suppress this warning.");
+            }
         }
     }
 
@@ -704,6 +712,158 @@ public class ItemHolder : MonoBehaviour
         }
         
         return result;
+    }
+    
+    /// <summary>
+    /// 檢查是否擁有指定類型的鑰匙
+    /// </summary>
+    /// <param name="keyType">鑰匙類型</param>
+    /// <returns>是否擁有該鑰匙</returns>
+    public bool HasKey(KeyType keyType)
+    {
+        if (keyType == KeyType.None)
+            return true; // 不需要鑰匙的門總是可以開啟
+        
+        foreach (var item in availableItems)
+        {
+            if (item is Key key)
+            {
+                if (key.CanUnlock(keyType))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// 獲取可以開啟指定門的鑰匙
+    /// </summary>
+    /// <param name="keyType">所需的鑰匙類型</param>
+    /// <returns>找到的鑰匙，如果沒有則返回 null</returns>
+    public Key GetKeyForDoor(KeyType keyType)
+    {
+        if (keyType == KeyType.None)
+            return null; // 不需要鑰匙
+        
+        foreach (var item in availableItems)
+        {
+            if (item is Key key)
+            {
+                if (key.CanUnlock(keyType))
+                {
+                    return key;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// 檢查當前裝備的 item 是否為鑰匙
+    /// </summary>
+    /// <returns>是否為鑰匙</returns>
+    public bool IsCurrentItemKey()
+    {
+        return currentItem != null && currentItem is Key;
+    }
+    
+    /// <summary>
+    /// 獲取當前裝備的鑰匙（如果有）
+    /// </summary>
+    /// <returns>鑰匙，如果當前 item 不是鑰匙則返回 null</returns>
+    public Key GetCurrentKey()
+    {
+        return currentItem as Key;
+    }
+    
+    /// <summary>
+    /// 移除指定物品
+    /// </summary>
+    /// <param name="item">要移除的物品</param>
+    /// <returns>是否成功移除</returns>
+    public bool RemoveItem(Item item)
+    {
+        if (item == null || !availableItems.Contains(item))
+        {
+            return false;
+        }
+        
+        // 如果是當前物品，需要切換到其他物品
+        bool wasCurrentItem = (item == currentItem);
+        
+        // 從列表中移除
+        availableItems.Remove(item);
+        itemToPrefabMap.Remove(item);
+        
+        // 如果是當前物品，切換到下一個可用物品
+        if (wasCurrentItem)
+        {
+            if (availableItems.Count > 0)
+            {
+                // 調整索引
+                if (currentItemIndex >= availableItems.Count)
+                {
+                    currentItemIndex = 0;
+                }
+                SwitchToItem(currentItemIndex);
+            }
+            else
+            {
+                // 沒有其他物品了
+                currentItem = null;
+                currentItemIndex = 0;
+                OnItemChanged?.Invoke(null);
+            }
+        }
+        else
+        {
+            // 調整當前索引（如果需要）
+            int removedIndex = availableItems.IndexOf(item);
+            if (removedIndex != -1 && removedIndex < currentItemIndex)
+            {
+                currentItemIndex--;
+            }
+        }
+        
+        // 銷毀物品
+        if (item != null && item.gameObject != null)
+        {
+            Destroy(item.gameObject);
+        }
+        
+        Debug.Log($"[ItemHolder] 移除物品: {item.ItemName}，剩餘物品數: {availableItems.Count}");
+        return true;
+    }
+    
+    /// <summary>
+    /// 獲取所有鑰匙
+    /// </summary>
+    /// <returns>鑰匙列表</returns>
+    public List<Key> GetAllKeys()
+    {
+        return GetItemsOfType<Key>();
+    }
+    
+    /// <summary>
+    /// 獲取指定類型的鑰匙
+    /// </summary>
+    /// <param name="keyType">鑰匙類型</param>
+    /// <returns>找到的鑰匙，如果沒有則返回 null</returns>
+    public Key GetKeyByType(KeyType keyType)
+    {
+        foreach (var item in availableItems)
+        {
+            if (item is Key key && key.KeyType == keyType)
+            {
+                return key;
+            }
+        }
+        
+        return null;
     }
     
     /// <summary>

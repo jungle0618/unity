@@ -2,41 +2,21 @@ using UnityEngine;
 
 /// <summary>
 /// 刀子 - 近戰武器
+/// 特性：無限耐久度
 /// </summary>
 public class Knife : MeleeWeapon
 {
 
+
+
+
     protected override void PerformAttack(Vector2 origin, GameObject attacker)
     {
-        Collider2D[] hits = Physics2D.OverlapCircleAll(origin, attackRange);
-        foreach (var hit in hits)
-        {
-            if (hit == null) continue;
-            if (hit.gameObject == attacker) continue; // 跳過攻擊者本人
-            
-            // log all hit objects
-            Debug.Log($"Knife hit: {hit.gameObject.name}");
-
-            var enemy = hit.GetComponent<Enemy>();
-            if (enemy != null)
-            {
-                Debug.Log($"[Knife] Hit enemy: {enemy.gameObject.name} for {attackDamage} damage");
-                enemy.TakeDamage(attackDamage, "Player Knife");
-                continue;
-            }
-
-            var player = hit.GetComponent<Player>();
-            if (player != null)
-            {
-                // 檢查攻擊者是否是敵人
-                var enemyAttacker = attacker.GetComponent<Enemy>();
-                if (enemyAttacker != null)
-                {
-                    Debug.Log($"[Knife] Enemy {enemyAttacker.gameObject.name} attacked player for {attackDamage} damage");
-                    player.TakeDamage(attackDamage, "Enemy Knife");
-                }
-                continue;
-            }
-        }
+        // 注意：傷害處理已移至 EntityManager.HandleAttack 統一處理
+        // 此方法只負責視覺效果和碰撞檢測（如果需要）
+        // 實際傷害由 ItemHolder.OnAttackPerformed 事件觸發 EntityManager.HandleAttack 處理
+        
+        // 可以在此處添加攻擊動畫、音效等視覺效果
+        Debug.Log($"[Knife] PerformAttack at {origin} by {attacker.name}");
     }
 }

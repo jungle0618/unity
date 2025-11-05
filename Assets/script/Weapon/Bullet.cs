@@ -118,8 +118,31 @@ public class Bullet : MonoBehaviour
         var enemy = collision.GetComponent<Enemy>();
         if (enemy != null)
         {
-            Debug.Log($"[Bullet] Hit enemy: {enemy.gameObject.name} for {damage} damage");
-            enemy.TakeDamage(damage, "Player Gun");
+            // 檢查攻擊者類型
+            var playerAttacker = _owner.GetComponent<Player>();
+            var enemyAttacker = _owner.GetComponent<Enemy>();
+            var targetAttacker = _owner.GetComponent<Target>();
+            
+            if (playerAttacker != null)
+            {
+                // Player 可以攻擊 Enemy
+                Debug.Log($"[Bullet] Player shot Enemy for {damage} damage");
+                enemy.TakeDamage(damage, "Player Gun");
+            }
+            else if (enemyAttacker != null)
+            {
+                // Enemy 不能攻擊 Enemy（同類型），只銷毀子彈
+                Debug.Log($"[Bullet] Enemy bullet hit Enemy - no damage (Enemy cannot attack Enemy)");
+            }
+            else if (targetAttacker != null)
+            {
+                // Target 不能攻擊 Enemy，只銷毀子彈
+                Debug.Log($"[Bullet] Target bullet hit Enemy - no damage (Target cannot attack Enemy)");
+            }
+            else
+            {
+                Debug.Log($"[Bullet] Hit Enemy: {enemy.gameObject.name}");
+            }
             Destroy(gameObject);
             return;
         }
@@ -128,16 +151,64 @@ public class Bullet : MonoBehaviour
         var player = collision.GetComponent<Player>();
         if (player != null)
         {
-            // 檢查攻擊者是否是敵人
+            // 檢查攻擊者類型
+            var playerAttacker = _owner.GetComponent<Player>();
             var enemyAttacker = _owner.GetComponent<Enemy>();
-            if (enemyAttacker != null)
+            var targetAttacker = _owner.GetComponent<Target>();
+            
+            if (playerAttacker != null)
             {
+                // Player 不能攻擊 Player（同類型），只銷毀子彈
+                Debug.Log($"[Bullet] Player bullet hit Player - no damage (Player cannot attack Player)");
+            }
+            else if (enemyAttacker != null)
+            {
+                // Enemy 可以攻擊 Player
                 Debug.Log($"[Bullet] Enemy {enemyAttacker.gameObject.name} shot player for {damage} damage");
                 player.TakeDamage(damage, "Enemy Gun");
+            }
+            else if (targetAttacker != null)
+            {
+                // Target 可以攻擊 Player
+                Debug.Log($"[Bullet] Target {targetAttacker.gameObject.name} shot player for {damage} damage");
+                player.TakeDamage(damage, "Target Gun");
             }
             else
             {
                 Debug.Log($"[Bullet] Hit player: {player.gameObject.name}");
+            }
+            Destroy(gameObject);
+            return;
+        }
+
+        // Check if hit a target
+        var target = collision.GetComponent<Target>();
+        if (target != null)
+        {
+            // 檢查攻擊者類型
+            var playerAttacker = _owner.GetComponent<Player>();
+            var enemyAttacker = _owner.GetComponent<Enemy>();
+            var targetAttacker = _owner.GetComponent<Target>();
+            
+            if (playerAttacker != null)
+            {
+                // Player 可以攻擊 Target
+                Debug.Log($"[Bullet] Player shot Target for {damage} damage");
+                target.TakeDamage(damage, "Player Gun");
+            }
+            else if (enemyAttacker != null)
+            {
+                // Enemy 不能攻擊 Target，只銷毀子彈
+                Debug.Log($"[Bullet] Enemy bullet hit Target - no damage (Enemy cannot attack Target)");
+            }
+            else if (targetAttacker != null)
+            {
+                // Target 不能攻擊 Target（同類型），只銷毀子彈
+                Debug.Log($"[Bullet] Target bullet hit Target - no damage (Target cannot attack Target)");
+            }
+            else
+            {
+                Debug.Log($"[Bullet] Hit Target: {target.gameObject.name}");
             }
             Destroy(gameObject);
             return;

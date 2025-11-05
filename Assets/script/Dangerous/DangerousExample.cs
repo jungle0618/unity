@@ -19,7 +19,7 @@ public class DangerousExample : MonoBehaviour
     [SerializeField] private int autoTestAmount = 5;
     
     private DangerousManager dangerousManager;
-    private EnemyManager enemyManager;
+    private EntityManager entityManager;
     private Player player;
     private float lastAutoTestTime;
     
@@ -39,13 +39,13 @@ public class DangerousExample : MonoBehaviour
             return;
         }
         
-        // 獲取EnemyManager和Player
-        enemyManager = FindFirstObjectByType<EnemyManager>();
+        // 獲取EntityManager和Player
+        entityManager = FindFirstObjectByType<EntityManager>();
         player = FindFirstObjectByType<Player>();
         
-        if (enemyManager == null)
+        if (entityManager == null)
         {
-            Debug.LogWarning("DangerousExample: 找不到EnemyManager！");
+            Debug.LogWarning("DangerousExample: 找不到EntityManager！");
         }
         
         if (player == null)
@@ -253,42 +253,13 @@ public class DangerousExample : MonoBehaviour
     /// </summary>
     private void AdjustGameParameters(DangerousManager.DangerLevel level)
     {
-        int levelIndex = (int)level;
-        
-        // 調整敵人參數
-        if (enemyManager != null)
-        {
-            AdjustEnemyParameters(levelIndex);
-        }
+        // 敵人參數現在由 EntityManager 自動根據危險等級調整
+        // 這裡只需要調整玩家參數（如果需要）
         
         // 調整玩家參數
         if (player != null)
         {
-            AdjustPlayerParameters(levelIndex);
-        }
-    }
-    
-    /// <summary>
-    /// 調整敵人參數
-    /// </summary>
-    private void AdjustEnemyParameters(int levelIndex)
-    {
-        // 確保索引在範圍內
-        levelIndex = Mathf.Clamp(levelIndex, 0, enemySpeedMultipliers.Length - 1);
-        
-        float speedMultiplier = enemySpeedMultipliers[levelIndex];
-        float damageReduction = enemyDamageReduction[levelIndex];
-        
-        Debug.Log($"調整敵人參數 - 等級: {levelIndex}, 速度倍數: {speedMultiplier}, 傷害減少: {damageReduction:P0}");
-        
-        // 調用EnemyManager的方法來調整所有敵人的參數
-        if (enemyManager != null)
-        {
-            enemyManager.SetAllEnemiesSpeedMultiplier(speedMultiplier);
-            enemyManager.SetAllEnemiesDamageReduction(damageReduction);
-            
-            Debug.Log($"已調整所有敵人的速度倍數為: {speedMultiplier}");
-            Debug.Log($"已設定敵人傷害減少為: {damageReduction:P0}");
+            AdjustPlayerParameters((int)level);
         }
     }
     

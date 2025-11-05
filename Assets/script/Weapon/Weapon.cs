@@ -16,11 +16,19 @@ public enum WeaponType
 /// </summary>
 public abstract class Weapon : Item
 {
+    [Header("Attack Settings")]
     [SerializeField] protected float attackCooldown = 0.5f;
-    [SerializeField] protected int maxDurability = 100;
     [SerializeField] protected int attackDamage = 1;
     
+    [Header("Equip Settings")]
+    [Tooltip("掏出武器後需要等待多久才能攻擊")]
+    [SerializeField] protected float equipDelay = 0.3f; // 掏槍延遲
+    
+    [Header("Durability Settings")]
+    [SerializeField] protected int maxDurability = 100;
+    
     protected float lastAttackTime = -999f;
+    protected float equipTime = -999f; // 記錄裝備時間
     protected int currentDurability;
     
     public abstract WeaponType Type { get; }
@@ -29,6 +37,16 @@ public abstract class Weapon : Item
     public float DurabilityPercentage => maxDurability > 0 ? (float)currentDurability / maxDurability : 1f;
     public bool IsBroken => currentDurability <= 0;
     public int AttackDamage => attackDamage;
+    
+    /// <summary>
+    /// 武器是否已準備好（裝備延遲已過）
+    /// </summary>
+    public bool IsReady => Time.time >= equipTime + equipDelay;
+    
+    /// <summary>
+    /// 裝備後剩餘的等待時間
+    /// </summary>
+    public float RemainingEquipTime => Mathf.Max(0, equipTime + equipDelay - Time.time);
 
     public event Action<GameObject> OnAttackPerformed; // 攻擊事件
     public event Action<int, int> OnDurabilityChanged; // 當前耐久度, 最大耐久度
@@ -45,7 +63,8 @@ public abstract class Weapon : Item
     public override void OnEquip()
     {
         base.OnEquip();
-        // 武器裝備時的邏輯
+        // 記錄裝備時間，用於計算掏槍延遲
+        equipTime = Time.time;
     }
     
     /// <summary>
@@ -69,19 +88,19 @@ public abstract class Weapon : Item
         transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
-    public virtual bool CanAttack() => Time.time >= lastAttackTime + attackCooldown && !IsBroken;
+    /// <summary>
+    /// 檢查是否可以攻擊
+    /// 條件：1) 攻擊冷卻完成 2) 裝備延遲完成 3) 武器未損壞
+    /// </summary>
+    public virtual bool CanAttack() 
+    {
+        return Time.time >= lastAttackTime + attackCooldown 
+            && Time.time >= equipTime + equipDelay  // 新增：檢查裝備延遲
+            && !IsBroken;
+    }
 
     public bool TryPerformAttack(Vector2 origin, GameObject attacker)
     {
-        
-        Debug.Log("TryPerformAttack");
-        Debug.Log("CanAttack: " + CanAttack());
-        Debug.Log("lastAttackTime: " + lastAttackTime);
-        Debug.Log("attackCooldown: " + attackCooldown);
-        Debug.Log("IsBroken: " + IsBroken);
-        Debug.Log("Time.time: " + Time.time);
-        Debug.Log("Time.time - lastAttackTime: " + (Time.time - lastAttackTime));
-        Debug.Log("Time.time - lastAttackTime < attackCooldown: " + (Time.time - lastAttackTime < attackCooldown));
         if (!CanAttack()) return false;
         lastAttackTime = Time.time;
         PerformAttack(origin, attacker);
@@ -101,11 +120,11 @@ public abstract class Weapon : Item
     /// <param name="amount">減少的數量</param>
     public virtual void ReduceDurability(int amount)
     {
+
         if (amount <= 0) return;
         
         int oldDurability = currentDurability;
         currentDurability = Mathf.Max(0, currentDurability - amount);
-        
         // 觸發耐久度變化事件
         OnDurabilityChanged?.Invoke(currentDurability, maxDurability);
         

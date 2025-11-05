@@ -10,13 +10,18 @@ using UnityEditor;
 /// 職責：載入物品資料、生成物品、處理撿取邏輯
 /// 參考 EnemyManager 的架構設計
 /// </summary>
+[DefaultExecutionOrder(200)] // 在 GameManager (150) 之後執行
 public class ItemManager : MonoBehaviour
 {
     [Header("物品資料設定")]
     [SerializeField] private TextAsset itemDataFile; // itemdata.txt 檔案
     [SerializeField] private GameObject worldItemPrefab; // WorldItem 的 Prefab
     
-    [Header("物品 Prefab 對應表")]
+    [Header("物品映射來源")]
+    [Tooltip("從 EntityManager 獲取物品映射（優先）")]
+    [SerializeField] private bool useEntityManagerMapping = true;
+    
+    [Header("物品 Prefab 對應表（僅當 useEntityManagerMapping 為 false 時使用）")]
     [Tooltip("物品類型名稱與對應的 Item Prefab（必須與 itemdata.txt 中的 ItemType 一致）")]
     [SerializeField] private ItemPrefabMapping[] itemPrefabMappings;
     
@@ -34,6 +39,9 @@ public class ItemManager : MonoBehaviour
     private List<WorldItemData> worldItemsData = new List<WorldItemData>(); // 從檔案載入的物品資料
     private List<WorldItem> spawnedItems = new List<WorldItem>(); // 已生成的物品
     private Dictionary<string, GameObject> itemPrefabDict = new Dictionary<string, GameObject>(); // 物品類型 -> Prefab
+    
+    // EntityManager 引用（用於獲取統一的 item mapping）
+    private EntityManager entityManager;
     
     // 統計資訊
     public int TotalItemCount => worldItemsData.Count;
@@ -63,6 +71,17 @@ public class ItemManager : MonoBehaviour
     /// </summary>
     private void InitializeManager()
     {
+        // 獲取 EntityManager 引用
+        if (useEntityManagerMapping)
+        {
+            entityManager = FindFirstObjectByType<EntityManager>();
+            if (entityManager == null)
+            {
+                Debug.LogWarning("ItemManager: EntityManager not found, falling back to local mappings");
+                useEntityManagerMapping = false;
+            }
+        }
+        
         // 建立物品類型對應表
         BuildItemPrefabDictionary();
         
@@ -85,6 +104,30 @@ public class ItemManager : MonoBehaviour
     {
         itemPrefabDict.Clear();
         
+        // 優先使用 EntityManager 的映射
+        if (useEntityManagerMapping && entityManager != null)
+        {
+            var entityMapping = entityManager.ItemMappingDict;
+            if (entityMapping != null && entityMapping.Count > 0)
+            {
+                foreach (var kvp in entityMapping)
+                {
+                    itemPrefabDict[kvp.Key] = kvp.Value;
+                }
+                
+                if (showDebugInfo)
+                {
+                    Debug.Log($"ItemManager: Loaded {itemPrefabDict.Count} item mappings from EntityManager");
+                }
+                return;
+            }
+            else
+            {
+                Debug.LogWarning("ItemManager: EntityManager mapping is empty, falling back to local mappings");
+            }
+        }
+        
+        // 使用本地映射（向後兼容）
         if (itemPrefabMappings == null || itemPrefabMappings.Length == 0)
         {
             Debug.LogWarning("ItemManager: No item prefab mappings assigned!");

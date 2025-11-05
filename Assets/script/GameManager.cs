@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// GameManager - Central game management system
@@ -10,7 +11,9 @@ using System.Collections;
 /// - Game initialization and cleanup
 /// - Score and statistics tracking
 /// - Game pause/resume functionality
+/// - Manager initialization coordination
 /// </summary>
+[DefaultExecutionOrder(150)] // 在 EntityManager (50) 和 Player (100) 之後執行
 public class GameManager : MonoBehaviour
 {
     // Singleton instance
@@ -28,8 +31,16 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameState currentState = GameState.MainMenu;
     
     [Header("System References")]
-    [SerializeField] private PlayerManager playerManager;
-    [SerializeField] private EnemyManager enemyManager;
+    [SerializeField] private EntityManager entityManager;
+    
+    [Header("Manager Initialization")]
+    [Tooltip("自動協調管理器初始化順序")]
+    [SerializeField] private bool autoInitializeManagers = true;
+    [Tooltip("顯示初始化調試信息")]
+    [SerializeField] private bool showInitializationDebug = false;
+    
+    // Target 記錄（由 GameManager 管理，不再由 Player 管理）
+    private List<Target> activeTargets = new List<Target>();
     
     [Header("Game Statistics")]
     [SerializeField] private int enemiesKilled = 0;
@@ -52,6 +63,73 @@ public class GameManager : MonoBehaviour
 
     public delegate void WaveChangedHandler(int waveNumber);
     public event WaveChangedHandler OnWaveChanged;
+    
+    // 初始化階段事件
+    public enum InitializationPhase
+    {
+        CoreSystems,      // EntityManager, Player
+        GameSystems,      // DangerousManager, ItemManager
+        UISystems         // 所有 UI Manager
+    }
+    
+    public delegate void PhaseInitializedHandler(InitializationPhase phase);
+    public event PhaseInitializedHandler OnPhaseInitialized;
+    
+    // Target 管理
+    /// <summary>
+    /// 註冊 Target（由 EntityManager 調用）
+    /// </summary>
+    public void RegisterTarget(Target target)
+    {
+        if (target != null && !activeTargets.Contains(target))
+        {
+            activeTargets.Add(target);
+            if (showInitializationDebug)
+                Debug.Log($"[GameManager] Target registered: {target.gameObject.name}");
+        }
+    }
+    
+    /// <summary>
+    /// 取消註冊 Target
+    /// </summary>
+    public void UnregisterTarget(Target target)
+    {
+        if (target != null && activeTargets.Remove(target))
+        {
+            if (showInitializationDebug)
+                Debug.Log($"[GameManager] Target unregistered: {target.gameObject.name}");
+        }
+    }
+    
+    /// <summary>
+    /// 檢查是否所有 Target 都已死亡
+    /// </summary>
+    public bool AreAllTargetsDead()
+    {
+        if (activeTargets.Count == 0)
+        {
+            // 如果沒有註冊的 Target，嘗試從 EntityManager 獲取
+            if (entityManager != null)
+            {
+                return entityManager.AreAllTargetsDead();
+            }
+            return false;
+        }
+        
+        foreach (var target in activeTargets)
+        {
+            if (target != null && !target.IsDead)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    /// <summary>
+    /// 獲取活躍的 Target 數量
+    /// </summary>
+    public int ActiveTargetCount => activeTargets.Count;
 
     private void Awake()
     {
@@ -73,6 +151,12 @@ public class GameManager : MonoBehaviour
         if (startPaused)
         {
             PauseGame();
+        }
+        
+        // 在 GameScene 中自動初始化管理器
+        if (currentState == GameState.Playing && autoInitializeManagers)
+        {
+            StartCoroutine(InitializeManagersSequentially());
         }
     }
 
@@ -144,26 +228,78 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 按順序初始化所有管理器（協調初始化流程）
+    /// </summary>
+    private IEnumerator InitializeManagersSequentially()
+    {
+        if (showInitializationDebug)
+            Debug.Log("[GameManager] Starting manager initialization sequence...");
+        
+        // 階段 1: 核心系統（EntityManager 應該已經通過 DefaultExecutionOrder 初始化）
+        yield return WaitForManager<EntityManager>();
+        if (showInitializationDebug)
+            Debug.Log("[GameManager] Phase 1: Core systems initialized");
+        OnPhaseInitialized?.Invoke(InitializationPhase.CoreSystems);
+        
+        // 階段 2: 遊戲系統
+        yield return WaitForManager<DangerousManager>();
+        yield return WaitForManager<ItemManager>();
+        if (showInitializationDebug)
+            Debug.Log("[GameManager] Phase 2: Game systems initialized");
+        OnPhaseInitialized?.Invoke(InitializationPhase.GameSystems);
+        
+        // 階段 3: UI 系統（通常已經通過事件系統初始化，但這裡確保順序）
+        yield return WaitForManager<GameUIManager>();
+        if (showInitializationDebug)
+            Debug.Log("[GameManager] Phase 3: UI systems initialized");
+        OnPhaseInitialized?.Invoke(InitializationPhase.UISystems);
+        
+        if (showInitializationDebug)
+            Debug.Log("[GameManager] All managers initialized successfully");
+    }
+    
+    /// <summary>
+    /// 等待指定的 Manager 初始化完成
+    /// </summary>
+    private IEnumerator WaitForManager<T>() where T : MonoBehaviour
+    {
+        T manager = FindFirstObjectByType<T>();
+        if (manager == null)
+        {
+            Debug.LogWarning($"[GameManager] {typeof(T).Name} not found in scene");
+            yield break;
+        }
+        
+        // 等待一幀，確保 Start() 已執行
+        yield return null;
+        
+        if (showInitializationDebug)
+            Debug.Log($"[GameManager] {typeof(T).Name} ready");
+    }
+    
+    /// <summary>
     /// Refresh references to systems in the current scene
     /// </summary>
     private void RefreshSystemReferences()
     {
-        playerManager = FindFirstObjectByType<PlayerManager>();
-        enemyManager = FindFirstObjectByType<EnemyManager>();
+        entityManager = FindFirstObjectByType<EntityManager>();
         
-        // Log warnings if managers are not found
-        if (playerManager == null)
-            Debug.LogWarning("[GameManager] PlayerManager not found in scene!");
+        // Log warnings if manager is not found
+        if (entityManager == null)
+            Debug.LogWarning("[GameManager] EntityManager not found in scene!");
         else
-            Debug.Log("[GameManager] PlayerManager found and registered");
+        {
+            Debug.Log("[GameManager] EntityManager found and registered");
             
-        if (enemyManager == null)
-            Debug.LogWarning("[GameManager] EnemyManager not found in scene!");
-        else
-            Debug.Log("[GameManager] EnemyManager found and registered");
+            // 訂閱 EntityManager 的 OnPlayerReady 事件，確保 Player 初始化完成後再設置事件監聽
+            entityManager.OnPlayerReady += SetupPlayerEventListeners;
             
-        // 監聽玩家死亡事件
-        SetupPlayerDeathListener();
+            // 如果 Player 已經存在，立即設置事件監聽
+            if (entityManager.Player != null)
+            {
+                SetupPlayerEventListeners();
+            }
+        }
     }
     
     /// <summary>
@@ -171,35 +307,48 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ClearGameplayReferences()
     {
-        // 取消玩家死亡和勝利事件監聽
-        Player player = FindFirstObjectByType<Player>();
-        if (player != null)
+        // 取消 EntityManager 事件訂閱
+        if (entityManager != null)
         {
-            player.OnPlayerDied -= HandlePlayerDeath;
-            player.OnPlayerWon -= HandlePlayerWin;
+            entityManager.OnPlayerReady -= SetupPlayerEventListeners;
+            
+            // 取消玩家事件監聽
+            if (entityManager.Player != null)
+            {
+                entityManager.Player.OnPlayerDied -= HandlePlayerDeath;
+                // 注意：OnPlayerWon 已不再使用，勝利條件由 CheckVictoryCondition 處理
+                entityManager.Player.OnPlayerReachedSpawnPoint -= HandlePlayerReachedSpawnPoint;
+            }
         }
         
-        playerManager = null;
-        enemyManager = null;
+        // 清理 Target 列表
+        activeTargets.Clear();
+        
+        entityManager = null;
         // Don't clear spawnPointManager if it uses DontDestroyOnLoad
     }
     
     /// <summary>
-    /// 設定玩家死亡事件監聽
+    /// 設定玩家事件監聽
     /// </summary>
-    private void SetupPlayerDeathListener()
+    private void SetupPlayerEventListeners()
     {
-        // 尋找 Player 並監聽死亡事件
-        Player player = FindFirstObjectByType<Player>();
-        if (player != null)
+        // 通過 EntityManager 訪問 Player 並監聽事件
+        if (entityManager != null && entityManager.Player != null)
         {
-            player.OnPlayerDied += HandlePlayerDeath;
-            player.OnPlayerWon += HandlePlayerWin;
-            Debug.Log("[GameManager] Player death and win listeners registered");
+            // 先取消訂閱（避免重複訂閱）
+            entityManager.Player.OnPlayerDied -= HandlePlayerDeath;
+            entityManager.Player.OnPlayerReachedSpawnPoint -= HandlePlayerReachedSpawnPoint;
+            
+            // 再訂閱事件
+            entityManager.Player.OnPlayerDied += HandlePlayerDeath;
+            // 注意：OnPlayerWon 已不再使用，勝利條件由 CheckVictoryCondition 處理
+            entityManager.Player.OnPlayerReachedSpawnPoint += HandlePlayerReachedSpawnPoint;
+            Debug.Log("[GameManager] Player event listeners registered");
         }
         else
         {
-            Debug.LogWarning("[GameManager] Player not found - cannot register listeners");
+            Debug.LogWarning("[GameManager] EntityManager or Player not found - cannot register listeners");
         }
     }
     
@@ -229,13 +378,92 @@ public class GameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 處理玩家勝利
+    /// 處理玩家勝利（已廢棄，不再使用）
+    /// 現在由 HandlePlayerReachedSpawnPoint 和 OnTargetDied 共同檢查勝利條件
     /// </summary>
-    public void HandlePlayerWin()
+    [System.Obsolete("此方法已廢棄，請使用 HandlePlayerReachedSpawnPoint 和 OnTargetDied 來檢查勝利條件", true)]
+    private void HandlePlayerWin()
     {
-        Debug.Log("[GameManager] Player won! Target eliminated and player returned to spawn point");
+        // 此方法已不再使用，保留僅為向後兼容
+        // 實際勝利檢查已移至 CheckVictoryCondition
+        Debug.LogWarning("[GameManager] HandlePlayerWin called (deprecated - should not be called)");
+    }
+    
+    /// <summary>
+    /// 處理玩家回到出生點
+    /// </summary>
+    private void HandlePlayerReachedSpawnPoint()
+    {
+        Debug.Log("[GameManager] Player reached spawn point");
+        CheckVictoryCondition();
+    }
+    
+    /// <summary>
+    /// 處理 Target 死亡
+    /// </summary>
+    public void OnTargetDied(Target target)
+    {
+        if (target == null) return;
         
-        // 觸發遊戲結束
+        Debug.Log($"[GameManager] Target died: {target.gameObject.name}");
+        CheckVictoryCondition();
+    }
+    
+    /// <summary>
+    /// 處理 Target 到達逃亡點（失敗條件）
+    /// </summary>
+    public void OnTargetReachedEscapePoint(Target target)
+    {
+        if (target == null) return;
+        
+        Debug.Log($"[GameManager] Target reached escape point: {target.gameObject.name} - Game Over!");
+        
+        // 觸發遊戲失敗
+        GameOver();
+        
+        // 延遲回到主畫面
+        StartCoroutine(ReturnToMainMenuAfterDelay(2f));
+    }
+    
+    /// <summary>
+    /// 檢查勝利條件
+    /// 獲勝條件：Target 死亡 且 玩家回到出生點
+    /// </summary>
+    private void CheckVictoryCondition()
+    {
+        if (entityManager == null || entityManager.Player == null)
+        {
+            return;
+        }
+        
+        // 檢查玩家是否死亡
+        if (entityManager.Player.IsDead)
+        {
+            return; // 玩家已死亡，不檢查勝利
+        }
+        
+        // 檢查是否所有 Target 都已死亡（使用 GameManager 的記錄）
+        if (!AreAllTargetsDead())
+        {
+            return; // 還有 Target 存活，不勝利
+        }
+        
+        // 檢查玩家是否在出生點
+        // 注意：這個方法在 HandlePlayerReachedSpawnPoint 中調用時，玩家應該在出生點
+        // 但為了安全起見，我們再次檢查
+        Vector3 playerPosition = entityManager.Player.transform.position;
+        Vector3 spawnPoint = entityManager.Player.SpawnPoint;
+        float distance = Vector3.Distance(playerPosition, spawnPoint);
+        
+        if (distance > entityManager.Player.SpawnPointTolerance)
+        {
+            // 玩家不在出生點，不勝利
+            return;
+        }
+        
+        Debug.Log("[GameManager] Victory condition met: All targets dead and player at spawn point!");
+        
+        // 觸發遊戲勝利
         GameOver();
         
         // 延遲回到主畫面，讓玩家看到勝利效果
@@ -490,7 +718,8 @@ public class GameManager : MonoBehaviour
     public void TestPlayerWin()
     {
         Debug.Log("[GameManager] Testing player win flow...");
-        HandlePlayerWin();
+        // 直接調用 CheckVictoryCondition 來測試勝利條件
+        CheckVictoryCondition();
     }
 
     private void OnDestroy()
