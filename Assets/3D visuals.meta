@@ -1,0 +1,12 @@
+fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/SimpleRuleTiles.meta
+guid: a08cb7808ade4214bb96d42b32499442
+========
+guid: 76b3af89a92c72142a644e4b8c498ee2
+>>>>>>>> 3e10a83 (Setup 3D URP):Assets/3D visuals.meta
+folderAsset: yes
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
