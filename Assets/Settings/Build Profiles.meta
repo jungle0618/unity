@@ -1,6 +1,10 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Settings/Build Profiles.meta
 guid: dff6196e0d8acfa419bf7ed47cb8970b
 folderAsset: yes
+========
+guid: dff38961ea32ebb49ba2a8028917a048
+>>>>>>>> af241b3 (Added more props and 3d stuff):Assets/_Recovery/0.unity.meta
 DefaultImporter:
   externalObjects: {}
   userData: 
