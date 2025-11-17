@@ -24,7 +24,8 @@ public class GameManager : MonoBehaviour
         MainMenu,
         Playing,
         Paused,
-        GameOver
+        GameOver,
+        GameWin
     }
 
     [Header("Game State")]
@@ -357,24 +358,10 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void HandlePlayerDeath()
     {
-        Debug.Log("[GameManager] Player died - ending game and returning to main menu");
+        Debug.Log("[GameManager] Player died - ending game");
         
-        // 觸發遊戲結束
+        // 觸發遊戲結束（會顯示結算頁面，不再自動返回主畫面）
         GameOver();
-        
-        // 延遲回到主畫面，讓玩家看到死亡效果
-        StartCoroutine(ReturnToMainMenuAfterDelay(2f));
-    }
-    
-    /// <summary>
-    /// 延遲回到主畫面
-    /// </summary>
-    private System.Collections.IEnumerator ReturnToMainMenuAfterDelay(float delay)
-    {
-        yield return new WaitForSecondsRealtime(delay); // 使用 Realtime 因為遊戲已暫停
-        
-        Debug.Log("[GameManager] Returning to main menu after player death");
-        ReturnToMainMenu();
     }
     
     /// <summary>
@@ -418,11 +405,8 @@ public class GameManager : MonoBehaviour
         
         Debug.Log($"[GameManager] Target reached escape point: {target.gameObject.name} - Game Over!");
         
-        // 觸發遊戲失敗
+        // 觸發遊戲失敗（會顯示結算頁面，不再自動返回主畫面）
         GameOver();
-        
-        // 延遲回到主畫面
-        StartCoroutine(ReturnToMainMenuAfterDelay(2f));
     }
     
     /// <summary>
@@ -463,22 +447,8 @@ public class GameManager : MonoBehaviour
         
         Debug.Log("[GameManager] Victory condition met: All targets dead and player at spawn point!");
         
-        // 觸發遊戲勝利
-        GameOver();
-        
-        // 延遲回到主畫面，讓玩家看到勝利效果
-        StartCoroutine(ReturnToMainMenuAfterWin(3f));
-    }
-    
-    /// <summary>
-    /// 延遲回到主畫面（勝利後）
-    /// </summary>
-    private System.Collections.IEnumerator ReturnToMainMenuAfterWin(float delay)
-    {
-        yield return new WaitForSecondsRealtime(delay);
-        
-        Debug.Log("[GameManager] Returning to main menu after game win");
-        ReturnToMainMenu();
+        // 觸發遊戲勝利（會顯示任務成功頁面，不再自動返回主畫面）
+        GameWin();
     }
 
     /// <summary>
@@ -523,6 +493,11 @@ public class GameManager : MonoBehaviour
             case GameState.GameOver:
                 Time.timeScale = 0f;
                 HandleGameOver();
+                break;
+
+            case GameState.GameWin:
+                Time.timeScale = 0f;
+                HandleGameWin();
                 break;
         }
     }
@@ -601,14 +576,32 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] Game Over!");
         ChangeGameState(GameState.GameOver);
     }
-
+    
+    /// <summary>
+    /// Trigger game win
+    /// </summary>
+    public void GameWin()
+    {
+        Debug.Log("[GameManager] Game Win!");
+        ChangeGameState(GameState.GameWin);
+    }
+    
     /// <summary>
     /// Handle game over logic
     /// </summary>
     private void HandleGameOver()
     {
-        // Save high scores or statistics here
-        SaveGameStatistics();
+        // 遊戲結束時的處理邏輯
+        // 如果需要保存統計數據，可以在這裡添加
+    }
+    
+    /// <summary>
+    /// Handle game win logic
+    /// </summary>
+    private void HandleGameWin()
+    {
+        // 保存最快速通關時間
+        SaveBestTime();
     }
 
     /// <summary>
@@ -666,27 +659,68 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Save game statistics
+    /// Save game statistics（已移除最高分保存功能）
     /// </summary>
     private void SaveGameStatistics()
     {
-        // Save high scores or statistics
-        int highScore = PlayerPrefs.GetInt("HighScore", 0);
-        if (enemiesKilled > highScore)
+        // 如果需要保存其他統計數據，可以在這裡添加
+        PlayerPrefs.Save();
+    }
+    
+    /// <summary>
+    /// 保存最快速通關時間
+    /// </summary>
+    private void SaveBestTime()
+    {
+        float currentTime = gameTime;
+        float bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
+        
+        // 如果當前時間更快，更新最快速通關時間
+        if (currentTime < bestTime)
         {
-            PlayerPrefs.SetInt("HighScore", enemiesKilled);
-            Debug.Log($"[GameManager] New high score: {enemiesKilled}");
+            PlayerPrefs.SetFloat("BestTime", currentTime);
+            Debug.Log($"[GameManager] New best time: {currentTime:F1} seconds");
         }
         
         PlayerPrefs.Save();
     }
-
+    
     /// <summary>
-    /// Get the high score
+    /// 獲取最快速通關時間
     /// </summary>
-    public int GetHighScore()
+    public float GetBestTime()
     {
-        return PlayerPrefs.GetInt("HighScore", 0);
+        float bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
+        // 如果沒有記錄，返回當前遊戲時間（第一次通關）
+        if (bestTime == float.MaxValue)
+        {
+            return gameTime;
+        }
+        return bestTime;
+    }
+    
+    /// <summary>
+    /// 獲取擊殺敵人數
+    /// </summary>
+    public int GetEnemiesKilled()
+    {
+        return enemiesKilled;
+    }
+    
+    /// <summary>
+    /// 獲取遊戲時間
+    /// </summary>
+    public float GetGameTime()
+    {
+        return gameTime;
+    }
+    
+    /// <summary>
+    /// 獲取當前波次
+    /// </summary>
+    public int GetCurrentWave()
+    {
+        return currentWave;
     }
 
     /// <summary>

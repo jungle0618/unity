@@ -19,6 +19,8 @@ public class GameUIManager : MonoBehaviour
     
     [Header("Game Process UI Managers - 遊戲過程中的功能 UI")]
     [SerializeField] private PauseUIManager pauseUIManager;             // 暫停選單（屬於遊戲過程中的 UI）
+    [SerializeField] private GameOverUIManager gameOverUIManager;       // 結算頁面（遊戲結束時顯示）
+    [SerializeField] private GameWinUIManager gameWinUIManager;         // 任務成功頁面（遊戲勝利時顯示）
     
     [Header("Optional UI Managers")]
     [SerializeField] private LoadingProgressUIManager loadingProgressUIManager;  // 載入進度（通常在 LoadingScene，可選）
@@ -152,6 +154,24 @@ public class GameUIManager : MonoBehaviour
         else
         {
             Debug.LogWarning("GameUIManager: PauseUIManager 未設定");
+        }
+        
+        if (gameOverUIManager != null)
+        {
+            gameOverUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: GameOverUIManager 未設定");
+        }
+        
+        if (gameWinUIManager != null)
+        {
+            gameWinUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: GameWinUIManager 未設定");
         }
         
         // 可選的載入進度UI（通常在 LoadingScene，不在 GameScene）
@@ -319,6 +339,30 @@ public class GameUIManager : MonoBehaviour
     }
     
     /// <summary>
+    /// 設定結算頁面UI管理器
+    /// </summary>
+    public void SetGameOverUIManager(GameOverUIManager manager)
+    {
+        gameOverUIManager = manager;
+        if (manager != null)
+        {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
+    /// 設定任務成功頁面UI管理器
+    /// </summary>
+    public void SetGameWinUIManager(GameWinUIManager manager)
+    {
+        gameWinUIManager = manager;
+        if (manager != null)
+        {
+            manager.Initialize();
+        }
+    }
+    
+    /// <summary>
     /// 設定載入進度UI管理器（可選，通常在 LoadingScene）
     /// </summary>
     public void SetLoadingProgressUIManager(LoadingProgressUIManager manager)
@@ -358,6 +402,16 @@ public class GameUIManager : MonoBehaviour
     /// 獲取暫停選單UI管理器
     /// </summary>
     public PauseUIManager GetPauseUIManager() => pauseUIManager;
+    
+    /// <summary>
+    /// 獲取結算頁面UI管理器
+    /// </summary>
+    public GameOverUIManager GetGameOverUIManager() => gameOverUIManager;
+    
+    /// <summary>
+    /// 獲取任務成功頁面UI管理器
+    /// </summary>
+    public GameWinUIManager GetGameWinUIManager() => gameWinUIManager;
     
     /// <summary>
     /// 獲取載入進度UI管理器（可選，通常在 LoadingScene）

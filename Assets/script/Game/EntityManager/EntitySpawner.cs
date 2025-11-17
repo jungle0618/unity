@@ -218,6 +218,8 @@ namespace Game.EntityManager
 
             // 訂閱攻擊事件
             eventManager.SubscribeToEnemyEvents(enemy);
+            
+            // 注意：敵人死亡事件訂閱在 EntityManager 中處理，這裡不需要訂閱
 
             // 設定 AI 更新間隔
             enemy.SetAIUpdateInterval(aiUpdateInterval + Random.Range(0f, aiUpdateInterval * 0.5f));
