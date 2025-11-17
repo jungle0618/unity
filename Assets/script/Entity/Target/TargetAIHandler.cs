@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -16,6 +17,7 @@ public class TargetAIHandler : MonoBehaviour
     private Vector3 currentEscapeTarget;
     private bool hasReachedGuard = false; // 是否已到達守衛位置（僅在 safe 等級時使用）
     private bool hasReachedEscapePoint = false; // 是否已到達逃亡點
+    private bool hasEverEnteredEscapeMode = false; // 是否曾經進入過逃亡模式（一旦進入就不會回到 Stay）
     
     // 系統引用
     private DangerousManager dangerousManager;
@@ -39,6 +41,10 @@ public class TargetAIHandler : MonoBehaviour
     private Vector2 cachedPosition;
     private Vector2 cachedDirectionToPlayer;
     private bool cachedCanSeePlayer;
+    
+    // 地圖可視化更新計時器
+    private float lastMapVisualizationUpdate = 0f;
+    private const float MAP_VISUALIZATION_UPDATE_INTERVAL = 1.0f; // 每秒更新一次
     
     private void Awake()
     {
@@ -106,6 +112,22 @@ public class TargetAIHandler : MonoBehaviour
     }
     
     /// <summary>
+    /// 獲取當前逃亡目標位置（用於可視化）
+    /// </summary>
+    public Vector3 GetCurrentEscapeTarget()
+    {
+        return currentEscapeTarget;
+    }
+    
+    /// <summary>
+    /// 檢查是否曾經進入逃亡模式
+    /// </summary>
+    public bool HasEverEnteredEscapeMode()
+    {
+        return hasEverEnteredEscapeMode;
+    }
+    
+    /// <summary>
     /// 更新快取數據（由 Target 調用）
     /// </summary>
     public void UpdateCachedData(Vector2 position, Vector2 directionToPlayer, bool canSeePlayer)
@@ -167,6 +189,7 @@ public class TargetAIHandler : MonoBehaviour
         targetStateMachine.ChangeState(TargetState.Escape);
         hasReachedGuard = false;
         hasReachedEscapePoint = false;
+        hasEverEnteredEscapeMode = true; // 標記已經進入逃亡模式
         
         // 根據設定決定逃亡路線
         if (showDebugInfo)
@@ -227,6 +250,53 @@ public class TargetAIHandler : MonoBehaviour
                 }
             }
         }
+        
+        // 延遲顯示地圖標記，讓路徑先計算
+        // 使用協程在下一幀更新地圖可視化
+        StartCoroutine(UpdateMapVisualizationNextFrame());
+    }
+    
+    /// <summary>
+    /// 在下一幀更新地圖可視化（等待路徑計算完成）
+    /// </summary>
+    private System.Collections.IEnumerator UpdateMapVisualizationNextFrame()
+    {
+        // 等待一幀，讓 ExecuteMovement 有機會計算路徑
+        yield return null;
+        
+        // 再等待幾幀確保路徑完全計算完成
+        for (int i = 0; i < 3; i++)
+        {
+            yield return null;
+        }
+        
+        // 現在更新地圖可視化
+        UpdateMapVisualization();
+    }
+    
+    /// <summary>
+    /// 更新地圖可視化（顯示逃亡點和路徑）
+    /// </summary>
+    public void UpdateMapVisualization()
+    {
+        MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
+        if (mapUI != null && escapePoint != Vector3.zero)
+        {
+            // 獲取當前的 A* 路徑
+            List<PathfindingNode> currentPath = targetMovement?.GetCurrentPath();
+            
+            // 傳遞逃亡點、目標位置和路徑
+            mapUI.ShowEscapePoint(escapePoint, transform.position, currentPath);
+            
+            if (currentPath != null && currentPath.Count > 0)
+            {
+                Debug.LogWarning($"[TargetAI] {gameObject.name} 地圖已更新：逃亡點標記 + A* 路徑（{currentPath.Count} 個節點）");
+            }
+            else
+            {
+                Debug.LogWarning($"[TargetAI] {gameObject.name} 地圖已更新：逃亡點標記（路徑尚未計算或使用直線）");
+            }
+        }
     }
     
     /// <summary>
@@ -234,6 +304,13 @@ public class TargetAIHandler : MonoBehaviour
     /// </summary>
     private void HandleStayState()
     {
+        // 如果曾經進入過逃亡模式，不應該回到 Stay 狀態，強制切換回 Escape
+        if (hasEverEnteredEscapeMode)
+        {
+            targetStateMachine?.ChangeState(TargetState.Escape);
+            return;
+        }
+        
         // 停止移動
         targetMovement?.StopMovement();
         
@@ -250,13 +327,35 @@ public class TargetAIHandler : MonoBehaviour
     /// </summary>
     private void HandleEscapeState()
     {
+        // 定期更新地圖可視化（每秒一次）
+        if (Time.time - lastMapVisualizationUpdate > MAP_VISUALIZATION_UPDATE_INTERVAL)
+        {
+            UpdateMapVisualization();
+            lastMapVisualizationUpdate = Time.time;
+        }
+        
         // 檢查是否到達逃亡點
         if (!hasReachedEscapePoint && Vector2.Distance(cachedPosition, escapePoint) < 1f)
         {
             // 到達逃亡點，停止移動
             hasReachedEscapePoint = true;
             targetMovement?.StopMovement();
-            Debug.Log($"{gameObject.name}: 已到達逃亡點！");
+            
+            // 在地圖上隱藏逃亡點標記
+            MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
+            if (mapUI != null)
+            {
+                mapUI.HideEscapePoint();
+            }
+            
+            // 顯示通知
+            NotificationUIManager notification = FindFirstObjectByType<NotificationUIManager>();
+            if (notification != null)
+            {
+                notification.ShowNotification("The target has escaped!", 10f);
+            }
+            
+            Debug.LogWarning($"[目標逃脫] {gameObject.name} 已到達逃亡點 {escapePoint}！");
             
             // 觸發到達逃亡點事件
             if (target != null)
@@ -311,4 +410,5 @@ public class TargetAIHandler : MonoBehaviour
         return nearestGuard;
     }
 }
+
 

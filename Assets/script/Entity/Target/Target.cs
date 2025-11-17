@@ -56,7 +56,7 @@ public class Target : BaseEntity<TargetState>, IEntity
 
     [Header("逃亡設定")]
     [Tooltip("逃亡速度")]
-    [SerializeField] private float escapeSpeed = 3f;
+    [SerializeField] private float escapeSpeed = 1.5f;
     
 
     // 效能優化變數
@@ -158,6 +158,13 @@ public class Target : BaseEntity<TargetState>, IEntity
             targetStateMachine.ChangeState(TargetState.Stay);
         }
         SetCanVisualize(false);
+        
+        // 在地圖上註冊目標標記
+        MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
+        if (mapUI != null)
+        {
+            mapUI.AddTargetMarker(this);
+        }
     }
 
     protected override void Update()

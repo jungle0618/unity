@@ -264,6 +264,9 @@ public class Player : BaseEntity<PlayerState>, IEntity
     {
         base.Update(); // 調用基類 Update
         
+        // 數字鍵快速切換武器：1=Knife, 2=Gun, 3=Empty Hands
+        HandleNumberKeyWeaponSwitch();
+        
         // 更新武器方向（限制更新頻率以提升性能）
         if (Time.time - weaponUpdateTime >= WEAPON_UPDATE_INTERVAL)
         {
@@ -431,11 +434,76 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
     private void OnSwitchWeaponPerformed(InputAction.CallbackContext ctx)
     {
-        // 切換物品邏輯
+        // 切換武器邏輯（只在武器之間循環，不包括鑰匙等）
         if (ItemHolder != null)
         {
-            ItemHolder.SwitchToNextItem();
+            ItemHolder.SwitchToNextWeapon(); // 只切換武器 + 空手
         }
+    }
+
+    private void HandleNumberKeyWeaponSwitch()
+    {
+        if (ItemHolder == null) return;
+        
+        // 1 = Knife
+        if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1))
+        {
+            TrySwitchToWeaponType("Knife");
+            return;
+        }
+        // 2 = Gun
+        if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2))
+        {
+            TrySwitchToWeaponType("Gun");
+            return;
+        }
+        // 3 = Empty Hands
+        if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3))
+        {
+            ItemHolder.TryEquipEmptyHands();
+            return;
+        }
+    }
+
+    private void TrySwitchToWeaponType(string typeKey)
+    {
+        // 取得所有武器，依獲取順序（GetAllItems 的順序與加入一致）
+        var allWeapons = ItemHolder.GetItemsOfType<Weapon>();
+        Weapon target = null;
+        foreach (var w in allWeapons)
+        {
+            if (GetWeaponTypeKey(w) == typeKey)
+            {
+                target = w; break;
+            }
+        }
+        if (target == null) return;
+        
+        // 切換到該武器實例
+        var allItems = ItemHolder.GetAllItems();
+        for (int i = 0; i < allItems.Count; i++)
+        {
+            if (allItems[i] == target)
+            {
+                ItemHolder.SwitchToItem(i);
+                return;
+            }
+        }
+    }
+
+    private string GetWeaponTypeKey(Weapon w)
+    {
+        if (w == null) return null;
+        string n = w.ItemName != null ? w.ItemName.ToLowerInvariant() : null;
+        if (!string.IsNullOrEmpty(n))
+        {
+            if (n.Contains("knife")) return "Knife";
+            if (n.Contains("gun")) return "Gun";
+        }
+        string t = w.GetType().Name.ToLowerInvariant();
+        if (t.Contains("knife")) return "Knife";
+        if (t.Contains("gun")) return "Gun";
+        return null;
     }
 
     #endregion

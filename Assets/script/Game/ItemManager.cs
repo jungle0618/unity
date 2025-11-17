@@ -373,9 +373,12 @@ public class ItemManager : MonoBehaviour
         WorldItem closestItem = null;
         float closestDistanceSqr = maxRange * maxRange;
         
+        // 清理已銷毀的物品
+        spawnedItems.RemoveAll(item => item == null || item.gameObject == null);
+        
         foreach (var item in spawnedItems)
         {
-            if (item == null) continue;
+            if (item == null || item.gameObject == null) continue;
             
             float distanceSqr = (item.Position - position).sqrMagnitude;
             
@@ -400,6 +403,16 @@ public class ItemManager : MonoBehaviour
             return false;
         }
         
+        // 檢查物品是否已經被撿取（GameObject 是否已被銷毀）
+        if (worldItem.gameObject == null)
+        {
+            Debug.LogWarning($"ItemManager: WorldItem {worldItem.ItemType} GameObject already destroyed!");
+            spawnedItems.Remove(worldItem);
+            return false;
+        }
+        
+        Debug.Log($"[ItemManager] Attempting to pickup {worldItem.ItemType}. Current items in holder: {targetHolder.ItemCount}");
+        
         // 將物品 Prefab 加入 ItemHolder（不裝備，只加到列表尾端）
         Item addedItem = targetHolder.AddItemFromPrefab(worldItem.ItemPrefab);
         
@@ -409,8 +422,13 @@ public class ItemManager : MonoBehaviour
             return false;
         }
         
-        // 從場景中移除物品
-        spawnedItems.Remove(worldItem);
+        Debug.Log($"[ItemManager] Successfully added {worldItem.ItemType} to holder. New count: {targetHolder.ItemCount}");
+        
+        // 從場景中移除物品（先從列表移除，再銷毀）
+        bool removed = spawnedItems.Remove(worldItem);
+        Debug.Log($"[ItemManager] Removed from spawnedItems: {removed}. Remaining items: {spawnedItems.Count}");
+        
+        // 銷毀 GameObject
         worldItem.OnPickedUp(); // 會銷毀 GameObject
         
         if (showDebugInfo)

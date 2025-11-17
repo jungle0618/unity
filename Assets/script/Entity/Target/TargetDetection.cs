@@ -153,7 +153,6 @@ public class TargetDetection : BaseDetection
         {
             LookAtTarget(dirToTarget);
         }
-        Debug.LogError("CanSeeTarget: " + true);
 
         return true;
     }

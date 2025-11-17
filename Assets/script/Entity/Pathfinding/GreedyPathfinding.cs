@@ -314,7 +314,7 @@ public class GreedyPathfinding : MonoBehaviour
 
         if (iterations >= maxIterations)
         {
-            Debug.LogWarning("改進貪心算法達到最大迭代次數！");
+            Debug.Log("改進貪心算法達到最大迭代次數！");
             return null;
         }
 

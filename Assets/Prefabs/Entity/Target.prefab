@@ -84,11 +84,13 @@ MonoBehaviour:
   arriveThreshold: 0.2
   patrolPoints: []
   usePathfinding: 1
+  useAStar: 1
   pathUpdateDistance: 2
   chasePathUpdateDistance: 1
   pathReachThreshold: 0.5
   chasePathReachThreshold: 0.3
   targetPositionChangeThreshold: 0.5
+  showPathfindingDebug: 1
   obstaclesLayerMask:
     serializedVersion: 2
     m_Bits: 4194496
@@ -140,6 +142,11 @@ MonoBehaviour:
   healthBarOffset: 0.5
   healthBarBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   healthBarForegroundColor: {r: 0, g: 1, b: 0, a: 1}
+  showEscapePath: 1
+  escapePathColor: {r: 1, g: 0, b: 0, a: 0.8}
+  escapePointColor: {r: 1, g: 0.5, b: 0, a: 1}
+  escapePathWidth: 0.1
+  escapePointRadius: 0.5
 --- !u!114 &6284012439364513415
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -194,10 +201,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4285ee845d1013342a8a88d37000d612, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Target
-  baseSpeed: 7
+  baseSpeed: 5
   baseViewRange: 8
   baseViewAngle: 90
-  escapeSpeed: 10
+  escapeSpeed: 5
 --- !u!212 &-4752818439337429296
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -308,3 +315,4 @@ MonoBehaviour:
   itemPrefabs: []
   equipOnStart: 1
   allowDynamicEquipping: 1
+  useEmptyHands: 0

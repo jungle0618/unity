@@ -22,11 +22,13 @@ public class TargetMovement : BaseMovement
 
     [Header("路徑規劃")]
     [SerializeField] private bool usePathfinding = true;
+    [SerializeField] private bool useAStar = true; // 優先使用 A* 算法
     [SerializeField] private float pathUpdateDistance = 2f;
     [SerializeField] private float chasePathUpdateDistance = 1f;
     [SerializeField] private float pathReachThreshold = 0.5f;
     [SerializeField] private float chasePathReachThreshold = 0.3f;
     [SerializeField] private float targetPositionChangeThreshold = 0.5f;
+    [SerializeField] private bool showPathfindingDebug = true; // 顯示路徑規劃調試信息
 
     [Header("直線追擊檢測")]
     [SerializeField] private LayerMask obstaclesLayerMask;
@@ -34,7 +36,8 @@ public class TargetMovement : BaseMovement
 
     private Vector2 spawnPoint;
     private int patrolIndex = 0;
-    private GreedyPathfinding pathfinding;
+    private GreedyPathfinding greedyPathfinding;
+    private AStarPathfinding aStarPathfinding;
     
     // 路徑規劃
     private List<PathfindingNode> currentPath = new List<PathfindingNode>();
@@ -60,10 +63,11 @@ public class TargetMovement : BaseMovement
         spawnPoint = transform.position;
 
         // 自動查找路徑規劃組件
-        pathfinding = FindFirstObjectByType<GreedyPathfinding>();
-        if (usePathfinding && pathfinding == null)
+        greedyPathfinding = FindFirstObjectByType<GreedyPathfinding>();
+        aStarPathfinding = FindFirstObjectByType<AStarPathfinding>();
+        if (usePathfinding && greedyPathfinding == null && aStarPathfinding == null)
         {
-            Debug.LogError($"{gameObject.name}: 找不到 GreedyPathfinding 組件！");
+            Debug.LogError($"{gameObject.name}: 找不到 GreedyPathfinding 或 AStarPathfinding 組件！");
         }
 
         // 自動配置 ObstaclesLayerMask
@@ -170,6 +174,14 @@ public class TargetMovement : BaseMovement
     }
     
     /// <summary>
+    /// 檢查是否有可用的路徑規劃組件
+    /// </summary>
+    private bool HasPathfinding()
+    {
+        return (useAStar && aStarPathfinding != null) || greedyPathfinding != null;
+    }
+    
+    /// <summary>
     /// 逃亡移動（使用路徑規劃，最短路徑到目標）
     /// </summary>
     public void MoveTowardsEscape(Vector3 target, float escapeSpeed)
@@ -177,7 +189,7 @@ public class TargetMovement : BaseMovement
         float baseSpeed = GetBaseSpeed();
         float speedMultiplier = escapeSpeed / baseSpeed;
         
-        if (usePathfinding && pathfinding != null)
+        if (usePathfinding && greedyPathfinding != null)
         {
             // 使用路徑規劃移動到目標
             MoveTowardsWithPathfinding(target, speedMultiplier);
@@ -194,7 +206,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public void MoveTowardsSmart(Vector2 target, float speedMultiplier)
     {
-        if (usePathfinding && pathfinding != null)
+        if (usePathfinding && HasPathfinding())
         {
             MoveTowardsWithPathfinding(target, speedMultiplier);
         }
@@ -308,7 +320,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public void MoveTowardsWithChasePathfinding(Vector2 target, float speedMultiplier)
     {
-        if (!usePathfinding || pathfinding == null)
+        if (!usePathfinding || !HasPathfinding())
         {
             // 如果沒有路徑規劃，使用直接移動
             MoveTowards(target, speedMultiplier);
@@ -418,7 +430,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public void MoveTowardsWithPathfinding(Vector2 target, float speedMultiplier)
     {
-        if (!usePathfinding || pathfinding == null)
+        if (!usePathfinding || !HasPathfinding())
         {
             // 如果沒有路徑規劃，使用直接移動
             MoveTowards(target, speedMultiplier);
@@ -509,16 +521,68 @@ public class TargetMovement : BaseMovement
     /// </summary>
     private void UpdatePathToTargetSafe(Vector2 target)
     {
-        if (pathfinding == null) return;
+        if (!HasPathfinding()) 
+        {
+            if (showPathfindingDebug)
+            {
+                Debug.LogWarning($"{gameObject.name}: 沒有可用的路徑規劃組件");
+            }
+            return;
+        }
 
-        PathfindingGrid grid = pathfinding.GetComponent<PathfindingGrid>() ?? FindFirstObjectByType<PathfindingGrid>();
-        if (grid == null) return;
+        PathfindingGrid grid = FindFirstObjectByType<PathfindingGrid>();
+        if (grid == null)
+        {
+            if (showPathfindingDebug)
+            {
+                Debug.LogError($"{gameObject.name}: 找不到 PathfindingGrid");
+            }
+            return;
+        }
 
         // 調整起點和終點到可行走位置
         Vector2 start = AdjustToWalkable(grid, transform.position, 2f);
         Vector2 adjustedTarget = AdjustToWalkable(grid, target, 3f);
 
-        currentPath = pathfinding.FindPath(start, adjustedTarget);
+        if (showPathfindingDebug)
+        {
+            Debug.Log($"{gameObject.name}: 更新路徑 {start} → {adjustedTarget}");
+        }
+
+        // 優先使用 A* 算法
+        if (useAStar && aStarPathfinding != null)
+        {
+            currentPath = aStarPathfinding.FindPath(start, adjustedTarget);
+        }
+        else if (greedyPathfinding != null)
+        {
+            currentPath = greedyPathfinding.FindPath(start, adjustedTarget);
+        }
+        
+        if (currentPath != null && showPathfindingDebug)
+        {
+            // 使用 LogWarning 讓路徑信息更顯眼，方便快速閱讀
+            string pathDetails = "";
+            for (int i = 0; i < Mathf.Min(currentPath.Count, 10); i++) // 只顯示前10個節點
+            {
+                pathDetails += $"\n  [{i}] ({currentPath[i].worldPosition.x:F1}, {currentPath[i].worldPosition.y:F1})";
+            }
+            if (currentPath.Count > 10)
+            {
+                pathDetails += $"\n  ... 還有 {currentPath.Count - 10} 個節點";
+            }
+            
+            string algorithm = (useAStar && aStarPathfinding != null) ? "A*" : "Greedy";
+            Debug.Log($"[{algorithm}路徑] {gameObject.name}: ✓ 路徑已更新！\n" +
+                           $"起點: ({start.x:F1}, {start.y:F1})\n" +
+                           $"終點: ({adjustedTarget.x:F1}, {adjustedTarget.y:F1})\n" +
+                           $"節點數: {currentPath.Count}{pathDetails}");
+        }
+        else if (currentPath == null && showPathfindingDebug)
+        {
+            Debug.LogWarning($"{gameObject.name}: ✗ 無法找到路徑！起點: ({start.x:F1}, {start.y:F1}) → 終點: ({adjustedTarget.x:F1}, {adjustedTarget.y:F1})");
+        }
+        
         currentPathIndex = 0;
         lastPathUpdatePosition = transform.position;
         lastTargetPosition = target;

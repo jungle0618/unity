@@ -31,6 +31,16 @@ public class MapUIManager : MonoBehaviour
     private List<MapMarker> mapMarkers = new List<MapMarker>();
     private bool isVisible = false;
     
+    // 逃亡點標記
+    private MapMarker escapePointMarker;
+    
+    // 逃亡路徑線（地圖UI上）
+    private GameObject escapePathLineContainer; // 容器存放所有路徑線段
+    private List<GameObject> escapePathLineSegments = new List<GameObject>(); // 所有線段
+    
+    // 目標標記（Target markers）
+    private Dictionary<Target, MapMarker> targetMarkers = new Dictionary<Target, MapMarker>();
+    
     /// <summary>
     /// 初始化地圖UI
     /// </summary>
@@ -64,6 +74,12 @@ public class MapUIManager : MonoBehaviour
         if (isVisible && updateInRealtime && player != null)
         {
             UpdatePlayerPosition();
+        }
+        
+        // 更新目標標記位置
+        if (isVisible)
+        {
+            UpdateTargetMarkers();
         }
     }
     
@@ -144,9 +160,19 @@ public class MapUIManager : MonoBehaviour
     /// </summary>
     private Vector2 WorldToMapPosition(Vector3 worldPosition)
     {
-        // 基本的座標轉換：世界XZ座標 -> 地圖XY座標
+        // 優先使用 TilemapMapUIManager 的精確轉換方法
+        TilemapMapUIManager tilemapMapUI = GetComponent<TilemapMapUIManager>();
+        
+        if (tilemapMapUI != null)
+        {
+            // 使用 TilemapMapUI 的公開轉換方法，保證完全對齊
+            return tilemapMapUI.WorldToMapUIPosition(worldPosition);
+        }
+        
+        // 降級方案：使用簡單的縮放和偏移
+        Debug.LogWarning("[MapUI] 找不到 TilemapMapUIManager，使用簡單轉換");
         float mapX = (worldPosition.x + worldOffset.x) * mapScale;
-        float mapY = (worldPosition.z + worldOffset.y) * mapScale;
+        float mapY = (worldPosition.y + worldOffset.y) * mapScale;
         
         return new Vector2(mapX, mapY);
     }
@@ -185,6 +211,7 @@ public class MapUIManager : MonoBehaviour
         }
         
         // 創建標記
+        Debug.Log("[MapUIManager] 添加地圖標記: " + markerName + " at " + worldPosition);
         GameObject markerObj = Instantiate(mapMarkerPrefab, container);
         MapMarker marker = markerObj.GetComponent<MapMarker>();
         
@@ -277,43 +304,289 @@ public class MapUIManager : MonoBehaviour
     }
     
     #endregion
-}
-
-/// <summary>
-/// 地圖標記類別
-/// 代表地圖上的一個標記點
-/// </summary>
-public class MapMarker : MonoBehaviour
-{
-    [SerializeField] private UnityEngine.UI.Image markerImage;
-    [SerializeField] private TMPro.TextMeshProUGUI markerNameText;
     
-    private Vector3 worldPosition;
-    private string markerName;
+    #region 目標標記管理
     
-    public Vector3 WorldPosition => worldPosition;
-    public string MarkerName => markerName;
-    
-    public void SetWorldPosition(Vector3 position)
+    /// <summary>
+    /// 添加目標標記到地圖
+    /// </summary>
+    public void AddTargetMarker(Target target)
     {
-        worldPosition = position;
-    }
-    
-    public void SetMarkerName(string name)
-    {
-        markerName = name;
-        if (markerNameText != null)
+        if (target == null) return;
+        
+        // 如果已經有標記，不重複添加
+        if (targetMarkers.ContainsKey(target)) return;
+        
+        // 創建標記
+        Vector3 targetPos = target.transform.position;
+        MapMarker marker = AddMarker(targetPos, "目標");
+        
+        if (marker != null)
         {
-            markerNameText.text = name;
+            // 設定為紅色
+            marker.SetMarkerColor(new Color(1f, 0f, 0f, 1f)); // Red
+            
+            // 標記稍微小一點
+            RectTransform markerRect = marker.GetComponent<RectTransform>();
+            if (markerRect != null)
+            {
+                markerRect.localScale = Vector3.one * 0.8f;
+            }
+            
+            targetMarkers[target] = marker;
+            Debug.Log($"[MapUI] 目標標記已添加: {target.name}");
         }
     }
     
-    public void SetMarkerColor(Color color)
+    /// <summary>
+    /// 移除目標標記
+    /// </summary>
+    public void RemoveTargetMarker(Target target)
     {
-        if (markerImage != null)
+        if (target == null) return;
+        
+        if (targetMarkers.TryGetValue(target, out MapMarker marker))
         {
-            markerImage.color = color;
+            RemoveMarker(marker);
+            targetMarkers.Remove(target);
+            Debug.Log($"[MapUI] 目標標記已移除: {target.name}");
         }
     }
+    
+    /// <summary>
+    /// 更新所有目標標記位置
+    /// </summary>
+    private void UpdateTargetMarkers()
+    {
+        if (!isVisible) return;
+        
+        // 創建列表以避免在迭代時修改字典
+        List<Target> targetsToRemove = new List<Target>();
+        
+        foreach (var kvp in targetMarkers)
+        {
+            Target target = kvp.Key;
+            MapMarker marker = kvp.Value;
+            
+            if (target == null || target.IsDead)
+            {
+                // 目標已死亡，標記為待移除
+                targetsToRemove.Add(target);
+                continue;
+            }
+            
+            // 更新標記位置
+            Vector2 mapPos = WorldToMapPosition(target.transform.position);
+            RectTransform markerRect = marker.GetComponent<RectTransform>();
+            if (markerRect != null)
+            {
+                markerRect.anchoredPosition = mapPos;
+            }
+        }
+        
+        // 移除死亡的目標標記
+        foreach (Target target in targetsToRemove)
+        {
+            RemoveTargetMarker(target);
+        }
+    }
+    
+    #endregion
+    
+    #region 逃亡點標記
+    
+    /// <summary>
+    /// 顯示逃亡點標記（亮綠色）並繪製路徑線
+    /// </summary>
+    /// <param name="escapePointWorldPos">逃亡點世界座標</param>
+    /// <param name="targetWorldPos">目標當前世界座標</param>
+    /// <param name="pathNodes">A* 路徑節點列表（可選）</param>
+    public void ShowEscapePoint(Vector3 escapePointWorldPos, Vector3 targetWorldPos, List<PathfindingNode> pathNodes = null)
+    {
+        // 如果已經有逃亡點標記，先移除
+        if (escapePointMarker != null)
+        {
+            RemoveMarker(escapePointMarker);
+            escapePointMarker = null;
+        }
+        
+        // 清除舊的路徑線
+        ClearEscapePathLine();
+        
+        // 創建新的逃亡點標記
+        escapePointMarker = AddMarker(escapePointWorldPos, "Escape Point");
+        
+        if (escapePointMarker != null)
+        {
+            // 設定為亮綠色
+            escapePointMarker.SetMarkerColor(new Color(0f, 1f, 0f, 1f)); // Bright Green
+            
+            // 讓標記稍微大一點
+            RectTransform markerRect = escapePointMarker.GetComponent<RectTransform>();
+            if (markerRect != null)
+            {
+                markerRect.localScale = Vector3.one * 1.5f; // 放大1.5倍
+            }
+            
+            Debug.LogWarning($"[MapUI] ✓ 逃亡點已顯示在地圖上: {escapePointWorldPos}");
+        }
+        
+        // 繪製路徑線（使用 A* 路徑或直線）
+        if (pathNodes != null && pathNodes.Count > 0)
+        {
+            DrawEscapePathWithWaypoints(targetWorldPos, pathNodes);
+        }
+        else
+        {
+            // 沒有路徑，繪製直線
+            DrawEscapePathDirectLine(targetWorldPos, escapePointWorldPos);
+        }
+    }
+    
+    /// <summary>
+    /// 在地圖上繪製逃亡路徑線（使用 A* 路徑節點）
+    /// </summary>
+    private void DrawEscapePathWithWaypoints(Vector3 startWorldPos, List<PathfindingNode> pathNodes)
+    {
+        Transform container = markersContainer != null ? markersContainer : mapContainer;
+        if (container == null) return;
+        
+        // 創建容器存放所有線段
+        escapePathLineContainer = new GameObject("EscapePathLines");
+        escapePathLineContainer.transform.SetParent(container, false);
+        
+        RectTransform containerRect = escapePathLineContainer.AddComponent<RectTransform>();
+        containerRect.anchoredPosition = Vector2.zero;
+        containerRect.sizeDelta = Vector2.zero;
+        
+        // 建立完整路徑點列表（起點 + 所有路徑節點）
+        List<Vector2> pathMapPositions = new List<Vector2>();
+        pathMapPositions.Add(WorldToMapPosition(startWorldPos)); // 起點：目標當前位置
+        
+        foreach (var node in pathNodes)
+        {
+            pathMapPositions.Add(WorldToMapPosition(node.worldPosition));
+        }
+        
+        // 繪製每段線
+        for (int i = 0; i < pathMapPositions.Count - 1; i++)
+        {
+            DrawLineSegment(pathMapPositions[i], pathMapPositions[i + 1], container);
+        }
+        
+        Debug.LogWarning($"[MapUI] ✓ 逃亡路徑已繪製: {pathMapPositions.Count} 個點，{escapePathLineSegments.Count} 條線段");
+    }
+    
+    /// <summary>
+    /// 繪製單條線段
+    /// </summary>
+    private bool DrawLineSegment(Vector2 startMapPos, Vector2 endMapPos, Transform parent)
+    {
+        // 計算線的方向和長度
+        Vector2 direction = endMapPos - startMapPos;
+        float distance = direction.magnitude;
+        
+        if (distance < 0.1f)
+        {
+            Debug.Log($"[MapUI] 跳過過短線段: {startMapPos} → {endMapPos} (長度: {distance:F2})");
+            return false; // 太短的線段不繪製
+        }
+        
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        
+        // 創建線段 GameObject
+        GameObject lineSegment = new GameObject($"PathSegment_{escapePathLineSegments.Count}");
+        lineSegment.transform.SetParent(escapePathLineContainer.transform, false);
+        
+        // 添加 RectTransform
+        RectTransform lineRect = lineSegment.AddComponent<RectTransform>();
+        
+        // 添加 Image 組件作為線條
+        UnityEngine.UI.Image lineImage = lineSegment.AddComponent<UnityEngine.UI.Image>();
+        lineImage.color = new Color(0f, 1f, 0f, 0.8f); // 亮綠色，稍微透明
+        
+        // 設置線條的位置、大小和旋轉
+        lineRect.anchoredPosition = startMapPos;
+        lineRect.sizeDelta = new Vector2(distance, 3f); // 寬度3像素
+        lineRect.pivot = new Vector2(0, 0.5f); // 從左側中心開始
+        lineRect.rotation = Quaternion.Euler(0, 0, angle);
+        
+        // 添加到列表以便後續清理
+        escapePathLineSegments.Add(lineSegment);
+        
+        Debug.Log($"[MapUI] 線段已創建: {startMapPos:F1} → {endMapPos:F1}, 長度: {distance:F1}, 角度: {angle:F1}°");
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// 在地圖上繪製直線逃亡路徑（無 A* 路徑時使用）
+    /// </summary>
+    private void DrawEscapePathDirectLine(Vector3 startWorldPos, Vector3 endWorldPos)
+    {
+        Transform container = markersContainer != null ? markersContainer : mapContainer;
+        if (container == null) return;
+        
+        // 創建容器
+        escapePathLineContainer = new GameObject("EscapePathLine_Direct");
+        escapePathLineContainer.transform.SetParent(container, false);
+        
+        // 轉換為地圖座標
+        Vector2 startMapPos = WorldToMapPosition(startWorldPos);
+        Vector2 endMapPos = WorldToMapPosition(endWorldPos);
+        
+        // 繪製單條線
+        DrawLineSegment(startMapPos, endMapPos, container);
+        
+        Debug.LogWarning($"[MapUI] ✓ 逃亡直線路徑已繪製: {startWorldPos} → {endWorldPos}");
+    }
+    
+    /// <summary>
+    /// 清除逃亡路徑線
+    /// </summary>
+    private void ClearEscapePathLine()
+    {
+        // 清除所有線段
+        foreach (var segment in escapePathLineSegments)
+        {
+            if (segment != null)
+            {
+                Destroy(segment);
+            }
+        }
+        escapePathLineSegments.Clear();
+        
+        // 清除容器
+        if (escapePathLineContainer != null)
+        {
+            Destroy(escapePathLineContainer);
+            escapePathLineContainer = null;
+        }
+    }
+    
+    /// <summary>
+    /// 隱藏逃亡點標記
+    /// </summary>
+    public void HideEscapePoint()
+    {
+        if (escapePointMarker != null)
+        {
+            RemoveMarker(escapePointMarker);
+            escapePointMarker = null;
+            Debug.Log("[MapUI] 逃亡點已從地圖移除");
+        }
+        
+        ClearEscapePathLine();
+    }
+    
+    /// <summary>
+    /// 檢查逃亡點是否正在顯示
+    /// </summary>
+    public bool IsEscapePointVisible()
+    {
+        return escapePointMarker != null;
+    }
+    
+    #endregion
 }
 

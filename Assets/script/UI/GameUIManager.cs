@@ -16,9 +16,15 @@ public class GameUIManager : MonoBehaviour
     [SerializeField] private DangerUIManager dangerUIManager;          // 危險等級UI
     [SerializeField] private HotbarUIManager hotbarUIManager;           // 物品欄UI
     [SerializeField] private TilemapMapUIManager tilemapMapUIManager;  // 地圖UI
+    [SerializeField] private WeaponSwitchUI weaponSwitchUI;          // 武器切換UI
+    [SerializeField] private NonWeaponItemsUI nonWeaponItemsUI;      // 非武器物品UI
     
     [Header("Game Process UI Managers - 遊戲過程中的功能 UI")]
     [SerializeField] private PauseUIManager pauseUIManager;             // 暫停選單（屬於遊戲過程中的 UI）
+    
+    [Header("Notification & Dialogue UI Managers - 通知與對話 UI")]
+    [SerializeField] private NotificationUIManager notificationUIManager; // 臨時通知UI
+    [SerializeField] private DialogueUIManager dialogueUIManager;       // 對話UI
     
     [Header("Optional UI Managers")]
     [SerializeField] private LoadingProgressUIManager loadingProgressUIManager;  // 載入進度（通常在 LoadingScene，可選）
@@ -154,6 +160,44 @@ public class GameUIManager : MonoBehaviour
             Debug.LogWarning("GameUIManager: PauseUIManager 未設定");
         }
         
+        // 初始化新的 UI
+        if (weaponSwitchUI != null)
+        {
+            weaponSwitchUI.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: WeaponSwitchUI 未設定");
+        }
+
+        if (nonWeaponItemsUI != null)
+        {
+            nonWeaponItemsUI.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: NonWeaponItemsUI 未設定");
+        }
+        
+        // 初始化通知與對話UI
+        if (notificationUIManager != null)
+        {
+            notificationUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: NotificationUIManager 未設定");
+        }
+        
+        if (dialogueUIManager != null)
+        {
+            dialogueUIManager.Initialize();
+        }
+        else
+        {
+            Debug.LogWarning("GameUIManager: DialogueUIManager 未設定");
+        }
+        
         // 可選的載入進度UI（通常在 LoadingScene，不在 GameScene）
         if (loadingProgressUIManager != null)
         {
@@ -164,8 +208,11 @@ public class GameUIManager : MonoBehaviour
         // 設定初始可見性
         SetHealthUIVisible(showHealthUI);
         SetDangerUIVisible(showDangerUI);
-        SetHotbarUIVisible(showHotbarUI);
+        
+        // Hotbar is deprecated and merged into NonWeaponItemsUI
+        // SetHotbarUIVisible(showHotbarUI);
         SetMapUIVisible(showMapUI);
+        
         // 暫停選單由 GameManager 自動控制，不需要手動設定
         
         isInitialized = true;
@@ -363,6 +410,16 @@ public class GameUIManager : MonoBehaviour
     /// 獲取載入進度UI管理器（可選，通常在 LoadingScene）
     /// </summary>
     public LoadingProgressUIManager GetLoadingProgressUIManager() => loadingProgressUIManager;
+    
+    /// <summary>
+    /// 獲取通知UI管理器
+    /// </summary>
+    public NotificationUIManager GetNotificationUIManager() => notificationUIManager;
+    
+    /// <summary>
+    /// 獲取對話UI管理器
+    /// </summary>
+    public DialogueUIManager GetDialogueUIManager() => dialogueUIManager;
     
     #endregion
 }

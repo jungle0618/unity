@@ -17,11 +17,16 @@ public class ItemHolder : MonoBehaviour
     [SerializeField] private bool equipOnStart = true; // 一開始是否自動裝備 prefab
     [Tooltip("如果物品通過代碼動態裝備（不設置 itemPrefabs），設為 true 可隱藏警告")]
     [SerializeField] private bool allowDynamicEquipping = true; // 允許動態裝備（不從 itemPrefabs 初始化）
+    [Tooltip("是否在沒有物品時使用空手狀態（預設為 false")]
+    [SerializeField] private bool useEmptyHands = false; // 是否使用空手狀態
 
     // Item management
     private List<Item> availableItems = new List<Item>(); // All instantiated items
     private int currentItemIndex = 0;
     private Item currentItem;
+    
+    // 空手狀態（當沒有物品時使用）
+    private EmptyHands emptyHands;
 
     // 記錄是哪個 prefab 用來裝備（方便避免重複 Instantiate 同一 prefab）
     private GameObject equippedPrefab;
@@ -61,6 +66,12 @@ public class ItemHolder : MonoBehaviour
 
     private void Start()
     {
+        // 初始化空手狀態（但不裝備，只是創建實例）
+        if (useEmptyHands)
+        {
+            InitializeEmptyHands();
+        }
+        
         // Initialize items from prefabs array
         if (itemPrefabs != null && itemPrefabs.Length > 0)
         {
@@ -78,20 +89,27 @@ public class ItemHolder : MonoBehaviour
                 }
             }
             
-            // Equip first item
+            // 如果有物品，裝備第一個物品（無論 useEmptyHands 是否為 true）
             if (availableItems.Count > 0 && equipOnStart)
             {
                 SwitchToItem(0);
             }
+            // 只有在沒有任何物品時才裝備空手
+            else if (availableItems.Count == 0 && useEmptyHands && emptyHands != null)
+            {
+                EquipEmptyHands();
+            }
         }
         else
         {
-            // 如果允許動態裝備，則不顯示警告（因為物品會通過代碼裝備，例如 EntityManager）
-            // 只有在不允許動態裝備且沒有 itemPrefabs 時才警告
+            // 沒有設定 itemPrefabs（動態裝備模式）
             if (!allowDynamicEquipping)
             {
                 Debug.LogWarning($"ItemHolder on {gameObject.name}: No item prefabs assigned! If items are equipped dynamically via code, set 'Allow Dynamic Equipping' to true to suppress this warning.");
             }
+            
+            // 動態裝備模式下不自動裝備空手，等待物品被動態添加
+            // 空手會在 ClearAllItems 或沒有物品時自動裝備
         }
     }
 
@@ -124,9 +142,21 @@ public class ItemHolder : MonoBehaviour
                 weapon.OnWeaponBroken -= OnWeaponBrokenHandler;
             }
             
-            Destroy(currentItem.gameObject);
+            // 如果不是空手，銷毀物品
+            if (!(currentItem is EmptyHands))
+            {
+                Destroy(currentItem.gameObject);
+            }
+            
             currentItem = null;
             equippedPrefab = null;
+        }
+        
+        // 銷毀空手物件
+        if (emptyHands != null && emptyHands.gameObject != null)
+        {
+            Destroy(emptyHands.gameObject);
+            emptyHands = null;
         }
     }
 
@@ -295,7 +325,7 @@ public class ItemHolder : MonoBehaviour
         {
             TriggerAttackAnimation();
             
-            // 只有近戰武器才觸發範圍檢測事件（遠程武器用子彈處理傷害）
+            // 只有近戰武器才觸发範圍檢測事件（遠程武器用子彈處理傷害）
             if (weapon is MeleeWeapon meleeWeapon)
             {
                 OnAttackPerformed?.Invoke(origin, meleeWeapon.AttackRange, attacker);
@@ -307,6 +337,9 @@ public class ItemHolder : MonoBehaviour
 
     public bool CanAttack()
     {
+        // 空手無法攻擊
+        if (IsEmptyHands()) return false;
+        
         if (!IsCurrentItemWeapon) return false;
         Weapon weapon = currentItem as Weapon;
         return weapon != null && !isAttacking && weapon.CanAttack();
@@ -347,26 +380,92 @@ public class ItemHolder : MonoBehaviour
 
     /// <summary>
     /// 切換到下一個物品（循環切換）
+    /// 如果使用空手模式，會在物品之間包含空手狀態
     /// </summary>
     /// <returns>切換是否成功</returns>
     public bool SwitchToNextItem()
     {
-        if (availableItems.Count <= 1) return false;
-
-        int nextIndex = (currentItemIndex + 1) % availableItems.Count;
-        return SwitchToItem(nextIndex);
+        // 如果沒有物品且不使用空手，無法切換
+        if (availableItems.Count == 0 && !useEmptyHands) return false;
+        
+        // 如果只有空手或只有一個物品（不使用空手時），無法切換
+        if (availableItems.Count <= 1 && !useEmptyHands) return false;
+        
+        // 如果使用空手模式
+        if (useEmptyHands)
+        {
+            // 如果當前是空手，切換到第一個物品（如果有）
+            if (IsEmptyHands())
+            {
+                if (availableItems.Count > 0)
+                {
+                    return SwitchToItem(0);
+                }
+                return false; // 沒有其他物品可切換
+            }
+            
+            // 如果當前是最後一個物品，切換到空手
+            if (currentItemIndex == availableItems.Count - 1)
+            {
+                EquipEmptyHands();
+                return true;
+            }
+            
+            // 否則切換到下一個物品
+            int nextIndex = currentItemIndex + 1;
+            return SwitchToItem(nextIndex);
+        }
+        else
+        {
+            // 不使用空手模式，正常循環切換
+            int nextIndex = (currentItemIndex + 1) % availableItems.Count;
+            return SwitchToItem(nextIndex);
+        }
     }
 
     /// <summary>
     /// 切換到上一個物品（循環切換）
+    /// 如果使用空手模式，會在物品之間包含空手狀態
     /// </summary>
     /// <returns>切換是否成功</returns>
     public bool SwitchToPreviousItem()
     {
-        if (availableItems.Count <= 1) return false;
-
-        int prevIndex = (currentItemIndex - 1 + availableItems.Count) % availableItems.Count;
-        return SwitchToItem(prevIndex);
+        // 如果沒有物品且不使用空手，無法切換
+        if (availableItems.Count == 0 && !useEmptyHands) return false;
+        
+        // 如果只有空手或只有一個物品（不使用空手時），無法切換
+        if (availableItems.Count <= 1 && !useEmptyHands) return false;
+        
+        // 如果使用空手模式
+        if (useEmptyHands)
+        {
+            // 如果當前是空手，切換到最後一個物品（如果有）
+            if (IsEmptyHands())
+            {
+                if (availableItems.Count > 0)
+                {
+                    return SwitchToItem(availableItems.Count - 1);
+                }
+                return false; // 沒有其他物品可切換
+            }
+            
+            // 如果當前是第一個物品，切換到空手
+            if (currentItemIndex == 0)
+            {
+                EquipEmptyHands();
+                return true;
+            }
+            
+            // 否則切換到上一個物品
+            int prevIndex = currentItemIndex - 1;
+            return SwitchToItem(prevIndex);
+        }
+        else
+        {
+            // 不使用空手模式，正常循環切換
+            int prevIndex = (currentItemIndex - 1 + availableItems.Count) % availableItems.Count;
+            return SwitchToItem(prevIndex);
+        }
     }
 
     /// <summary>
@@ -417,21 +516,212 @@ public class ItemHolder : MonoBehaviour
     }
 
     /// <summary>
-    /// 切換到下一個武器（循環切換，向後兼容方法）
+    /// 切換到下一個武器類型（只在武器類型之間循環：Knife → Gun → 空手）
+    /// 每種類型使用最舊的武器（先獲得的優先）
     /// </summary>
     /// <returns>切換是否成功</returns>
     public bool SwitchToNextWeapon()
     {
-        return SwitchToNextItem();
+        // 獲取所有武器並按類型分組
+        var weapons = GetItemsOfType<Weapon>();
+        var weaponsByType = GroupWeaponsByType(weapons);
+        
+        if (weaponsByType.Count == 0)
+        {
+            // 沒有武器，如果使用空手則切換到空手
+            if (useEmptyHands)
+            {
+                EquipEmptyHands();
+                return true;
+            }
+            return false;
+        }
+        
+        // 確定當前武器類型
+        string currentType = null;
+        if (currentItem != null && currentItem is Weapon currentWeapon)
+        {
+            currentType = GetWeaponTypeName(currentWeapon);
+        }
+        
+        // 定義類型切換順序：Knife → Gun → 空手 → Knife
+        string[] typeOrder = { "Knife", "Gun" };
+        int currentTypeIndex = -1; // -1 表示空手或未知類型
+        
+        if (!string.IsNullOrEmpty(currentType))
+        {
+            for (int i = 0; i < typeOrder.Length; i++)
+            {
+                if (typeOrder[i] == currentType)
+                {
+                    currentTypeIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // 嘗試切換到下一個類型（最多嘗試3次：下一個武器類型 → 再下一個 → 空手）
+        int attempts = 0;
+        while (attempts < 3)
+        {
+            currentTypeIndex++;
+            
+            // 超過最後一個類型，考慮空手
+            if (currentTypeIndex >= typeOrder.Length)
+            {
+                if (useEmptyHands)
+                {
+                    EquipEmptyHands();
+                    return true;
+                }
+                else
+                {
+                    // 不使用空手，循環回第一個類型
+                    currentTypeIndex = 0;
+                }
+            }
+            
+            // 嘗試切換到該類型的武器
+            if (currentTypeIndex < typeOrder.Length)
+            {
+                string targetType = typeOrder[currentTypeIndex];
+                if (weaponsByType.ContainsKey(targetType) && weaponsByType[targetType].Count > 0)
+                {
+                    // 使用該類型最舊的武器（Queue 的第一個）
+                    Weapon targetWeapon = weaponsByType[targetType].Peek();
+                    return SwitchToItemInstance(targetWeapon);
+                }
+            }
+            
+            attempts++;
+        }
+        
+        // 如果所有嘗試都失敗，返回 false
+        return false;
     }
 
     /// <summary>
-    /// 切換到上一個武器（循環切換，向後兼容方法）
+    /// 切換到上一個武器類型（只在武器類型之間循環：Gun ← Knife ← 空手）
     /// </summary>
     /// <returns>切換是否成功</returns>
     public bool SwitchToPreviousWeapon()
     {
-        return SwitchToPreviousItem();
+        // 獲取所有武器並按類型分組
+        var weapons = GetItemsOfType<Weapon>();
+        var weaponsByType = GroupWeaponsByType(weapons);
+        
+        if (weaponsByType.Count == 0)
+        {
+            // 沒有武器，如果使用空手則切換到空手
+            if (useEmptyHands)
+            {
+                EquipEmptyHands();
+                return true;
+            }
+            return false;
+        }
+        
+        // 確定當前武器類型
+        string currentType = null;
+        if (currentItem != null && currentItem is Weapon currentWeapon)
+        {
+            currentType = GetWeaponTypeName(currentWeapon);
+        }
+        
+        // 定義類型切換順序
+        string[] typeOrder = { "Knife", "Gun" };
+        int currentTypeIndex = typeOrder.Length; // 默認為空手位置
+        
+        if (!string.IsNullOrEmpty(currentType))
+        {
+            for (int i = 0; i < typeOrder.Length; i++)
+            {
+                if (typeOrder[i] == currentType)
+                {
+                    currentTypeIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // 嘗試切換到上一個類型
+        int attempts = 0;
+        while (attempts < 3)
+        {
+            currentTypeIndex--;
+            
+            // 小於0，考慮空手
+            if (currentTypeIndex < 0)
+            {
+                if (useEmptyHands)
+                {
+                    EquipEmptyHands();
+                    return true;
+                }
+                else
+                {
+                    // 不使用空手，循環到最後一個類型
+                    currentTypeIndex = typeOrder.Length - 1;
+                }
+            }
+            
+            // 嘗試切換到該類型的武器
+            if (currentTypeIndex >= 0 && currentTypeIndex < typeOrder.Length)
+            {
+                string targetType = typeOrder[currentTypeIndex];
+                if (weaponsByType.ContainsKey(targetType) && weaponsByType[targetType].Count > 0)
+                {
+                    Weapon targetWeapon = weaponsByType[targetType].Peek();
+                    return SwitchToItemInstance(targetWeapon);
+                }
+            }
+            
+            attempts++;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// 將武器按類型分組（返回每個類型的隊列，保持獲取順序）
+    /// </summary>
+    private Dictionary<string, Queue<Weapon>> GroupWeaponsByType(List<Weapon> weapons)
+    {
+        var grouped = new Dictionary<string, Queue<Weapon>>();
+        
+        foreach (var weapon in weapons)
+        {
+            string type = GetWeaponTypeName(weapon);
+            if (string.IsNullOrEmpty(type)) continue;
+            
+            if (!grouped.ContainsKey(type))
+            {
+                grouped[type] = new Queue<Weapon>();
+            }
+            
+            grouped[type].Enqueue(weapon);
+        }
+        
+        return grouped;
+    }
+    
+    /// <summary>
+    /// 切換到指定的物品實例
+    /// </summary>
+    private bool SwitchToItemInstance(Item item)
+    {
+        if (item == null) return false;
+        
+        // 在 availableItems 中找到該物品的索引
+        for (int i = 0; i < availableItems.Count; i++)
+        {
+            if (availableItems[i] == item)
+            {
+                return SwitchToItem(i);
+            }
+        }
+        
+        return false;
     }
 
     /// <summary>
@@ -483,41 +773,102 @@ public class ItemHolder : MonoBehaviour
             
             // 從可用物品列表中移除
             Item brokenItem = currentItem;
+            Weapon brokenWeapon = brokenItem as Weapon;
             availableItems.Remove(brokenItem);
             
             // 取消訂閱事件
-            if (brokenItem is Weapon weapon)
+            if (brokenWeapon != null)
             {
-                weapon.OnDurabilityChanged -= OnWeaponDurabilityChangedHandler;
-                weapon.OnWeaponBroken -= OnWeaponBrokenHandler;
+                brokenWeapon.OnDurabilityChanged -= OnWeaponDurabilityChangedHandler;
+                brokenWeapon.OnWeaponBroken -= OnWeaponBrokenHandler;
             }
             
-            // 切換到下一個可用物品
-            if (availableItems.Count > 0)
+            // 智能切換邏輯：優先同類型武器 → 其他武器 → 空手（不要鑰匙）
+            Weapon nextWeapon = FindNextWeaponAfterBroken(brokenWeapon);
+            
+            if (nextWeapon != null)
             {
-                // 調整索引，確保不超出範圍
-                if (currentItemIndex >= availableItems.Count)
-                {
-                    currentItemIndex = 0;
-                }
-                
-                SwitchToItem(currentItemIndex);
+                // 找到下一個武器，切換到它
+                SwitchToItemInstance(nextWeapon);
+                Debug.Log($"武器損壞後切換到: {nextWeapon.ItemName}");
             }
             else
             {
-                // 沒有其他物品了
-                currentItem = null;
-                currentItemIndex = 0;
-                equippedPrefab = null;
-                Debug.Log("所有物品都已損壞或移除！");
-                
-                // 觸發物品變更事件，讓 UI 知道沒有物品了
-                OnItemChanged?.Invoke(null);
+                // 沒有其他武器了，裝備空手（如果啟用）
+                if (useEmptyHands && emptyHands != null)
+                {
+                    EquipEmptyHands();
+                    Debug.Log("所有武器都已損壞！已裝備空手。");
+                }
+                else
+                {
+                    currentItem = null;
+                    currentItemIndex = 0;
+                    equippedPrefab = null;
+                    Debug.Log("所有武器都已損壞！");
+                    
+                    // 觸發物品變更事件，讓 UI 知道沒有武器了
+                    OnItemChanged?.Invoke(null);
+                }
             }
             
             // 在處理完所有清理工作後才觸發事件
             OnWeaponBroken?.Invoke();
         }
+    }
+    
+    /// <summary>
+    /// 武器損壞後尋找下一個要裝備的武器
+    /// 優先級：同類型武器 → 其他類型武器 → null
+    /// </summary>
+    private Weapon FindNextWeaponAfterBroken(Weapon brokenWeapon)
+    {
+        var allWeapons = GetItemsOfType<Weapon>();
+        
+        if (allWeapons.Count == 0)
+        {
+            return null; // 沒有武器了
+        }
+        
+        // 如果損壞的武器有類型，優先尋找同類型
+        if (brokenWeapon != null)
+        {
+            string brokenType = GetWeaponTypeName(brokenWeapon);
+            
+            // 優先：同類型武器
+            foreach (var weapon in allWeapons)
+            {
+                if (GetWeaponTypeName(weapon) == brokenType)
+                {
+                    return weapon; // 找到同類型，返回第一個（最舊的）
+                }
+            }
+        }
+        
+        // 次選：任何其他武器（第一個即可）
+        return allWeapons.Count > 0 ? allWeapons[0] : null;
+    }
+    
+    /// <summary>
+    /// 獲取武器類型名稱（用於分類）
+    /// </summary>
+    private string GetWeaponTypeName(Weapon weapon)
+    {
+        if (weapon == null) return null;
+        
+        string name = weapon.ItemName?.ToLowerInvariant();
+        if (name != null)
+        {
+            if (name.Contains("knife")) return "Knife";
+            if (name.Contains("gun")) return "Gun";
+        }
+        
+        // 後備：使用類型名稱
+        string typeName = weapon.GetType().Name.ToLowerInvariant();
+        if (typeName.Contains("knife")) return "Knife";
+        if (typeName.Contains("gun")) return "Gun";
+        
+        return weapon.GetType().Name; // 返回類型名作為默認
     }
 
     /// <summary>
@@ -559,7 +910,11 @@ public class ItemHolder : MonoBehaviour
 
     /// <summary>
     /// 從 prefab 添加物品到列表（不裝備，用於撿取物品）
-    /// 如果手上沒有物品，則自動裝備新獲得的物品
+    /// 規則：
+    /// 1. 如果是武器且當前沒有裝備武器，自動裝備該武器
+    /// 2. 如果是武器且已有武器，不裝備（實體最多持有一個武器）
+    /// 3. 如果是非武器物品（如鑰匙），添加到列表但不裝備
+    /// 4. 如果當前是空手且添加了武器，自動裝備武器
     /// </summary>
     /// <param name="prefab">物品 prefab</param>
     /// <returns>添加的 Item 組件，失敗則返回 null</returns>
@@ -571,9 +926,6 @@ public class ItemHolder : MonoBehaviour
             return null;
         }
         
-        // 檢查是否手上沒有物品
-        bool noCurrentItem = (currentItem == null || availableItems.Count == 0);
-        
         // 實例化物品
         Item item = InstantiateItem(prefab);
         if (item == null)
@@ -581,27 +933,72 @@ public class ItemHolder : MonoBehaviour
             return null;
         }
         
+        bool isWeapon = item is Weapon;
+        bool currentIsWeapon = IsCurrentItemWeapon;
+        bool currentIsEmptyHands = IsEmptyHands();
+        bool hadNoItems = availableItems.Count == 0; // 添加前是否沒有物品
+        
+        Debug.Log($"[ItemHolder] AddItemFromPrefab called on {gameObject.name}: item={item.ItemName}, isWeapon={isWeapon}, currentItem={currentItem?.ItemName ?? "null"}, currentIsWeapon={currentIsWeapon}, currentIsEmptyHands={currentIsEmptyHands}, hadNoItems={hadNoItems}");
+        
         // 加入到可用物品列表尾端
         availableItems.Add(item);
         itemToPrefabMap[item] = prefab; // 記錄對應的 Prefab
         
-        // 如果手上沒有物品，則自動裝備新獲得的物品
-        if (noCurrentItem)
+        // 決定是否裝備這個物品
+        bool shouldEquip = false;
+        
+        // 規則：如果這是第一個物品（之前沒有任何物品），總是裝備它
+        if (hadNoItems)
         {
-            item.gameObject.SetActive(false); // 先設為不啟用
-            SwitchToItem(availableItems.Count - 1); // 切換到剛加入的物品
-            Debug.Log($"[ItemHolder] 自動裝備獲得的物品 {item.ItemName}");
+            shouldEquip = true;
+            Debug.Log($"[ItemHolder] ✅ 裝備第一個物品 {item.ItemName} 到 {gameObject.name} (這是第一個添加的物品)");
+        }
+        else if (isWeapon)
+        {
+            // 如果是武器，且當前沒有武器或只有空手，則裝備
+            if (!currentIsWeapon || currentIsEmptyHands)
+            {
+                shouldEquip = true;
+                Debug.Log($"[ItemHolder] ✅ 裝備武器 {item.ItemName} 到 {gameObject.name} (當前沒有武器或是空手)");
+            }
+            else
+            {
+                // 已經有武器了，不裝備新武器（但會加入列表）
+                Debug.Log($"[ItemHolder] ❌ {gameObject.name} 已有武器 {(currentItem != null ? currentItem.ItemName : "Unknown")}，將 {item.ItemName} 加入列表但不裝備");
+            }
         }
         else
         {
-            // 設為不啟用（不裝備）
+            // 非武器物品（如鑰匙）
+            // 只在當前是空手時才裝備
+            if (currentIsEmptyHands)
+            {
+                shouldEquip = true;
+                Debug.Log($"[ItemHolder] ✅ 裝備非武器物品 {item.ItemName} 到 {gameObject.name} (當前是空手)");
+            }
+            else
+            {
+                Debug.Log($"[ItemHolder] ❌ 將非武器物品 {item.ItemName} 加入 {gameObject.name} 的列表 (當前已有 {currentItem?.ItemName})");
+            }
+        }
+        
+        if (shouldEquip)
+        {
+            item.gameObject.SetActive(false); // 先設為不啟用
+            Debug.Log($"[ItemHolder] Calling SwitchToItem({availableItems.Count - 1}) for {item.ItemName} on {gameObject.name}");
+            SwitchToItem(availableItems.Count - 1); // 切換到剛加入的物品
+            Debug.Log($"[ItemHolder] After SwitchToItem: currentItem={currentItem?.ItemName ?? "null"}, active={currentItem?.gameObject.activeSelf}");
+        }
+        else
+        {
+            // 不裝備，只是加入列表
             item.gameObject.SetActive(false);
             
             // 觸發物品變更事件以更新 UI
             OnItemChanged?.Invoke(currentItem); // 保持當前物品不變，但通知 UI 更新
         }
         
-        Debug.Log($"[ItemHolder] Added {item.ItemName} to inventory. Total items: {availableItems.Count}");
+        Debug.Log($"[ItemHolder] ✅ Finished AddItemFromPrefab: {item.ItemName} added to {gameObject.name}. Total items: {availableItems.Count}, Currently equipped: {(currentItem != null ? currentItem.ItemName : "None")}, Item active: {currentItem?.gameObject.activeSelf}");
         
         return item;
     }
@@ -813,10 +1210,17 @@ public class ItemHolder : MonoBehaviour
             }
             else
             {
-                // 沒有其他物品了
-                currentItem = null;
-                currentItemIndex = 0;
-                OnItemChanged?.Invoke(null);
+                // 沒有其他物品了，裝備空手（如果啟用）
+                if (useEmptyHands && emptyHands != null)
+                {
+                    EquipEmptyHands();
+                }
+                else
+                {
+                    currentItem = null;
+                    currentItemIndex = 0;
+                    OnItemChanged?.Invoke(null);
+                }
             }
         }
         else
@@ -827,6 +1231,8 @@ public class ItemHolder : MonoBehaviour
             {
                 currentItemIndex--;
             }
+            // 非當前裝備物品被移除時也要通知 UI 重新整理（例如鑰匙使用後消失）
+            OnItemChanged?.Invoke(currentItem);
         }
         
         // 銷毀物品
@@ -871,10 +1277,12 @@ public class ItemHolder : MonoBehaviour
     /// </summary>
     public void ClearAllItems()
     {
-        // 銷毀所有物品實例
+        Debug.Log($"[ItemHolder] ClearAllItems called on {gameObject.name}. Current items: {availableItems.Count}, currentItem: {currentItem?.ItemName ?? "null"}, useEmptyHands: {useEmptyHands}");
+        
+        // 銷毀所有物品實例（不包括空手）
         foreach (var item in availableItems)
         {
-            if (item != null && item.gameObject != null)
+            if (item != null && item.gameObject != null && !(item is EmptyHands))
             {
                 Destroy(item.gameObject);
             }
@@ -886,6 +1294,108 @@ public class ItemHolder : MonoBehaviour
         currentItem = null;
         currentItemIndex = 0;
         
-        Debug.Log($"[ItemHolder] Cleared all items from {gameObject.name}");
+        // 只有在沒有任何物品時才裝備空手
+        // 注意：此時 availableItems 已經清空，所以會裝備空手
+        if (useEmptyHands)
+        {
+            // 確保空手已初始化（如果 ClearAllItems 在 Start 之前被調用）
+            if (emptyHands == null)
+            {
+                Debug.Log($"[ItemHolder] ClearAllItems: emptyHands is null, initializing now on {gameObject.name}");
+                InitializeEmptyHands();
+            }
+            
+            // 由於列表已清空，裝備空手
+            if (emptyHands != null)
+            {
+                Debug.Log($"[ItemHolder] ClearAllItems: No items remaining, equipping empty hands on {gameObject.name}");
+                EquipEmptyHands();
+            }
+            else
+            {
+                Debug.LogError($"[ItemHolder] ClearAllItems: Failed to initialize empty hands on {gameObject.name}!");
+            }
+        }
+        else
+        {
+            Debug.Log($"[ItemHolder] ClearAllItems: useEmptyHands is false, not equipping empty hands");
+        }
+        
+        Debug.Log($"[ItemHolder] ClearAllItems complete on {gameObject.name}. currentItem: {currentItem?.ItemName ?? "null"}");
+    }
+    
+    /// <summary>
+    /// 初始化空手狀態
+    /// </summary>
+    private void InitializeEmptyHands()
+    {
+        if (emptyHands != null) return; // 已經初始化過了
+        
+        // 創建一個空的 GameObject 來掛載 EmptyHands 組件
+        GameObject emptyHandsGO = new GameObject("EmptyHands");
+        emptyHandsGO.transform.SetParent(this.transform, false);
+        emptyHandsGO.transform.localPosition = Vector3.zero;
+        emptyHandsGO.transform.localRotation = Quaternion.identity;
+        emptyHandsGO.transform.localScale = Vector3.one;
+        
+        // 添加 EmptyHands 組件
+        emptyHands = emptyHandsGO.AddComponent<EmptyHands>();
+        emptyHands.gameObject.SetActive(false); // 初始時隱藏
+        
+        Debug.Log($"[ItemHolder] Initialized EmptyHands for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// 裝備空手狀態
+    /// </summary>
+    private void EquipEmptyHands()
+    {
+        if (!useEmptyHands || emptyHands == null) return;
+        
+        // 卸下當前物品（如果有）
+        if (currentItem != null && !(currentItem is EmptyHands))
+        {
+            currentItem.OnUnequip();
+            currentItem.gameObject.SetActive(false);
+        }
+        
+        // 裝備空手
+        currentItem = emptyHands;
+        currentItemIndex = -1; // 空手沒有索引
+        emptyHands.gameObject.SetActive(true);
+        emptyHands.OnEquip();
+        
+        // 觸發物品變更事件
+        OnItemChanged?.Invoke(emptyHands);
+        
+        Debug.Log($"[ItemHolder] Equipped EmptyHands for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// 公開：嘗試裝備空手（若系統啟用空手且已初始化）。
+    /// </summary>
+    public bool TryEquipEmptyHands()
+    {
+        if (!useEmptyHands)
+        {
+            Debug.Log("[ItemHolder] TryEquipEmptyHands ignored - useEmptyHands=false");
+            return false;
+        }
+        if (emptyHands == null)
+        {
+            InitializeEmptyHands();
+            if (emptyHands == null) return false;
+        }
+        EquipEmptyHands();
+        return true;
+    }
+
+    /// <summary>
+    /// 檢查當前是否為空手狀態
+    /// </summary>
+    public bool IsEmptyHands()
+    {
+        return currentItem is EmptyHands;
     }
 }
+

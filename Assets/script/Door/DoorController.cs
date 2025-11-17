@@ -98,7 +98,7 @@ public class DoorController : MonoBehaviour
     }
     
     /// <summary>
-    /// 嘗試使用當前裝備的鑰匙開啟門（在範圍內的最近門）
+    /// 嘗試使用鑰匙開啟門（從背包中查找，不需要裝備）
     /// </summary>
     /// <param name="playerPosition">玩家位置</param>
     /// <param name="itemHolder">持有鑰匙的物品持有者</param>
@@ -130,41 +130,42 @@ public class DoorController : MonoBehaviour
             return true;
         }
         
-        // 需要鑰匙 - 檢查當前裝備的 item 是否為鑰匙
+        // 需要鑰匙 - 從背包中查找（不需要裝備）
         if (itemHolder == null)
         {
             Debug.LogWarning($"[DoorController] 門在位置 {cellPosition} 需要 {requiredKeyType} 鑰匙，但沒有提供 ItemHolder");
+            ShowNotification("The door is locked! ItemHolder is missing.");
             return false;
         }
         
-        // 獲取當前裝備的 item
-        Item currentItem = itemHolder.CurrentItem;
-        if (currentItem == null || !(currentItem is Key))
+        // 從背包中取得對應鑰匙（不需要裝備）
+        Key matchingKey = itemHolder.GetKeyForDoor(requiredKeyType);
+        
+        if (matchingKey == null)
         {
-            Debug.LogWarning($"[DoorController] 門需要 {requiredKeyType} 鑰匙，但當前沒有裝備鑰匙");
+            Debug.LogWarning($"[DoorController] 門需要 {requiredKeyType} 鑰匙，但背包中沒有找到");
+            ShowNotification(GetKeyRequiredMessage(requiredKeyType));
             return false;
         }
         
-        // 當前裝備的是鑰匙，讓鑰匙決定是否能開門
-        Key key = currentItem as Key;
-        bool canUnlock = key.TryUnlockDoor(requiredKeyType, out bool shouldRemove);
+        // 嘗試開門
+        bool unlocked = matchingKey.TryUnlockDoor(requiredKeyType, out bool shouldRemove);
         
-        if (!canUnlock)
+        if (!unlocked)
         {
-            Debug.LogWarning($"[DoorController] 門需要 {requiredKeyType} 鑰匙，但當前裝備的是 {key.KeyType} 鑰匙");
+            Debug.LogWarning($"[DoorController] 鑰匙 {matchingKey.KeyType} 無法開啟 {requiredKeyType} 門");
             return false;
         }
         
-        // 成功開門
-        Debug.Log($"[DoorController] 使用 {key.KeyType} 鑰匙開啟門在位置 {cellPosition}{(shouldRemove ? "（鑰匙已使用完畢）" : "")}");
+        // 成功開門記錄（不再顯示剩餘堆疊數，因為堆疊功能已取消）
+        Debug.Log($"[DoorController] 使用 {matchingKey.KeyType} 鑰匙開啟門在位置 {cellPosition}{(shouldRemove ? "（鑰匙已使用完畢，已移除）" : "（鑰匙保留）")}");
         
-        // 如果鑰匙需要移除（單次使用）
         if (shouldRemove)
         {
-            itemHolder.RemoveItem(key);
+            itemHolder.RemoveItem(matchingKey); // 會自動觸發 UI 更新事件
         }
         
-        // 開啟門（刪除門tile）
+        // 刪除門 tiles
         RemoveConnectedDoorTiles(cellPosition);
         
         return true;
@@ -259,5 +260,52 @@ public class DoorController : MonoBehaviour
             }
         }
     }
+    
+    #region Notification Helpers
+    
+    /// <summary>
+    /// 顯示通知訊息給玩家
+    /// </summary>
+    private void ShowNotification(string message)
+    {
+        // 嘗試找到 GameUIManager
+        GameUIManager gameUIManager = FindFirstObjectByType<GameUIManager>();
+        if (gameUIManager != null)
+        {
+            NotificationUIManager notificationManager = gameUIManager.GetNotificationUIManager();
+            if (notificationManager != null)
+            {
+                notificationManager.ShowNotification(message);
+            }
+            else
+            {
+                Debug.LogWarning($"[DoorController] NotificationUIManager 未找到，無法顯示訊息: {message}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[DoorController] GameUIManager 未找到，無法顯示訊息: {message}");
+        }
+    }
+    
+    /// <summary>
+    /// 根據鑰匙類型獲取通知訊息
+    /// </summary>
+    private string GetKeyRequiredMessage(KeyType keyType)
+    {
+        switch (keyType)
+        {
+            case KeyType.Red:
+                return "The door is locked! Requires a RED key.";
+            case KeyType.Blue:
+                return "The door is locked! Requires a BLUE key.";
+            case KeyType.None:
+                return "The door is locked!";
+            default:
+                return $"The door is locked! Requires a {keyType} key.";
+        }
+    }
+    
+    #endregion
     
 }
