@@ -11,7 +11,6 @@ public class TilemapMapUIManager : MonoBehaviour
 {
     [Header("Tilemap References")]
     [SerializeField] private Tilemap tilemap;                   // 要顯示的 Tilemap
-    [SerializeField] private Grid grid;                         // Tilemap 的 Grid
     [SerializeField] private bool autoFindTilemap = true;       // 自動尋找 Tilemap
     
     [Header("Map Display")]
@@ -42,6 +41,13 @@ public class TilemapMapUIManager : MonoBehaviour
     [SerializeField] private bool autoFindPlayer = true;
     [SerializeField] private bool useEntityManager = true; // 是否使用 EntityManager 獲取 Player
     
+    [Header("Map Zoom Settings")]
+    [SerializeField] private KeyCode zoomKey = KeyCode.M; // 放大鍵
+    [SerializeField] private float zoomScale = 7.5f; // 地圖放大倍率
+    [SerializeField] private float playerIconZoomScale = 1.5f; // 玩家圖標放大倍率（相對於原始大小）
+    [SerializeField] private float transitionDuration = 0.2f; // 過渡動畫時間
+    [SerializeField] private bool useSmoothTransition = true; // 是否使用平滑過渡
+    
     private Player player;
     private EntityManager entityManager;
     private bool isInitialized = false;
@@ -52,10 +58,27 @@ public class TilemapMapUIManager : MonoBehaviour
     
     // Tilemap 邊界
     private Bounds tilemapBounds;
-    private Vector2 mapSize;
+    
+    // 地圖縮放狀態
+    private bool isZoomed = false;
+    private Vector2 originalAnchoredPosition; // 原始位置
+    private Vector2 originalSizeDelta; // 原始大小
+    private Vector3 originalLocalScale; // 原始縮放
+    private Vector2 zoomedAnchoredPosition; // 放大後位置（畫面中間）
+    private Vector2 zoomedSizeDelta; // 放大後大小
+    private Vector3 zoomedLocalScale; // 放大後縮放
+    private bool hasStoredOriginalValues = false; // 是否已儲存原始值
+    private float transitionTimer = 0f; // 過渡計時器
+    
+    // 玩家圖標縮放狀態
+    private Vector3 originalPlayerIconScale; // 玩家圖標原始縮放
+    private Vector3 zoomedPlayerIconScale; // 玩家圖標放大後的縮放
     
     private void Awake()
     {
+        // 強制使用程式碼預設值（覆蓋場景中保存的值）
+        updateInterval = 0.1f;
+        
         // 嘗試獲取 EntityManager 引用
         if (useEntityManager)
         {
@@ -92,10 +115,6 @@ public class TilemapMapUIManager : MonoBehaviour
         if (autoFindTilemap && tilemap == null)
         {
             tilemap = FindFirstObjectByType<Tilemap>();
-            if (tilemap != null)
-            {
-                grid = tilemap.GetComponentInParent<Grid>();
-            }
         }
         
         if (tilemap == null)
@@ -163,6 +182,15 @@ public class TilemapMapUIManager : MonoBehaviour
     
     private void Update()
     {
+        // 處理地圖縮放輸入
+        HandleMapZoomInput();
+        
+        // 處理過渡動畫
+        if (useSmoothTransition && transitionTimer > 0f)
+        {
+            UpdateMapTransition();
+        }
+        
         // 只有在地圖可見且需要即時更新時才更新
         if (isVisible && updateInRealtime && player != null)
         {
@@ -210,6 +238,18 @@ public class TilemapMapUIManager : MonoBehaviour
         {
             UpdatePlayerPosition();
             lastUpdateTime = Time.time;
+            
+            // 當地圖顯示時，儲存原始值（如果還沒儲存）
+            if (!hasStoredOriginalValues && mapContainer != null)
+            {
+                StoreOriginalValues();
+            }
+        }
+        
+        // 如果地圖被隱藏，重置縮放狀態
+        if (!visible && isZoomed)
+        {
+            SetMapZoomed(false, false);
         }
     }
     
@@ -238,9 +278,6 @@ public class TilemapMapUIManager : MonoBehaviour
         // 獲取 Tilemap 的實際使用邊界
         tilemap.CompressBounds();
         tilemapBounds = tilemap.localBounds;
-        
-        // Tilemap 是 2D 的，使用 X 和 Y
-        mapSize = new Vector2(tilemapBounds.size.x, tilemapBounds.size.y);
         
         Debug.Log($"Tilemap 邊界更新: Center={tilemapBounds.center}, Size={tilemapBounds.size}");
     }
@@ -387,45 +424,32 @@ public class TilemapMapUIManager : MonoBehaviour
     /// </summary>
     private Vector2 WorldToMapUIPosition(Vector3 worldPosition)
     {
-        if (tilemap == null || mapDisplay == null) return Vector2.zero;
+        if (tilemap == null || mapDisplay == null || mapCamera == null) return Vector2.zero;
         
-        // 計算相對於 Tilemap 中心的位置
+        // 使用相機的視角範圍來計算座標轉換
+        // 相機的 orthographicSize 是垂直方向的一半大小
+        float orthoSize = mapCamera.orthographicSize;
+        
+        // 計算相機視角的寬高比（RenderTexture 是正方形，所以寬高比為 1）
+        float aspectRatio = 1f; // RenderTexture 是正方形
+        
+        // 相機視角的實際寬度和高度
+        float cameraWidth = orthoSize * 2f * aspectRatio;
+        float cameraHeight = orthoSize * 2f;
+        
+        // 計算相對於相機中心的位置（相機在 tilemapBounds.center 上方）
         Vector3 relativePos = worldPosition - tilemapBounds.center;
         
-        // Tilemap 是 2D 的，使用 X 和 Y 軸（不是 Z 軸）
-        // 檢查是否有有效的尺寸，避免除以零
-        float sizeX = tilemapBounds.size.x != 0 ? tilemapBounds.size.x : 1f;
-        float sizeY = tilemapBounds.size.y != 0 ? tilemapBounds.size.y : 1f;
+        // 轉換為相機視角空間的座標（-0.5 到 0.5）
+        float normalizedX = relativePos.x / cameraWidth;
+        float normalizedY = relativePos.y / cameraHeight;
         
-        // 轉換為 0-1 的比例
-        float normalizedX = (relativePos.x / sizeX) + 0.5f;
-        float normalizedY = (relativePos.y / sizeY) + 0.5f; // 使用 Y 軸，不是 Z 軸
-        
-        // 轉換為地圖UI座標
+        // 轉換為地圖UI座標（0 到 1，然後轉換為 UI 座標）
         Rect rect = mapDisplay.rectTransform.rect;
-        float uiX = (normalizedX - 0.5f) * rect.width;
-        float uiY = (normalizedY - 0.5f) * rect.height;
+        float uiX = normalizedX * rect.width;
+        float uiY = normalizedY * rect.height;
         
         return new Vector2(uiX, uiY);
-    }
-    
-    /// <summary>
-    /// 將地圖UI座標轉換為世界座標
-    /// </summary>
-    private Vector3 MapUIToWorldPosition(Vector2 mapUIPosition)
-    {
-        if (tilemap == null || mapDisplay == null) return Vector3.zero;
-        
-        // 轉換為 0-1 的比例
-        Rect rect = mapDisplay.rectTransform.rect;
-        float normalizedX = (mapUIPosition.x / rect.width) + 0.5f;
-        float normalizedY = (mapUIPosition.y / rect.height) + 0.5f;
-        
-        // 轉換為世界座標（Tilemap 是 2D，使用 X 和 Y 軸）
-        float worldX = tilemapBounds.center.x + (normalizedX - 0.5f) * tilemapBounds.size.x;
-        float worldY = tilemapBounds.center.y + (normalizedY - 0.5f) * tilemapBounds.size.y;
-        
-        return new Vector3(worldX, worldY, 0); // Z 軸設為 0（2D 遊戲）
     }
     
     #endregion
@@ -512,6 +536,317 @@ public class TilemapMapUIManager : MonoBehaviour
     
     #endregion
     
+    #region 地圖縮放功能
+    
+    /// <summary>
+    /// 處理地圖縮放輸入
+    /// </summary>
+    private void HandleMapZoomInput()
+    {
+        if (mapContainer == null || !isVisible) return;
+        
+        // 儲存原始值（只在第一次需要時）
+        if (!hasStoredOriginalValues)
+        {
+            StoreOriginalValues();
+        }
+        
+        // 檢測按鍵狀態
+        bool keyPressed = Input.GetKey(zoomKey);
+        
+        // 如果狀態改變，切換縮放
+        if (keyPressed != isZoomed)
+        {
+            SetMapZoomed(keyPressed, useSmoothTransition);
+        }
+    }
+    
+    /// <summary>
+    /// 儲存原始位置和大小
+    /// </summary>
+    private void StoreOriginalValues()
+    {
+        if (mapContainer == null) return;
+        
+        originalAnchoredPosition = mapContainer.anchoredPosition;
+        originalSizeDelta = mapContainer.sizeDelta;
+        originalLocalScale = mapContainer.localScale;
+        
+        // 計算放大後的位置（畫面中間）
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            if (canvasRect != null)
+            {
+                // 使用 RectTransformUtility 來計算位置
+                // 獲取 Canvas 中心在螢幕座標中的位置
+                Vector2 canvasCenterScreen = RectTransformUtility.WorldToScreenPoint(
+                    canvas.worldCamera ?? Camera.main,
+                    canvasRect.position
+                );
+                
+                // 將螢幕座標轉換為相對於 mapContainer 的 anchoredPosition
+                Vector2 localPoint;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    mapContainer,
+                    canvasCenterScreen,
+                    canvas.worldCamera ?? Camera.main,
+                    out localPoint))
+                {
+                    // 計算從當前 anchor 位置到 Canvas 中心的偏移
+                    // 需要考慮 anchor 的位置
+                    Vector2 anchorPivot = (mapContainer.anchorMin + mapContainer.anchorMax) * 0.5f;
+                    Rect canvasRectBounds = canvasRect.rect;
+                    Vector2 anchorWorldPos = new Vector2(
+                        (anchorPivot.x - 0.5f) * canvasRectBounds.width,
+                        (anchorPivot.y - 0.5f) * canvasRectBounds.height
+                    );
+                    
+                    // 計算偏移
+                    zoomedAnchoredPosition = originalAnchoredPosition + (localPoint - anchorWorldPos);
+                }
+                else
+                {
+                    // 如果轉換失敗，使用簡化方法
+                    // 計算從原始位置到中心的偏移
+                    Rect canvasRectBounds = canvasRect.rect;
+                    Vector2 anchorPivot = (mapContainer.anchorMin + mapContainer.anchorMax) * 0.5f;
+                    Vector2 centerOffset = new Vector2(
+                        (0.5f - anchorPivot.x) * canvasRectBounds.width,
+                        (0.5f - anchorPivot.y) * canvasRectBounds.height
+                    );
+                    zoomedAnchoredPosition = originalAnchoredPosition + centerOffset;
+                }
+            }
+            else
+            {
+                // 如果無法獲取 Canvas RectTransform，使用簡化方法
+                zoomedAnchoredPosition = Vector2.zero;
+            }
+        }
+        else
+        {
+            // 如果找不到 Canvas，使用簡化方法
+            zoomedAnchoredPosition = Vector2.zero;
+        }
+        
+        // 放大後的大小和縮放
+        zoomedSizeDelta = originalSizeDelta * zoomScale;
+        zoomedLocalScale = originalLocalScale * zoomScale;
+        
+        // 儲存玩家圖標的原始縮放，並計算放大後的縮放
+        // 注意：playerIcon 是 mapContainer 的子物件，需要除以地圖縮放倍率來抵消父物件的縮放
+        if (playerIcon != null)
+        {
+            originalPlayerIconScale = playerIcon.localScale;
+            zoomedPlayerIconScale = originalPlayerIconScale * playerIconZoomScale / zoomScale;
+        }
+        else
+        {
+            originalPlayerIconScale = Vector3.one;
+            zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+        }
+        
+        hasStoredOriginalValues = true;
+    }
+    
+    /// <summary>
+    /// 設定地圖縮放狀態
+    /// </summary>
+    private void SetMapZoomed(bool zoomed, bool smooth)
+    {
+        if (mapContainer == null || !hasStoredOriginalValues) return;
+        
+        isZoomed = zoomed;
+        
+        if (smooth && transitionDuration > 0f)
+        {
+            // 使用平滑過渡
+            transitionTimer = transitionDuration;
+        }
+        else
+        {
+            // 立即切換
+            ApplyMapZoomState(zoomed);
+        }
+    }
+    
+    /// <summary>
+    /// 更新地圖過渡動畫
+    /// </summary>
+    private void UpdateMapTransition()
+    {
+        if (mapContainer == null || !hasStoredOriginalValues) return;
+        
+        transitionTimer -= Time.deltaTime;
+        float t = 1f - (transitionTimer / transitionDuration);
+        t = Mathf.Clamp01(t);
+        
+        // 使用平滑插值
+        float smoothT = SmoothStep(t);
+        
+        // 插值位置、大小和縮放
+        Vector2 currentPos = Vector2.Lerp(
+            isZoomed ? originalAnchoredPosition : zoomedAnchoredPosition,
+            isZoomed ? zoomedAnchoredPosition : originalAnchoredPosition,
+            smoothT
+        );
+        
+        Vector2 currentSize = Vector2.Lerp(
+            isZoomed ? originalSizeDelta : zoomedSizeDelta,
+            isZoomed ? zoomedSizeDelta : originalSizeDelta,
+            smoothT
+        );
+        
+        Vector3 currentScale = Vector3.Lerp(
+            isZoomed ? originalLocalScale : zoomedLocalScale,
+            isZoomed ? zoomedLocalScale : originalLocalScale,
+            smoothT
+        );
+        
+        mapContainer.anchoredPosition = currentPos;
+        mapContainer.sizeDelta = currentSize;
+        mapContainer.localScale = currentScale;
+        
+        // 同時更新玩家圖標的縮放
+        if (playerIcon != null)
+        {
+            Vector3 currentPlayerIconScale = Vector3.Lerp(
+                isZoomed ? originalPlayerIconScale : zoomedPlayerIconScale,
+                isZoomed ? zoomedPlayerIconScale : originalPlayerIconScale,
+                smoothT
+            );
+            playerIcon.localScale = currentPlayerIconScale;
+        }
+        
+        // 如果過渡完成，確保最終值正確
+        if (transitionTimer <= 0f)
+        {
+            ApplyMapZoomState(isZoomed);
+            transitionTimer = 0f;
+        }
+    }
+    
+    /// <summary>
+    /// 應用地圖縮放狀態（立即）
+    /// </summary>
+    private void ApplyMapZoomState(bool zoomed)
+    {
+        if (mapContainer == null || !hasStoredOriginalValues) return;
+        
+        if (zoomed)
+        {
+            mapContainer.anchoredPosition = zoomedAnchoredPosition;
+            mapContainer.sizeDelta = zoomedSizeDelta;
+            mapContainer.localScale = zoomedLocalScale;
+            
+            // 應用玩家圖標的縮放倍率
+            if (playerIcon != null)
+            {
+                playerIcon.localScale = zoomedPlayerIconScale;
+            }
+        }
+        else
+        {
+            mapContainer.anchoredPosition = originalAnchoredPosition;
+            mapContainer.sizeDelta = originalSizeDelta;
+            mapContainer.localScale = originalLocalScale;
+            
+            // 恢復玩家圖標原始大小
+            if (playerIcon != null)
+            {
+                playerIcon.localScale = originalPlayerIconScale;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 平滑階梯函數（用於更自然的動畫）
+    /// </summary>
+    private float SmoothStep(float t)
+    {
+        return t * t * (3f - 2f * t);
+    }
+    
+    /// <summary>
+    /// 設定地圖縮放倍率
+    /// </summary>
+    public void SetZoomScale(float scale)
+    {
+        zoomScale = Mathf.Max(1f, scale);
+        
+        // 重新計算放大後的大小和縮放
+        if (hasStoredOriginalValues)
+        {
+            zoomedSizeDelta = originalSizeDelta * zoomScale;
+            zoomedLocalScale = originalLocalScale * zoomScale;
+            
+            // 重新計算玩家圖標的縮放（需要除以地圖縮放倍率以抵消父物件的縮放）
+            if (playerIcon != null)
+            {
+                zoomedPlayerIconScale = originalPlayerIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
+            // 如果當前是放大狀態，立即應用新的大小和縮放
+            if (isZoomed)
+            {
+                mapContainer.sizeDelta = zoomedSizeDelta;
+                mapContainer.localScale = zoomedLocalScale;
+                if (playerIcon != null)
+                {
+                    playerIcon.localScale = zoomedPlayerIconScale;
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 設定玩家圖標縮放倍率
+    /// </summary>
+    public void SetPlayerIconZoomScale(float scale)
+    {
+        playerIconZoomScale = Mathf.Max(0.1f, scale);
+        
+        // 重新計算玩家圖標的縮放（需要除以地圖縮放倍率以抵消父物件的縮放）
+        if (hasStoredOriginalValues)
+        {
+            if (playerIcon != null)
+            {
+                zoomedPlayerIconScale = originalPlayerIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
+            // 如果當前是放大狀態，立即應用新的縮放
+            if (isZoomed && playerIcon != null)
+            {
+                playerIcon.localScale = zoomedPlayerIconScale;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 設定過渡時間
+    /// </summary>
+    public void SetTransitionDuration(float duration)
+    {
+        transitionDuration = Mathf.Max(0f, duration);
+    }
+    
+    /// <summary>
+    /// 獲取當前是否處於放大狀態
+    /// </summary>
+    public bool IsZoomed() => isZoomed;
+    
+    #endregion
+    
     #region 公開方法
     
     /// <summary>
@@ -552,7 +887,6 @@ public class TilemapMapUIManager : MonoBehaviour
         tilemap = newTilemap;
         if (tilemap != null)
         {
-            grid = tilemap.GetComponentInParent<Grid>();
             RefreshTilemapBounds();
             
             // 如果啟用自動偵測，更新相機 LayerMask
