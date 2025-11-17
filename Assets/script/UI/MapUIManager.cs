@@ -76,11 +76,8 @@ public class MapUIManager : MonoBehaviour
             UpdatePlayerPosition();
         }
         
-        // 更新目標標記位置
-        if (isVisible)
-        {
-            UpdateTargetMarkers();
-        }
+        // 更新目標標記位置 - 始終更新（不論地圖是否可見）
+        UpdateTargetMarkers();
     }
     
     /// <summary>
@@ -326,11 +323,11 @@ public class MapUIManager : MonoBehaviour
             // 設定為紅色
             marker.SetMarkerColor(new Color(1f, 0f, 0f, 1f)); // Red
             
-            // 標記稍微小一點
+            // 標記縮小以適應地圖
             RectTransform markerRect = marker.GetComponent<RectTransform>();
             if (markerRect != null)
             {
-                markerRect.localScale = Vector3.one * 0.8f;
+                markerRect.localScale = Vector3.one * 0.4f; // 縮小到0.4倍
             }
             
             targetMarkers[target] = marker;
@@ -358,36 +355,29 @@ public class MapUIManager : MonoBehaviour
     /// </summary>
     private void UpdateTargetMarkers()
     {
-        if (!isVisible) return;
-        
-        // 創建列表以避免在迭代時修改字典
-        List<Target> targetsToRemove = new List<Target>();
-        
         foreach (var kvp in targetMarkers)
         {
             Target target = kvp.Key;
             MapMarker marker = kvp.Value;
             
-            if (target == null || target.IsDead)
+            if (target == null)
             {
-                // 目標已死亡，標記為待移除
-                targetsToRemove.Add(target);
                 continue;
             }
             
-            // 更新標記位置
+            // 更新標記位置（即使死亡也保持顯示）
             Vector2 mapPos = WorldToMapPosition(target.transform.position);
             RectTransform markerRect = marker.GetComponent<RectTransform>();
             if (markerRect != null)
             {
                 markerRect.anchoredPosition = mapPos;
             }
-        }
-        
-        // 移除死亡的目標標記
-        foreach (Target target in targetsToRemove)
-        {
-            RemoveTargetMarker(target);
+            
+            // 如果死亡，改變標記顏色為灰色
+            if (target.IsDead)
+            {
+                marker.SetMarkerColor(new Color(0.5f, 0.5f, 0.5f, 1f)); // Gray
+            }
         }
     }
     
@@ -421,11 +411,11 @@ public class MapUIManager : MonoBehaviour
             // 設定為亮綠色
             escapePointMarker.SetMarkerColor(new Color(0f, 1f, 0f, 1f)); // Bright Green
             
-            // 讓標記稍微大一點
+            // 標記縮小以適應地圖
             RectTransform markerRect = escapePointMarker.GetComponent<RectTransform>();
             if (markerRect != null)
             {
-                markerRect.localScale = Vector3.one * 1.5f; // 放大1.5倍
+                markerRect.localScale = Vector3.one * 0.4f; // 縮小到0.4倍
             }
             
             Debug.LogWarning($"[MapUI] ✓ 逃亡點已顯示在地圖上: {escapePointWorldPos}");

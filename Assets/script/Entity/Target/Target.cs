@@ -78,6 +78,10 @@ public class Target : BaseEntity<TargetState>, IEntity
     // 視覺化控制
     private bool canVisualize = false;// 是否可以視覺化（由 EnemyManager 控制）
 
+    // 事件：目標死亡和逃脫事件
+    public event System.Action<Target> OnTargetDied;
+    public event System.Action<Target> OnTargetReachedEscapePoint;
+
     // 公共屬性
     public TargetState CurrentState => targetStateMachine?.CurrentState ?? TargetState.Stay;
     public int CurrentHealth => entityHealth != null ? entityHealth.CurrentHealth : 0;
@@ -116,10 +120,6 @@ public class Target : BaseEntity<TargetState>, IEntity
     
     // 保留 cachedPosition 用於內部優化（性能優化）
 
-    // 事件
-    public System.Action<Target> OnTargetDied;
-    public System.Action<Target> OnTargetReachedEscapePoint;
-
     #region Unity 生命週期
 
     protected override void Awake()
@@ -143,6 +143,12 @@ public class Target : BaseEntity<TargetState>, IEntity
         if (aiHandler != null)
         {
             aiHandler.OnTargetReachedEscapePoint += HandleTargetReachedEscapePoint;
+        }
+        
+        // 訂閱 EntityHealth 的死亡事件
+        if (entityHealth != null)
+        {
+            entityHealth.OnEntityDied += HandleTargetDied;
         }
         
         InitializeTargetComponents();
@@ -707,11 +713,32 @@ public class Target : BaseEntity<TargetState>, IEntity
     }
 
     /// <summary>
+    /// 處理目標死亡（由 EntityHealth.OnEntityDied 調用）
+    /// </summary>
+    private void HandleTargetDied()
+    {
+        Debug.LogWarning($"[Target] {gameObject.name} 已死亡！");
+        
+        // 清除地圖上的逃亡路徑
+        MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
+        if (mapUI != null)
+        {
+            mapUI.HideEscapePoint();
+            Debug.Log($"[Target] {gameObject.name} 死亡，已清除地圖上的逃亡路徑");
+        }
+        
+        // 觸發事件通知外部系統（WinConditionManager）
+        OnTargetDied?.Invoke(this);
+    }
+
+    /// <summary>
     /// 處理目標到達逃亡點（由 TargetAIHandler 調用）
     /// </summary>
     private void HandleTargetReachedEscapePoint(Target target)
     {
-        // 觸發事件通知外部系統
+        Debug.LogWarning($"[Target] {gameObject.name} 已到達逃亡點！");
+        
+        // 觸發事件通知外部系統（WinConditionManager，GameManager）
         OnTargetReachedEscapePoint?.Invoke(this);
     }
 
@@ -734,6 +761,12 @@ public class Target : BaseEntity<TargetState>, IEntity
         if (aiHandler != null)
         {
             aiHandler.OnTargetReachedEscapePoint -= HandleTargetReachedEscapePoint;
+        }
+        
+        // 取消訂閱 EntityHealth 事件
+        if (entityHealth != null)
+        {
+            entityHealth.OnEntityDied -= HandleTargetDied;
         }
     }
 

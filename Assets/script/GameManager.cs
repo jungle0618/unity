@@ -47,6 +47,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int enemiesKilled = 0;
     [SerializeField] private float gameTime = 0f;
     [SerializeField] private int currentWave = 0;
+    private float bestTime = float.MaxValue; // 最快速通關時間（秒）
     
     [Header("Game Settings")]
     [SerializeField] private bool startPaused = false;
@@ -203,6 +204,9 @@ public class GameManager : MonoBehaviour
         
         // Load saved game settings
         LoadGameSettings();
+        
+        // Load best time from PlayerPrefs
+        LoadBestTime();
     }
 
     /// <summary>
@@ -571,14 +575,36 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Trigger game over
     /// </summary>
-    public void GameOver()
+    public void GameOver(string reason = "Player died")
     {
-        Debug.Log("[GameManager] Game Over!");
+        Debug.Log($"[GameManager] Game Over! Reason: {reason}");
+        
+        // Set the reason in GameOverUI
+        GameOverUI gameOverUI = FindFirstObjectByType<GameOverUI>();
+        if (gameOverUI != null)
+        {
+            gameOverUI.SetReason(reason);
+        }
+        
         ChangeGameState(GameState.GameOver);
     }
     
     /// <summary>
-    /// Trigger game win
+    /// Trigger game win (公開方法，供 WinConditionManager 調用)
+    /// </summary>
+    public void TriggerGameWin()
+    {
+        if (currentState == GameState.GameWin || currentState == GameState.GameOver)
+        {
+            return; // 已經結束，不重複觸發
+        }
+        
+        Debug.LogWarning("[GameManager] 🎉 遊戲勝利！");
+        GameWin();
+    }
+    
+    /// <summary>
+    /// Trigger game win (原方法，內部使用)
     /// </summary>
     public void GameWin()
     {
@@ -600,8 +626,55 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void HandleGameWin()
     {
-        // 保存最快速通關時間
+        // Save best time
         SaveBestTime();
+    }
+    
+    /// <summary>
+    /// Save best completion time
+    /// </summary>
+    private void SaveBestTime()
+    {
+        // If current time is faster than best time, update it
+        if (gameTime < bestTime)
+        {
+            bestTime = gameTime;
+            PlayerPrefs.SetFloat("BestTime", bestTime);
+            PlayerPrefs.Save();
+            Debug.Log($"[GameManager] New record! Best time: {bestTime:F1} seconds");
+        }
+    }
+    
+    /// <summary>
+    /// Load best time from PlayerPrefs
+    /// </summary>
+    private void LoadBestTime()
+    {
+        bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
+    }
+    
+    /// <summary>
+    /// Get enemies killed count
+    /// </summary>
+    public int GetEnemiesKilled()
+    {
+        return enemiesKilled;
+    }
+    
+    /// <summary>
+    /// Get current game time
+    /// </summary>
+    public float GetGameTime()
+    {
+        return gameTime;
+    }
+    
+    /// <summary>
+    /// Get best completion time
+    /// </summary>
+    public float GetBestTime()
+    {
+        return bestTime;
     }
 
     /// <summary>
@@ -667,54 +740,7 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.Save();
     }
     
-    /// <summary>
-    /// 保存最快速通關時間
-    /// </summary>
-    private void SaveBestTime()
-    {
-        float currentTime = gameTime;
-        float bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
-        
-        // 如果當前時間更快，更新最快速通關時間
-        if (currentTime < bestTime)
-        {
-            PlayerPrefs.SetFloat("BestTime", currentTime);
-            Debug.Log($"[GameManager] New best time: {currentTime:F1} seconds");
-        }
-        
-        PlayerPrefs.Save();
-    }
-    
-    /// <summary>
-    /// 獲取最快速通關時間
-    /// </summary>
-    public float GetBestTime()
-    {
-        float bestTime = PlayerPrefs.GetFloat("BestTime", float.MaxValue);
-        // 如果沒有記錄，返回當前遊戲時間（第一次通關）
-        if (bestTime == float.MaxValue)
-        {
-            return gameTime;
-        }
-        return bestTime;
-    }
-    
-    /// <summary>
-    /// 獲取擊殺敵人數
-    /// </summary>
-    public int GetEnemiesKilled()
-    {
-        return enemiesKilled;
-    }
-    
-    /// <summary>
-    /// 獲取遊戲時間
-    /// </summary>
-    public float GetGameTime()
-    {
-        return gameTime;
-    }
-    
+
     /// <summary>
     /// 獲取當前波次
     /// </summary>

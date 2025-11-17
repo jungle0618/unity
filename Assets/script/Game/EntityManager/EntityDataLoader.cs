@@ -15,7 +15,8 @@ namespace Game.EntityManager
             None,   // 無效類型
             Enemy,  // 敵人
             Target, // 目標
-            Player  // 玩家（僅用於設置初始位置）
+            Player, // 玩家（僅用於設置初始位置）
+            Exit    // 出口點（勝利條件）
         }
 
         // 實體資料結構（擴展以支持不同類型）
@@ -97,6 +98,10 @@ namespace Game.EntityManager
                     {
                         entityData.type = EntityType.Player;
                     }
+                    else if (indexTypeParts[1].Equals("Exit", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        entityData.type = EntityType.Exit;
+                    }
                     else
                     {
                         entityData.type = EntityType.Enemy; // 默認為 Enemy
@@ -170,10 +175,10 @@ namespace Game.EntityManager
                     }
 
                     // 添加到列表
-                    // Enemy 和 Target 需要 patrol points，Player 只需要位置（第一個點）
-                    if (entityData.type == EntityType.Player)
+                    // Enemy 和 Target 需要 patrol points，Player 和 Exit 只需要位置（第一個點）
+                    if (entityData.type == EntityType.Player || entityData.type == EntityType.Exit)
                     {
-                        // Player 只需要第一個點作為初始位置
+                        // Player 和 Exit 只需要第一個點作為初始位置
                         if (entityData.patrolPoints != null && entityData.patrolPoints.Length > 0)
                         {
                             entityDataList.Add(entityData);

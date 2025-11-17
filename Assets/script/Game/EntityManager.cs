@@ -90,6 +90,7 @@ public class EntityManager : MonoBehaviour
     private EntityPerformanceOptimizer optimizer;
     private EntityEventManager eventManager;
     private EntitySpawner spawner;
+    private WinConditionManager winConditionManager;
 
     // 注意：統一實體註冊表已移至 AttackSystem，通過 attackSystem.ActiveEntities 訪問
 
@@ -182,8 +183,51 @@ public class EntityManager : MonoBehaviour
         // 7. 初始化生成器（需要所有其他子系統）
         InitializeSpawner();
 
-        // 8. 開始生成實體
+        // 8. 初始化勝利條件管理器
+        InitializeWinConditionManager();
+
+        // 9. 開始生成實體
         StartCoroutine(DelayedSpawnInitialEntities());
+    }
+    
+    /// <summary>
+    /// 初始化勝利條件管理器
+    /// </summary>
+    private void InitializeWinConditionManager()
+    {
+        // 從 dataLoader 尋找 Exit 點
+        Vector3 exitPoint = Vector3.zero;
+        
+        if (dataLoader != null && dataLoader.EntityDataList != null)
+        {
+            foreach (var data in dataLoader.EntityDataList)
+            {
+                if (data.type == EntityDataLoader.EntityType.Exit)
+                {
+                    if (data.patrolPoints != null && data.patrolPoints.Length > 0)
+                    {
+                        exitPoint = data.patrolPoints[0];
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (exitPoint == Vector3.zero)
+        {
+            Debug.LogWarning("[EntityManager] 未在 patroldata.txt 中找到 Exit 點，使用預設位置 (4, 54)");
+            exitPoint = new Vector3(4, 54, 0);
+        }
+        
+        // 創建 WinConditionManager GameObject
+        GameObject winConditionObj = new GameObject("WinConditionManager");
+        winConditionManager = winConditionObj.AddComponent<WinConditionManager>();
+        winConditionManager.Initialize(exitPoint);
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[EntityManager] WinConditionManager 已初始化，出口點: {exitPoint}");
+        }
     }
     
     /// <summary>

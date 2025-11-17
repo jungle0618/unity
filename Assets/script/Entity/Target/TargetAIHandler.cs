@@ -317,6 +317,18 @@ public class TargetAIHandler : MonoBehaviour
         // 檢查是否看到玩家
         if (cachedCanSeePlayer)
         {
+            // Show notification that target spotted the player
+            NotificationUIManager notificationUI = FindFirstObjectByType<NotificationUIManager>();
+            if (notificationUI != null)
+            {
+                notificationUI.ShowNotification("Warning! Target has spotted you!", 3f);
+            }
+            
+            if (showDebugInfo)
+            {
+                Debug.LogWarning($"[TargetAI] {gameObject.name} spotted the player! Entering escape mode.");
+            }
+            
             // 看到玩家，切換到逃亡狀態
             StartEscape();
         }

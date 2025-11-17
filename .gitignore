@@ -38,6 +38,7 @@
 # You might want to keep some builds for release, so adjust as needed
 /Assets/Builds/
 /Builds/
+Build.zip
 
 # Optional: Ignore specific file types if not needed in source control
 # *.bak

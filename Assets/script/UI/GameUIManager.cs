@@ -478,4 +478,60 @@ public class GameUIManager : MonoBehaviour
     public GameWinUIManager GetGameWinUIManager() => gameWinUIManager;
     
     #endregion
+    
+    #region Game End UI Control
+    
+    /// <summary>
+    /// 隱藏所有遊戲進行中的 UI（用於遊戲結束時）
+    /// </summary>
+    public void HideAllGameplayUI()
+    {
+        if (healthUIManager != null)
+            healthUIManager.gameObject.SetActive(false);
+        
+        if (dangerUIManager != null)
+            dangerUIManager.gameObject.SetActive(false);
+        
+        if (hotbarUIManager != null)
+            hotbarUIManager.gameObject.SetActive(false);
+        
+        if (tilemapMapUIManager != null)
+            tilemapMapUIManager.gameObject.SetActive(false);
+        
+        if (weaponSwitchUI != null)
+            weaponSwitchUI.gameObject.SetActive(false);
+        
+        if (nonWeaponItemsUI != null)
+            nonWeaponItemsUI.gameObject.SetActive(false);
+        
+        Debug.Log("[GameUIManager] All gameplay UI hidden");
+    }
+    
+    /// <summary>
+    /// 顯示所有遊戲進行中的 UI（用於恢復遊戲時）
+    /// </summary>
+    public void ShowAllGameplayUI()
+    {
+        if (healthUIManager != null)
+            healthUIManager.gameObject.SetActive(showHealthUI);
+        
+        if (dangerUIManager != null)
+            dangerUIManager.gameObject.SetActive(showDangerUI);
+        
+        if (hotbarUIManager != null)
+            hotbarUIManager.gameObject.SetActive(showHotbarUI);
+        
+        if (tilemapMapUIManager != null)
+            tilemapMapUIManager.gameObject.SetActive(showMapUI);
+        
+        if (weaponSwitchUI != null)
+            weaponSwitchUI.gameObject.SetActive(true);
+        
+        if (nonWeaponItemsUI != null)
+            nonWeaponItemsUI.gameObject.SetActive(true);
+        
+        Debug.Log("[GameUIManager] All gameplay UI shown");
+    }
+    
+    #endregion
 }

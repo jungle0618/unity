@@ -190,11 +190,17 @@ Knife
 Knife;Gun
 4,26
 
+# Exit Point (出口點 - 玩家勝利點)
+0 Exit
+None
+4,54
+
 # Target 0 (目標)
 0 Target
 None
 80,26
-2,53
+47,54
+#2,53
 #95,18
 
 #4,32

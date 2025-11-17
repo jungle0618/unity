@@ -12,6 +12,7 @@ public class GameOverUI : MonoBehaviour
     [SerializeField] private GameObject gameOverPanel;
     
     [Header("Statistics Display")]
+    [SerializeField] private TextMeshProUGUI reasonText;  // Reason for game over
     [SerializeField] private TextMeshProUGUI enemiesKilledText;
     [SerializeField] private TextMeshProUGUI gameTimeText;
     
@@ -20,8 +21,11 @@ public class GameOverUI : MonoBehaviour
     [SerializeField] private Button mainMenuButton;
     
     [Header("Settings")]
-    [SerializeField] private string enemiesKilledFormat = "擊殺數: {0}";
-    [SerializeField] private string gameTimeFormat = "遊戲時間: {0:F1} 秒";
+    [SerializeField] private string reasonFormat = "Reason: {0}";
+    [SerializeField] private string enemiesKilledFormat = "Enemies Killed: {0}";
+    [SerializeField] private string gameTimeFormat = "Time Survived: {0:F1}s";
+    
+    private string currentReason = "Unknown";
 
     private void Awake()
     {
@@ -81,6 +85,12 @@ public class GameOverUI : MonoBehaviour
     {
         if (GameManager.Instance == null) return;
 
+        // Update reason
+        if (reasonText != null)
+        {
+            reasonText.text = string.Format(reasonFormat, currentReason);
+        }
+
         // 更新擊殺數
         if (enemiesKilledText != null)
         {
@@ -134,6 +144,18 @@ public class GameOverUI : MonoBehaviour
             {
                 UpdateStatistics();
             }
+        }
+    }
+    
+    /// <summary>
+    /// Set the reason for game over
+    /// </summary>
+    public void SetReason(string reason)
+    {
+        currentReason = reason;
+        if (reasonText != null)
+        {
+            reasonText.text = string.Format(reasonFormat, reason);
         }
     }
 }

@@ -99,6 +99,13 @@ public class GameOverUIManager : MonoBehaviour
         if (newState == GameManager.GameState.GameOver)
         {
             SetVisible(true);
+            
+            // Hide all gameplay UI
+            GameUIManager gameUIManager = FindFirstObjectByType<GameUIManager>();
+            if (gameUIManager != null)
+            {
+                gameUIManager.HideAllGameplayUI();
+            }
         }
         else
         {
