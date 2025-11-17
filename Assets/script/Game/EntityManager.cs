@@ -265,6 +265,9 @@ public class EntityManager : MonoBehaviour
         // 生成所有實體
         spawner?.SpawnInitialEntities();
         
+        // 訂閱所有活躍敵人的死亡事件（用於統計擊殺數）
+        SubscribeToAllEnemyDeathEvents();
+        
         // 觸發 Player 準備就緒事件
         OnPlayerReady?.Invoke();
         
@@ -356,6 +359,59 @@ public class EntityManager : MonoBehaviour
 
     #region 事件處理
 
+    /// <summary>
+    /// 訂閱所有活躍敵人的死亡事件
+    /// </summary>
+    private void SubscribeToAllEnemyDeathEvents()
+    {
+        if (entityPool == null) return;
+        
+        var allEnemies = entityPool.GetActiveEnemiesList();
+        foreach (var enemy in allEnemies)
+        {
+            if (enemy != null)
+            {
+                // 先取消訂閱（避免重複訂閱）
+                enemy.OnEnemyDied -= HandleEnemyDied;
+                // 再訂閱
+                enemy.OnEnemyDied += HandleEnemyDied;
+            }
+        }
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[EntityManager] Subscribed to {allEnemies.Count} enemies' death events");
+        }
+    }
+    
+    /// <summary>
+    /// 處理敵人死亡
+    /// </summary>
+    private void HandleEnemyDied(Enemy deadEnemy)
+    {
+        if (deadEnemy == null) return;
+        
+        // 取消訂閱死亡事件（避免重複處理）
+        deadEnemy.OnEnemyDied -= HandleEnemyDied;
+        
+        // 從統一實體註冊表移除（通過 AttackSystem）
+        if (deadEnemy is IEntity deadEnemyEntity)
+        {
+            attackSystem?.RemoveEntity(deadEnemyEntity);
+        }
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[EntityManager] Enemy died: {deadEnemy.gameObject.name}");
+        }
+        
+        // 通知 GameManager 註冊擊殺數
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.RegisterEnemyKill();
+        }
+    }
+    
     /// <summary>
     /// 處理 Target 死亡
     /// </summary>
@@ -802,6 +858,21 @@ public class EntityManager : MonoBehaviour
     public void SpawnEnemy(Vector3 position, int enemyIndex = -1)
     {
         spawner?.SpawnEnemy(position, enemyIndex);
+        
+        // 訂閱新生成敵人的死亡事件
+        if (entityPool != null)
+        {
+            var allEnemies = entityPool.GetActiveEnemiesList();
+            if (allEnemies.Count > 0)
+            {
+                var lastEnemy = allEnemies[allEnemies.Count - 1];
+                if (lastEnemy != null)
+                {
+                    lastEnemy.OnEnemyDied -= HandleEnemyDied;
+                    lastEnemy.OnEnemyDied += HandleEnemyDied;
+                }
+            }
+        }
     }
 
     #endregion
