@@ -77,8 +77,8 @@ public class CameraController2D : MonoBehaviour
             TryFindPlayer();
         }
         
-        // 檢查是否按下 Y 鍵，將相機拉回以玩家為中心
-        if (Keyboard.current != null && Keyboard.current.yKey.wasPressedThisFrame)
+        // 檢查是否按下 f 鍵，將相機拉回以玩家為中心
+        if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
         {
             CenterCameraOnPlayer();
         }

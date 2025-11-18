@@ -1,12 +1,17 @@
-﻿using TMPro;
+﻿﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class MainMenuUI : MonoBehaviour
 {
     [SerializeField] private Button startButton = null;
-    [SerializeField] private Button quitButton = null;
+    [SerializeField] private Button settingsButton = null;
     [SerializeField] private Button controlsButton = null;
+    [SerializeField] private Button quitButton = null;
+    
+    [Header("Settings UI")]
+    [SerializeField] private SettingsUI settingsUI = null;
+    [SerializeField] private bool autoFindSettingsUI = true;
     
     [Header("Controls UI")]
     [SerializeField] private ControlsUI controlsUI = null;
@@ -17,10 +22,22 @@ public class MainMenuUI : MonoBehaviour
         startButton.onClick.AddListener(OnStartButtonClicked);
         quitButton.onClick.AddListener(OnQuitButtonClicked);
         
+        // 設定設置按鈕
+        if (settingsButton != null)
+        {
+            settingsButton.onClick.AddListener(OnSettingsButtonClicked);
+        }
+        
         // 設定控制說明按鈕
         if (controlsButton != null)
         {
             controlsButton.onClick.AddListener(OnControlsButtonClicked);
+        }
+        
+        // 自動尋找 SettingsUI
+        if (autoFindSettingsUI && settingsUI == null)
+        {
+            settingsUI = FindFirstObjectByType<SettingsUI>();
         }
         
         // 自動尋找 ControlsUI
@@ -40,6 +57,19 @@ public class MainMenuUI : MonoBehaviour
     {
         Debug.Log("[MainMenuUI] Quit Button Clicked, quitting game...");
         QuitGame();
+    }
+    
+    private void OnSettingsButtonClicked()
+    {
+        Debug.Log("[MainMenuUI] Settings Button Clicked, showing settings...");
+        if (settingsUI != null)
+        {
+            settingsUI.Show();
+        }
+        else
+        {
+            Debug.LogWarning("[MainMenuUI] SettingsUI not found! Please assign it in the Inspector or ensure it exists in the scene.");
+        }
     }
     
     private void OnControlsButtonClicked()
