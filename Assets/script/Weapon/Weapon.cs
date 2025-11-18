@@ -47,6 +47,21 @@ public abstract class Weapon : Item
     /// 裝備後剩餘的等待時間
     /// </summary>
     public float RemainingEquipTime => Mathf.Max(0, equipTime + equipDelay - Time.time);
+    
+    /// <summary>
+    /// 攻擊冷卻剩餘時間
+    /// </summary>
+    public float RemainingAttackCooldown => Mathf.Max(0, lastAttackTime + attackCooldown - Time.time);
+    
+    /// <summary>
+    /// 攻擊冷卻總時間
+    /// </summary>
+    public float AttackCooldownDuration => attackCooldown;
+    
+    /// <summary>
+    /// 裝備延遲總時間
+    /// </summary>
+    public float EquipDelayDuration => equipDelay;
 
     public event Action<GameObject> OnAttackPerformed; // 攻擊事件
     public event Action<int, int> OnDurabilityChanged; // 當前耐久度, 最大耐久度

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+﻿﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
@@ -16,6 +16,7 @@ public class WeaponSlotUI : MonoBehaviour
     [SerializeField] private Image durabilityBar;       // 耐久度條
     [SerializeField] private GameObject durabilityPanel; // 耐久度面板
     [SerializeField] private CanvasGroup canvasGroup;   // 用於控制亮暗
+    [SerializeField] private Image cooldownOverlay;     // 冷卻遮罩（新增）
     
     [Header("Count/Badge")]
     [SerializeField] private TextMeshProUGUI countBadge; // 右下角堆疊數字（可選）
@@ -30,6 +31,10 @@ public class WeaponSlotUI : MonoBehaviour
     [SerializeField] private Color durabilityHighColor = Color.green;
     [SerializeField] private Color durabilityMediumColor = Color.yellow;
     [SerializeField] private Color durabilityLowColor = Color.red;
+    
+    [Header("Cooldown Settings")]
+    [SerializeField] private Color attackCooldownColor = new Color(0f, 0f, 0f, 0.7f); // Dark overlay for attack cooldown
+    [SerializeField] private Color equipDelayColor = new Color(1f, 0.6f, 0f, 0.7f);   // Orange overlay for equip delay
     
     [Header("Animation")]
     [SerializeField] private float transitionSpeed = 10f; // 過渡動畫速度
@@ -46,6 +51,60 @@ public class WeaponSlotUI : MonoBehaviour
         if (canvasGroup != null)
         {
             canvasGroup.alpha = Mathf.Lerp(canvasGroup.alpha, targetAlpha, Time.deltaTime * transitionSpeed);
+        }
+        
+        // 更新冷卻遮罩
+        UpdateCooldownOverlay();
+    }
+    
+    /// <summary>
+    /// 更新冷卻遮罩顯示
+    /// </summary>
+    private void UpdateCooldownOverlay()
+    {
+        if (cooldownOverlay == null || currentWeapon == null || isEmpty)
+        {
+            if (cooldownOverlay != null)
+            {
+                cooldownOverlay.fillAmount = 0f;
+                cooldownOverlay.enabled = false;
+            }
+            return;
+        }
+        
+        // Check equip delay first (takes priority)
+        float remainingEquipTime = currentWeapon.RemainingEquipTime;
+        if (remainingEquipTime > 0)
+        {
+            // Show equip delay overlay (orange)
+            cooldownOverlay.enabled = true;
+            cooldownOverlay.color = equipDelayColor;
+            
+            // Calculate fill amount (1.0 = fully blocking, 0.0 = ready)
+            float equipDelay = currentWeapon.EquipDelayDuration;
+            float fillAmount = equipDelay > 0 ? remainingEquipTime / equipDelay : 0f;
+            cooldownOverlay.fillAmount = fillAmount;
+            return;
+        }
+        
+        // Check attack cooldown
+        float remainingCooldown = currentWeapon.RemainingAttackCooldown;
+        if (remainingCooldown > 0)
+        {
+            // Show attack cooldown overlay (dark)
+            cooldownOverlay.enabled = true;
+            cooldownOverlay.color = attackCooldownColor;
+            
+            // Calculate fill amount
+            float attackCooldown = currentWeapon.AttackCooldownDuration;
+            float fillAmount = attackCooldown > 0 ? remainingCooldown / attackCooldown : 0f;
+            cooldownOverlay.fillAmount = fillAmount;
+        }
+        else
+        {
+            // Weapon is ready - hide overlay
+            cooldownOverlay.fillAmount = 0f;
+            cooldownOverlay.enabled = false;
         }
     }
     

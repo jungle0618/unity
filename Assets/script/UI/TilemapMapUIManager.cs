@@ -78,6 +78,8 @@ public class TilemapMapUIManager : MonoBehaviour
     {
         // 強制使用程式碼預設值（覆蓋場景中保存的值）
         updateInterval = 0.1f;
+        zoomScale = 4.5f;
+        playerIconZoomScale = 1.5f;
         
         // 嘗試獲取 EntityManager 引用
         if (useEntityManager)
