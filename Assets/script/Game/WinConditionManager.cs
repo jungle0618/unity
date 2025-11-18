@@ -147,7 +147,7 @@ public class WinConditionManager : MonoBehaviour
         MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
         if (mapUI != null && exitPoint != Vector3.zero)
         {
-            MapMarker exitMarker = mapUI.AddMarker(exitPoint, "出口");
+            MapMarker exitMarker = mapUI.AddMarker(exitPoint, "Exit");
             if (exitMarker != null)
             {
                 // 設定為藍色

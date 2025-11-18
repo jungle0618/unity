@@ -7,7 +7,7 @@ using UnityEngine;
 public abstract class MeleeWeapon : Weapon
 {
     [Header("Melee Settings")]
-    [SerializeField] protected float attackRange = 1.5f;
+    [SerializeField] protected float attackRange = 2.5f;
     
     public float AttackRange => attackRange;
     public override WeaponType Type => WeaponType.Melee;

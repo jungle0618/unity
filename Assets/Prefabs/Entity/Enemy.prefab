@@ -180,6 +180,7 @@ MonoBehaviour:
   itemPrefabs: []
   equipOnStart: 1
   allowDynamicEquipping: 1
+  useEmptyHands: 0
 --- !u!114 &3109729174135743179
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -261,12 +262,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a529e448b7c16954d903e157015ed1c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
-  baseSpeed: 5
+  baseSpeed: 6.6
   baseViewRange: 10
   baseViewAngle: 90
   alertTime: 2
-  attackCooldown: 1
+  attackCooldown: 0.5
   attackDetectionRange: 3
+  useWeaponAttackRange: 1
   chaseSpeedMultiplier: 1.2
 --- !u!114 &5292676631361536599
 MonoBehaviour:
@@ -282,6 +284,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyAttackController
   attackCooldown: 1
   attackDetectionRange: 3
+  useWeaponAttackRange: 1
 --- !u!114 &9133391537299838568
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -322,8 +322,10 @@ public class EnemyAIHandler : MonoBehaviour
                 itemHolder?.UpdateWeaponDirection(cachedDirectionToPlayer);
 
                 // 檢查是否在攻擊偵測範圍內，然後嘗試攻擊
+                // 使用 Enemy 的 GetEffectiveAttackRange() 來獲取實際攻擊範圍（支援槍械的遠距離攻擊）
+                float effectiveAttackRange = enemy != null ? enemy.GetEffectiveAttackRange() : attackDetectionRange;
                 float distanceToTarget = Vector2.Distance(cachedPosition, target.position);
-                if (distanceToTarget <= attackDetectionRange && enemy != null)
+                if (distanceToTarget <= effectiveAttackRange && enemy != null)
                 {
                     enemy.TryAttackPlayer(target);
                 }

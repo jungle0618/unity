@@ -307,7 +307,11 @@ public class PlayerMovement : BaseMovement
 
     private void OnRunPerformed(InputAction.CallbackContext ctx)
     {
-        isRunning = true;
+        // Check if running is enabled in settings
+        if (GameSettings.Instance != null && GameSettings.Instance.RunEnabled)
+        {
+            isRunning = true;
+        }
     }
 
     private void OnRunCanceled(InputAction.CallbackContext ctx)

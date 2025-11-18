@@ -21,9 +21,9 @@ public class GameWinUI : MonoBehaviour
     [SerializeField] private Button mainMenuButton;
     
     [Header("Settings")]
-    [SerializeField] private string enemiesKilledFormat = "擊殺數: {0}";
-    [SerializeField] private string gameTimeFormat = "通關時間: {0:F1} 秒";
-    [SerializeField] private string bestTimeFormat = "最快速通關: {0:F1} 秒";
+    [SerializeField] private string enemiesKilledFormat = "Enemies Killed: {0}";
+    [SerializeField] private string gameTimeFormat = "Game Time: {0:F1}s";
+    [SerializeField] private string bestTimeFormat = "Best Time: {0:F1}s";
 
     private void Awake()
     {

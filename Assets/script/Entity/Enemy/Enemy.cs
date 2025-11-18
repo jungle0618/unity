@@ -27,9 +27,11 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
     [Header("AI 參數")]
     [SerializeField] private float alertTime = 2f;
-    [SerializeField] private float attackCooldown = 1f;
+    [SerializeField] private float attackCooldown = 0.5f;
     [Tooltip("敵人會在這個距離內嘗試攻擊（實際攻擊範圍由武器決定）")]
     [SerializeField] private float attackDetectionRange = 3f;
+    [Tooltip("是否使用武器的實際攻擊範圍（對持槍敵人啟用此選項）")]
+    [SerializeField] private bool useWeaponAttackRange = true;
     
     [Header("移動速度乘數")]
     [Tooltip("追擊速度倍數（相對於基礎速度）")]
@@ -63,6 +65,36 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     {
         add { if (entityHealth != null) entityHealth.OnHealthChanged += value; }
         remove { if (entityHealth != null) entityHealth.OnHealthChanged -= value; }
+    }
+    
+    /// <summary>
+    /// 獲取有效攻擊範圍（根據武器類型自動調整）
+    /// </summary>
+    public float GetEffectiveAttackRange()
+    {
+        // 優先使用 attackController 的方法（如果存在）
+        if (attackController != null)
+        {
+            return attackController.GetEffectiveAttackRange();
+        }
+        
+        // 如果啟用了使用武器攻擊範圍選項
+        if (useWeaponAttackRange && itemHolder != null && itemHolder.CurrentWeapon != null)
+        {
+            // 檢查是否為遠程武器（槍械）
+            if (itemHolder.CurrentWeapon is RangedWeapon rangedWeapon)
+            {
+                return rangedWeapon.AttackRange;
+            }
+            // 檢查是否為近戰武器（刀械）
+            else if (itemHolder.CurrentWeapon is MeleeWeapon meleeWeapon)
+            {
+                return meleeWeapon.AttackRange;
+            }
+        }
+        
+        // 否則使用預設的攻擊偵測範圍
+        return attackDetectionRange;
     }
     
     /// <summary>
@@ -127,7 +159,8 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         // 初始化 AI Handler（如果尚未初始化）
         if (aiHandler != null && entityHealth != null)
         {
-            aiHandler.Initialize(attackDetectionRange, 3f);
+            float effectiveRange = GetEffectiveAttackRange();
+            aiHandler.Initialize(effectiveRange, 3f);
         }
         SetCanVisualize(false);
     }
@@ -300,6 +333,12 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     {
         base.InitializeBaseValues(); // 調用基類方法
 
+        // 設定敵人專屬的基礎速度（快於玩家走路的 5f）
+        if (baseSpeed <= 2f) // 如果還是預設值，設定為敵人的基礎速度
+        {
+            baseSpeed = 6.0f; // Enemy 的基礎速度，明顯快於 Player 走路 (5f)
+        }
+
         // 從組件讀取基礎值（如果基類尚未設定）
         // 注意：由於 EnemyDetection 現在使用 currentViewRange/currentViewAngle，
         // 我們需要確保基礎值在 EnemyDetection 初始化時設定
@@ -309,13 +348,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
             // 但由於 EnemyDetection 不再直接定義這些值，我們使用預設值
             if (baseViewRange <= 0f) baseViewRange = 8f; // Enemy 的預設視野範圍
             if (baseViewAngle <= 0f) baseViewAngle = 90f; // Enemy 的預設視野角度
-        }
-        
-        if (enemyMovement != null)
-        {
-            // 如果基礎速度未設定，使用預設值
-            // 注意：EnemyMovement 不再直接定義 speed，所以我們使用預設值
-            if (baseSpeed <= 0f) baseSpeed = 2f; // Enemy 的預設基礎速度
         }
         
         // 初始化 EnemyDetection 的當前視野範圍和角度（使用基礎值）
@@ -362,7 +394,8 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         // 初始化 AI Handler
         if (aiHandler != null)
         {
-            aiHandler.Initialize(attackDetectionRange, 3f); // searchTime = 3f
+            float effectiveRange = GetEffectiveAttackRange();
+            aiHandler.Initialize(effectiveRange, 3f); // searchTime = 3f
         }
         else
         {

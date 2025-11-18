@@ -316,7 +316,7 @@ public class MapUIManager : MonoBehaviour
         
         // 創建標記
         Vector3 targetPos = target.transform.position;
-        MapMarker marker = AddMarker(targetPos, "目標");
+        MapMarker marker = AddMarker(targetPos, "Target");
         
         if (marker != null)
         {

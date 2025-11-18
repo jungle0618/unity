@@ -24,8 +24,8 @@ public class DialogueUIManager : MonoBehaviour
     [SerializeField] private bool pauseGameDuringDialogue = true; // 對話時是否暫停遊戲
     
     [Header("Button Texts")]
-    [SerializeField] private string continueButtonText = "Continue";
-    [SerializeField] private string finishButtonText = "Close";
+    [SerializeField] private string continueButtonText = "Continue...";
+    [SerializeField] private string finishButtonText = "Close.";
     
     private Queue<DialogueEntry> dialogueQueue = new Queue<DialogueEntry>();
     private bool isShowingDialogue = false;
@@ -424,3 +424,5 @@ public class DialogueUIManager : MonoBehaviour
         }
     }
 }
+
+

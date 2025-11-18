@@ -585,10 +585,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameOverUI
   gameOverPanel: {fileID: 1500672345}
+  reasonText: {fileID: 0}
   enemiesKilledText: {fileID: 798971043}
   gameTimeText: {fileID: 285594291}
   restartButton: {fileID: 1626001499}
   mainMenuButton: {fileID: 242929211}
+  reasonFormat: 'Reason: {0}'
   enemiesKilledFormat: 'Enimies Killed: {0}'
   gameTimeFormat: 'Game Time: {0:F1} sec'
 --- !u!114 &203230349
@@ -11488,8 +11490,8 @@ MonoBehaviour:
   restartButton: {fileID: 1357362309}
   mainMenuButton: {fileID: 1558597258}
   enemiesKilledFormat: 'Enemies Killed: {0}'
-  gameTimeFormat: 'Game Time: {0:F1} sec'
-  bestTimeFormat: 'Best Time: {0:F1} sec'
+  gameTimeFormat: 'Game Time: {0:F1}s'
+  bestTimeFormat: 'Best Time: {0:F1}s'
 --- !u!114 &930345723
 MonoBehaviour:
   m_ObjectHideFlags: 0
