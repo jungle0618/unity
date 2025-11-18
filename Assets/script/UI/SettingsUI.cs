@@ -30,6 +30,7 @@ public class SettingsUI : MonoBehaviour
     [Header("Gameplay Settings")]
     [SerializeField] private Toggle damageNumbersToggle;
     [SerializeField] private Toggle minimapToggle;
+    [SerializeField] private Toggle guardAreaSystemToggle;
     
     [Header("Buttons")]
     [SerializeField] private Button resetButton;
@@ -91,6 +92,9 @@ public class SettingsUI : MonoBehaviour
         
         if (minimapToggle != null)
             minimapToggle.onValueChanged.AddListener(OnMinimapToggleChanged);
+        
+        if (guardAreaSystemToggle != null)
+            guardAreaSystemToggle.onValueChanged.AddListener(OnGuardAreaSystemToggleChanged);
     }
     
     /// <summary>
@@ -146,6 +150,9 @@ public class SettingsUI : MonoBehaviour
         
         if (minimapToggle != null)
             minimapToggle.isOn = GameSettings.Instance.ShowMinimap;
+        
+        if (guardAreaSystemToggle != null)
+            guardAreaSystemToggle.isOn = GameSettings.Instance.UseGuardAreaSystem;
     }
     
     private void UpdateVolumeText(TextMeshProUGUI text, float volume)
@@ -213,6 +220,12 @@ public class SettingsUI : MonoBehaviour
     {
         if (GameSettings.Instance != null)
             GameSettings.Instance.ShowMinimap = value;
+    }
+    
+    private void OnGuardAreaSystemToggleChanged(bool value)
+    {
+        if (GameSettings.Instance != null)
+            GameSettings.Instance.UseGuardAreaSystem = value;
     }
     
     private void OnResetClicked()

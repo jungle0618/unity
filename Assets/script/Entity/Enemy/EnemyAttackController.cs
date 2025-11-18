@@ -68,6 +68,13 @@ public class EnemyAttackController : MonoBehaviour
     {
         if (playerTransform == null) return false;
         
+        // 【新增】檢查是否啟用 Guard Area System
+        // 如果停用，使用原始行為（總是可以攻擊）
+        if (GameSettings.Instance != null && !GameSettings.Instance.UseGuardAreaSystem)
+        {
+            return true; // 原始行為：總是可以攻擊
+        }
+        
         // 檢查玩家位置所在區域
         Vector3 playerPosition = playerTransform.position;
         

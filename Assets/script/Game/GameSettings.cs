@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+﻿﻿using UnityEngine;
 
 /// <summary>
 /// Game Settings - Persistent game settings that can be configured in menus
@@ -24,6 +24,7 @@ public class GameSettings : MonoBehaviour
     [Header("Gameplay Settings")]
     [SerializeField] private bool showDamageNumbers = true;
     [SerializeField] private bool showMinimap = true;
+    [SerializeField] private bool useGuardAreaSystem = true; // Enable guard/safe area system by default
     
     // PlayerPrefs keys
     private const string KEY_RUN_ENABLED = "Settings_RunEnabled";
@@ -34,6 +35,7 @@ public class GameSettings : MonoBehaviour
     private const string KEY_TARGET_FPS = "Settings_TargetFPS";
     private const string KEY_DAMAGE_NUMBERS = "Settings_DamageNumbers";
     private const string KEY_MINIMAP = "Settings_Minimap";
+    private const string KEY_GUARD_AREA_SYSTEM = "Settings_GuardAreaSystem";
     
     // Properties
     public bool RunEnabled 
@@ -121,6 +123,17 @@ public class GameSettings : MonoBehaviour
         }
     }
     
+    public bool UseGuardAreaSystem
+    {
+        get => useGuardAreaSystem;
+        set
+        {
+            useGuardAreaSystem = value;
+            SaveSettings();
+            Debug.Log($"[GameSettings] Guard Area System: {(useGuardAreaSystem ? "Enabled" : "Disabled")}");
+        }
+    }
+    
     private void Awake()
     {
         // Singleton pattern
@@ -149,11 +162,12 @@ public class GameSettings : MonoBehaviour
         targetFrameRate = PlayerPrefs.GetInt(KEY_TARGET_FPS, 60);
         showDamageNumbers = PlayerPrefs.GetInt(KEY_DAMAGE_NUMBERS, 1) == 1; // Default: true
         showMinimap = PlayerPrefs.GetInt(KEY_MINIMAP, 1) == 1; // Default: true
+        useGuardAreaSystem = PlayerPrefs.GetInt(KEY_GUARD_AREA_SYSTEM, 1) == 1; // Default: true
         
         // Apply loaded settings
         ApplyAllSettings();
         
-        Debug.Log($"[GameSettings] Loaded settings - Run: {runEnabled}, Master Vol: {masterVolume}, Fullscreen: {fullscreen}");
+        Debug.Log($"[GameSettings] Loaded settings - Run: {runEnabled}, Master Vol: {masterVolume}, Fullscreen: {fullscreen}, Guard Area System: {useGuardAreaSystem}");
     }
     
     /// <summary>
@@ -169,6 +183,7 @@ public class GameSettings : MonoBehaviour
         PlayerPrefs.SetInt(KEY_TARGET_FPS, targetFrameRate);
         PlayerPrefs.SetInt(KEY_DAMAGE_NUMBERS, showDamageNumbers ? 1 : 0);
         PlayerPrefs.SetInt(KEY_MINIMAP, showMinimap ? 1 : 0);
+        PlayerPrefs.SetInt(KEY_GUARD_AREA_SYSTEM, useGuardAreaSystem ? 1 : 0);
         PlayerPrefs.Save();
         
         Debug.Log($"[GameSettings] Saved settings");
@@ -187,6 +202,7 @@ public class GameSettings : MonoBehaviour
         targetFrameRate = 60;
         showDamageNumbers = true;
         showMinimap = true;
+        useGuardAreaSystem = true; // Default: enabled
         
         ApplyAllSettings();
         SaveSettings();

@@ -32,6 +32,7 @@ public class AreaManager : MonoBehaviour
     private Player player;
     private string lastAreaType = "";
     private float lastAreaCheckTime = 0f;
+    private bool lastGuardAreaSystemState = true; // Track if guard area system was enabled
     
     private void Awake()
     {
@@ -55,8 +56,8 @@ public class AreaManager : MonoBehaviour
             InitializePredefinedAreas();
         }
         
-        // Visualize on map UI
-        if (showOnMapUI)
+        // Visualize on map UI (only if guard area system is enabled)
+        if (showOnMapUI && IsGuardAreaSystemEnabled())
         {
             VisualizeAreasOnMap();
         }
@@ -142,6 +143,37 @@ public class AreaManager : MonoBehaviour
     
     private void Update()
     {
+        // Check if guard area system state changed
+        bool currentGuardAreaSystemState = IsGuardAreaSystemEnabled();
+        if (currentGuardAreaSystemState != lastGuardAreaSystemState)
+        {
+            lastGuardAreaSystemState = currentGuardAreaSystemState;
+            
+            if (currentGuardAreaSystemState)
+            {
+                // System enabled - show visualizations
+                Debug.Log("[AreaManager] Guard area system enabled - showing visualizations");
+                if (showOnMapUI)
+                {
+                    // If we have existing markers, show them; otherwise create new ones
+                    if (mapAreaMarkers.Count > 0)
+                    {
+                        ShowAllVisualization();
+                    }
+                    else
+                    {
+                        VisualizeAreasOnMap();
+                    }
+                }
+            }
+            else
+            {
+                // System disabled - hide visualizations
+                Debug.Log("[AreaManager] Guard area system disabled - hiding visualizations");
+                HideAllVisualization();
+            }
+        }
+        
         // Show player's current area in console
         if (showPlayerAreaInConsole && player != null && Time.time >= lastAreaCheckTime + areaCheckInterval)
         {
@@ -254,17 +286,57 @@ public class AreaManager : MonoBehaviour
         // Create a simple semi-transparent rectangle overlay
         GameObject areaOverlay = new GameObject($"GuardArea_{area.areaName}");
         
-        // Parent to markers container
-        Transform container = mapUI.transform.Find("MarkersContainer");
-        if (container == null)
+        // Try to find the correct container - look for MarkersContainer first
+        Transform container = null;
+        
+        // Try multiple ways to find the markers container
+        Transform markersContainerTransform = mapUI.transform.Find("MarkersContainer");
+        if (markersContainerTransform == null)
         {
-            container = mapUI.transform.Find("markersContainer");
+            markersContainerTransform = mapUI.transform.Find("markersContainer");
         }
+        
+        // Check if MapUIManager has a markersContainer field via reflection
+        if (markersContainerTransform == null)
+        {
+            var field = mapUI.GetType().GetField("markersContainer", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (field != null)
+            {
+                Transform fieldValue = field.GetValue(mapUI) as Transform;
+                if (fieldValue != null)
+                {
+                    markersContainerTransform = fieldValue;
+                }
+            }
+        }
+        
+        if (markersContainerTransform != null)
+        {
+            container = markersContainerTransform;
+            Debug.Log($"[AreaManager] Using MarkersContainer for guard area overlay");
+        }
+        else
+        {
+            // Fallback to mapContainer
+            var mapContainerField = mapUI.GetType().GetField("mapContainer", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (mapContainerField != null)
+            {
+                RectTransform mapContainerRect = mapContainerField.GetValue(mapUI) as RectTransform;
+                if (mapContainerRect != null)
+                {
+                    container = mapContainerRect;
+                    Debug.Log($"[AreaManager] Using mapContainer for guard area overlay");
+                }
+            }
+        }
+        
         if (container == null)
         {
-            // Use the mapUI transform itself
+            // Last resort: use mapUI transform itself
             container = mapUI.transform;
-            Debug.LogWarning($"[AreaManager] MarkersContainer not found, using MapUIManager transform");
+            Debug.LogWarning($"[AreaManager] Could not find container, using MapUIManager transform");
         }
         
         areaOverlay.transform.SetParent(container, false);
@@ -277,19 +349,21 @@ public class AreaManager : MonoBehaviour
         
         // Use white sprite (Unity's default)
         image.sprite = null; // Unity will use default white sprite
-        image.color = new Color(1f, 0f, 0f, 0.5f); // Semi-transparent red (higher opacity for visibility)
+        image.color = new Color(1f, 0f, 0f, 0.3f); // Semi-transparent red (lower opacity for better visibility)
         image.raycastTarget = false; // Don't block clicks
         
         // Convert world position to map position using MapUIManager's method
         Vector2 mapPos = ConvertWorldToMapPosition(area.center, mapUI);
         Vector2 mapSize = ConvertWorldToMapSize(area.size, mapUI);
         
+        // Set anchors to stretch (0,0) to (0,0) so positioning is relative to parent
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.zero;
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        
         // Set position and size
         rectTransform.anchoredPosition = mapPos;
         rectTransform.sizeDelta = mapSize;
-        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
         
         // Track for cleanup
         mapAreaMarkers.Add(areaOverlay);
@@ -389,6 +463,49 @@ public class AreaManager : MonoBehaviour
     public string GetAreaTypeName(Vector3 position)
     {
         return IsInGuardArea(position) ? "Guard Area" : "Safe Area";
+    }
+    
+    /// <summary>
+    /// Check if guard area system is enabled in GameSettings
+    /// </summary>
+    private bool IsGuardAreaSystemEnabled()
+    {
+        if (GameSettings.Instance != null)
+        {
+            return GameSettings.Instance.UseGuardAreaSystem;
+        }
+        // Default to enabled if settings not found
+        return true;
+    }
+    
+    /// <summary>
+    /// Hide all guard area visualizations
+    /// </summary>
+    private void HideAllVisualization()
+    {
+        foreach (var marker in mapAreaMarkers)
+        {
+            if (marker != null)
+            {
+                marker.SetActive(false);
+            }
+        }
+        Debug.Log("[AreaManager] All guard area visualizations hidden");
+    }
+    
+    /// <summary>
+    /// Show all guard area visualizations
+    /// </summary>
+    private void ShowAllVisualization()
+    {
+        foreach (var marker in mapAreaMarkers)
+        {
+            if (marker != null)
+            {
+                marker.SetActive(true);
+            }
+        }
+        Debug.Log("[AreaManager] All guard area visualizations shown");
     }
     
     private void OnDrawGizmos()

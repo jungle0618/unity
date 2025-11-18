@@ -202,6 +202,14 @@ public class EnemyAIHandler : MonoBehaviour
         Transform target = enemyDetection.GetTarget();
         if (target == null) return false;
         
+        // 【新增】檢查是否啟用 Guard Area System
+        // 如果停用，使用原始行為（總是追擊）
+        if (GameSettings.Instance != null && !GameSettings.Instance.UseGuardAreaSystem)
+        {
+            Debug.Log($"[EnemyAI] Guard Area System disabled - will always chase when seeing player");
+            return true; // 原始行為：看到就追
+        }
+        
         // 檢查玩家位置所在區域
         Vector3 playerPosition = target.position;
         

@@ -194,7 +194,7 @@ public class ControlsUI : MonoBehaviour
         sb.AppendLine("<size=32><color=#000000><b>Basic Movement</b></color></size>");
         sb.AppendLine();
         sb.AppendLine("<b>W / A / S / D</b> - Move character (Up / Left / Down / Right)");
-        sb.AppendLine("<b>Shift</b> - Sprint (Hold)");
+        sb.AppendLine("<b>Shift</b> - Sprint (Hold. This is only effective when selected in Settings)");
         sb.AppendLine("<b>Z</b> - Crouch (Toggle)");
         sb.AppendLine();
         
@@ -223,7 +223,7 @@ public class ControlsUI : MonoBehaviour
         sb.AppendLine("<size=32><color=#000000><b>Camera Controls</b></color></size>");
         sb.AppendLine();
         sb.AppendLine("<b>Space</b> (Hold) - Move camera (Player cannot move while holding, use WASD to move camera)");
-        sb.AppendLine("<b>Y</b> - Center camera on player");
+        sb.AppendLine("<b>F</b> - Center camera on player");
         sb.AppendLine();
         
         // Game Controls

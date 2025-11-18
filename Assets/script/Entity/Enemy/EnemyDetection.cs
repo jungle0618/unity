@@ -106,11 +106,15 @@ public class EnemyDetection : BaseDetection
         {
             // 如果不需要偵測，報告最大距離和不可見狀態
             dangerousManager.ReportEnemyPerception(float.MaxValue, false);
+            dangerousManager.ReportEnemyActuallySeesPlayer(false);
             return;
         }
 
         bool canSee = CanSeeCurrentTarget();
         float distance = GetDistanceToTarget();
+        
+        // 【新增】總是回報敵人是否實際看到玩家（用於防止危險值在追擊時下降）
+        dangerousManager.ReportEnemyActuallySeesPlayer(canSee);
         
         // 【新增】檢查是否應該增加危險等級
         // 在 Safe Area 中，如果玩家沒有武器，不應該增加危險等級
@@ -140,6 +144,13 @@ public class EnemyDetection : BaseDetection
         {
             // 看不到時，仍然根據距離變化危險值，但不基於可見性
             return false; // 返回 false 表示不要報告 "看見"
+        }
+        
+        // 【新增】檢查是否啟用 Guard Area System
+        // 如果停用，使用原始行為（看到就增加危險）
+        if (GameSettings.Instance != null && !GameSettings.Instance.UseGuardAreaSystem)
+        {
+            return true; // 原始行為：看到就增加危險
         }
         
         // 看得到玩家時，才判斷是否應該增加危險

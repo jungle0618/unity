@@ -58,7 +58,8 @@ public class DangerousManager : MonoBehaviour
     private float lastAutoDecreaseTime;
     
     // 來自敵人的知覺聚合（本幀）
-    private bool anyEnemySeesPlayer = false;
+    private bool anyEnemySeesPlayer = false; // 任何敵人看到玩家（會觸發危險值增加）
+    private bool anyEnemyActuallySeesPlayer = false; // 任何敵人實際看到玩家（用於防止危險值下降，不論區域或武器）
     private float minDistanceToPlayer = float.PositiveInfinity;
     private float dangerFloatAccumulator = 0f; // 用於累積小數部分避免抖動
     
@@ -103,6 +104,7 @@ public class DangerousManager : MonoBehaviour
         
         // 重置聚合狀態，供下一幀使用
         anyEnemySeesPlayer = false;
+        anyEnemyActuallySeesPlayer = false;
         minDistanceToPlayer = float.PositiveInfinity;
     }
     
@@ -333,6 +335,18 @@ public class DangerousManager : MonoBehaviour
             minDistanceToPlayer = distanceToPlayer;
         }
     }
+    
+    /// <summary>
+    /// 回報敵人是否實際看到玩家（不論是否應該增加危險值）
+    /// 用於防止危險值在被追擊時下降
+    /// </summary>
+    public void ReportEnemyActuallySeesPlayer(bool actuallySeesPlayer)
+    {
+        if (actuallySeesPlayer)
+        {
+            anyEnemyActuallySeesPlayer = true;
+        }
+    }
 
     /// <summary>
     /// 根據聚合的敵人資訊，依規則更新危險係數。
@@ -342,6 +356,7 @@ public class DangerousManager : MonoBehaviour
     ///   - 5 格以內：每秒 +20
     ///   - 5~10 格：不變
     ///   - 10 以上：每秒 -20
+    /// - 【新增】當危險等級不是 Safe 且任何敵人實際看到玩家時，危險值不會下降
     /// </summary>
     private void ApplyAggregatedPerception(float deltaTime)
     {
@@ -369,6 +384,16 @@ public class DangerousManager : MonoBehaviour
         else
         {
             ratePerSecond = -farDecreasePerSecond;
+        }
+        
+        // 【修正】當危險等級不是 Safe 且任何敵人實際看到玩家時，不允許危險值下降
+        // 這確保當敵人正在追擊玩家時，即使玩家切換到空手，危險值也不會下降
+        // 只有當玩家完全脫離所有敵人視線時，危險值才會自然下降
+        if (ratePerSecond < 0 && CurrentDangerLevelType != DangerLevel.Safe && anyEnemyActuallySeesPlayer)
+        {
+            // 危險等級不是 Safe 且有敵人看到玩家時，不允許降低危險值
+            Debug.Log("[DangerousManager] Danger level is not Safe and enemy can see player - preventing danger decrease");
+            return;
         }
         
         if (ratePerSecond == 0 || deltaTime <= 0f) return;
