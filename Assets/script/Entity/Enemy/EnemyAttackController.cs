@@ -31,6 +31,12 @@ public class EnemyAttackController : MonoBehaviour
         // 確保當前物品是武器
         if (!itemHolder.IsCurrentItemWeapon) return false;
 
+        // 【新增】檢查是否應該攻擊（基於區域和玩家狀態）
+        if (!ShouldAttackPlayer(playerTransform))
+        {
+            return false;
+        }
+
         // 冷卻檢查
         if (Time.time - lastAttackTime < attackCooldown) return false;
 
@@ -51,6 +57,53 @@ public class EnemyAttackController : MonoBehaviour
             lastAttackTime = Time.time;
         }
         return attackSucceeded;
+    }
+    
+    /// <summary>
+    /// 判斷是否應該攻擊玩家（基於區域類型和玩家狀態）
+    /// Guard Area: 始終攻擊
+    /// Safe Area: 只有當玩家持有武器或危險等級觸發時才攻擊
+    /// </summary>
+    private bool ShouldAttackPlayer(Transform playerTransform)
+    {
+        if (playerTransform == null) return false;
+        
+        // 檢查玩家位置所在區域
+        Vector3 playerPosition = playerTransform.position;
+        
+        // 如果 AreaManager 不存在，默認為 Guard Area 行為（向後兼容）
+        if (AreaManager.Instance == null)
+        {
+            return true;
+        }
+        
+        // 如果在 Guard Area，始終攻擊
+        if (AreaManager.Instance.IsInGuardArea(playerPosition))
+        {
+            return true;
+        }
+        
+        // 在 Safe Area 中，檢查玩家是否持有武器
+        Player player = playerTransform.GetComponent<Player>();
+        if (player == null) return true; // 找不到 Player 組件，默認攻擊
+        
+        ItemHolder playerItemHolder = player.GetComponent<ItemHolder>();
+        if (playerItemHolder == null) return true; // 找不到 ItemHolder，默認攻擊
+        
+        // 檢查玩家是否持有武器
+        bool playerHasWeapon = playerItemHolder.IsCurrentItemWeapon;
+        
+        // 檢查是否危險等級被觸發
+        bool isDangerTriggered = false;
+        DangerousManager dangerManager = DangerousManager.Instance;
+        if (dangerManager != null)
+        {
+            // 危險等級 > Safe 時視為觸發
+            isDangerTriggered = dangerManager.CurrentDangerLevelType != DangerousManager.DangerLevel.Safe;
+        }
+        
+        // Safe Area 邏輯：玩家持有武器 OR 危險等級觸發 → 攻擊
+        return playerHasWeapon || isDangerTriggered;
     }
 
     /// <summary>

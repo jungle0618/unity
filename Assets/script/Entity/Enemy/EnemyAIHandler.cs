@@ -191,6 +191,72 @@ public class EnemyAIHandler : MonoBehaviour
     }
     
     /// <summary>
+    /// 判斷是否應該追擊玩家（基於區域類型和玩家狀態）
+    /// Guard Area: 始終追擊
+    /// Safe Area: 只有當玩家持有武器或危險等級觸發時才追擊
+    /// </summary>
+    private bool ShouldChasePlayer()
+    {
+        // 如果沒有偵測組件或目標，不追擊
+        if (enemyDetection == null) return false;
+        Transform target = enemyDetection.GetTarget();
+        if (target == null) return false;
+        
+        // 檢查玩家位置所在區域
+        Vector3 playerPosition = target.position;
+        
+        // 如果 AreaManager 不存在，默認為 Guard Area 行為（向後兼容）
+        if (AreaManager.Instance == null)
+        {
+            return true;
+        }
+        
+        // 如果在 Guard Area，始終追擊
+        if (AreaManager.Instance.IsInGuardArea(playerPosition))
+        {
+            Debug.Log($"[EnemyAI] Player in GUARD AREA - will chase");
+            return true;
+        }
+        
+        // 在 Safe Area 中，檢查玩家是否持有武器
+        Player player = target.GetComponent<Player>();
+        if (player == null) return true; // 找不到 Player 組件，默認追擊
+        
+        ItemHolder playerItemHolder = player.GetComponent<ItemHolder>();
+        if (playerItemHolder == null) return true; // 找不到 ItemHolder，默認追擊
+        
+        // 檢查玩家是否持有武器
+        bool playerHasWeapon = playerItemHolder.IsCurrentItemWeapon;
+        
+        // 檢查是否危險等級被觸發
+        bool isDangerTriggered = false;
+        DangerousManager dangerManager = DangerousManager.Instance;
+        if (dangerManager != null)
+        {
+            // 危險等級 > Safe 時視為觸發
+            isDangerTriggered = dangerManager.CurrentDangerLevelType != DangerousManager.DangerLevel.Safe;
+        }
+        
+        // Safe Area 邏輯：玩家持有武器 OR 危險等級觸發 → 追擊
+        bool shouldChase = playerHasWeapon || isDangerTriggered;
+        
+        if (!shouldChase)
+        {
+            Debug.Log($"[EnemyAI] Player in SAFE AREA with EMPTY HANDS and danger is SAFE - will NOT chase");
+        }
+        else if (playerHasWeapon)
+        {
+            Debug.Log($"[EnemyAI] Player in SAFE AREA with WEAPON - will chase");
+        }
+        else if (isDangerTriggered)
+        {
+            Debug.Log($"[EnemyAI] Player in SAFE AREA but danger is TRIGGERED - will chase");
+        }
+        
+        return shouldChase;
+    }
+    
+    /// <summary>
     /// 重置巡邏索引
     /// </summary>
     public void ResetPatrolIndex()
@@ -244,7 +310,12 @@ public class EnemyAIHandler : MonoBehaviour
     {
         if (cachedCanSeePlayer)
         {
-            enemyStateMachine?.ChangeState(EnemyState.Chase);
+            // 【新增】檢查是否應該追擊玩家（基於區域和玩家狀態）
+            if (ShouldChasePlayer())
+            {
+                enemyStateMachine?.ChangeState(EnemyState.Chase);
+            }
+            // 如果不應該追擊，保持在 Alert 狀態
         }
         else if (enemyStateMachine?.IsAlertTimeUp() == true)
         {
@@ -282,6 +353,16 @@ public class EnemyAIHandler : MonoBehaviour
 
     private void HandleChaseState()
     {
+        // 【新增】檢查是否應該繼續追擊
+        if (cachedCanSeePlayer && !ShouldChasePlayer())
+        {
+            // 看到玩家但不應該追擊（例如：在安全區且玩家沒武器且危險等級安全）
+            Debug.Log($"{gameObject.name}: Can see player but should NOT chase - returning to Alert");
+            shouldMove = false;
+            enemyStateMachine?.ChangeState(EnemyState.Alert);
+            return;
+        }
+        
         // 檢查是否超出追擊範圍
         if (enemyDetection != null && enemyDetection.IsTargetOutOfChaseRange())
         {

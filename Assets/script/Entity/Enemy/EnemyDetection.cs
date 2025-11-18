@@ -111,7 +111,79 @@ public class EnemyDetection : BaseDetection
 
         bool canSee = CanSeeCurrentTarget();
         float distance = GetDistanceToTarget();
-        dangerousManager.ReportEnemyPerception(distance, canSee);
+        
+        // 【新增】檢查是否應該增加危險等級
+        // 在 Safe Area 中，如果玩家沒有武器，不應該增加危險等級
+        bool shouldIncreaseDanger = ShouldIncreaseDangerLevel(canSee);
+        
+        // 如果不應該增加危險，完全不報告給 DangerousManager
+        // 這樣距離也不會影響危險值
+        if (!shouldIncreaseDanger)
+        {
+            // 報告最大距離（表示沒有威脅）
+            dangerousManager.ReportEnemyPerception(float.MaxValue, false);
+        }
+        else
+        {
+            // 正常報告距離和可見性
+            dangerousManager.ReportEnemyPerception(distance, canSee);
+        }
+    }
+    
+    /// <summary>
+    /// 判斷是否應該增加危險等級（基於區域和玩家狀態）
+    /// </summary>
+    private bool ShouldIncreaseDangerLevel(bool canSeePlayer)
+    {
+        // 如果看不到玩家，使用距離判定（保持原有邏輯）
+        if (!canSeePlayer)
+        {
+            // 看不到時，仍然根據距離變化危險值，但不基於可見性
+            return false; // 返回 false 表示不要報告 "看見"
+        }
+        
+        // 看得到玩家時，才判斷是否應該增加危險
+        
+        // 如果沒有目標，不增加危險
+        if (target == null) return false;
+        
+        // 檢查玩家位置所在區域
+        Vector3 playerPosition = target.position;
+        
+        // 如果 AreaManager 不存在，默認為 Guard Area 行為（向後兼容）
+        if (AreaManager.Instance == null)
+        {
+            return true;
+        }
+        
+        // 如果在 Guard Area，始終增加危險
+        if (AreaManager.Instance.IsInGuardArea(playerPosition))
+        {
+            Debug.Log($"[EnemyDetection] Player in GUARD AREA - will attack regardless of weapon");
+            return true;
+        }
+        
+        // 在 Safe Area 中，檢查玩家是否持有武器
+        Player targetPlayer = target.GetComponent<Player>();
+        if (targetPlayer == null) return true; // 找不到 Player 組件，默認增加危險
+        
+        ItemHolder playerItemHolder = targetPlayer.GetComponent<ItemHolder>();
+        if (playerItemHolder == null) return true; // 找不到 ItemHolder，默認增加危險
+        
+        // 檢查玩家是否持有武器
+        bool playerHasWeapon = playerItemHolder.IsCurrentItemWeapon;
+        
+        if (!playerHasWeapon)
+        {
+            Debug.Log($"[EnemyDetection] Player in SAFE AREA with EMPTY HANDS - will NOT increase danger");
+        }
+        else
+        {
+            Debug.Log($"[EnemyDetection] Player in SAFE AREA with WEAPON - will increase danger");
+        }
+        
+        // Safe Area 邏輯：只有當玩家持有武器時才增加危險
+        return playerHasWeapon;
     }
 
     /// <summary>
