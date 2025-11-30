@@ -8,6 +8,7 @@ TagManager:
   - Walls
   - Floor
   - Objects
+  - VisualCamera
   layers:
   - Default
   - TransparentFX

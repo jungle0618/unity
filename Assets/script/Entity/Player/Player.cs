@@ -81,6 +81,10 @@ public class Player : BaseEntity<PlayerState>, IEntity
     
     [Header("物品撿取設定")]
     [SerializeField] private float pickupRange = 2f; // 物品撿取範圍
+
+    [Header("動畫控制器")]
+    [SerializeField] private PlayerAnimationController animationController;
+
     
     // 注意：viewRange 和 viewAngle 現在從基類 BaseEntity 獲取（baseViewRange, baseViewAngle）
     
@@ -371,14 +375,17 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         UpdateWeaponDirection();
         Debug.Log("[Player] OnAttackPerformed");
+        animationController.TriggerAttackAnimation3D();
         ItemHolder.TryAttack(gameObject);
     }
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
+        animationController.TriggerInteractAnimation();
+
         // 優先處理撿取物品
         bool itemPickedUp = TryPickupItem();
-        
+
         // 如果沒有撿到物品，則嘗試開門
         if (!itemPickedUp)
         {
