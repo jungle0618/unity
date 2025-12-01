@@ -64,9 +64,12 @@ public class PlayerAnimationController : MonoBehaviour
         relativeDirection.x =  Vector2.Dot(direction, new Vector2(weaponDirection.y, -weaponDirection.x));
         relativeDirection.y =  Vector2.Dot(direction, weaponDirection);
 
-        if (speed > 0f) {
-            animator.SetFloat("moveX", relativeDirection.x);
-            animator.SetFloat("moveY", relativeDirection.y);
+        animator.SetFloat("moveX", relativeDirection.x);
+        animator.SetFloat("moveY", relativeDirection.y);
+
+        if (playerMovement.IsCameraMode) {
+            animator.SetFloat("moveX", 0f);
+            animator.SetFloat("moveY", 0f);
         }
 
         animator.SetBool("isRunning", playerMovement.IsRunning);

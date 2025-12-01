@@ -375,8 +375,9 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         UpdateWeaponDirection();
         Debug.Log("[Player] OnAttackPerformed");
-        animationController.TriggerAttackAnimation3D();
-        ItemHolder.TryAttack(gameObject);
+
+        if (ItemHolder.TryAttack(gameObject))
+            animationController.TriggerAttackAnimation3D();
     }
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
