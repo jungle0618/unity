@@ -132,6 +132,31 @@ public class Player : BaseEntity<PlayerState>, IEntity
     public event System.Action OnPlayerDied; // 玩家死亡事件
     public event System.Action OnPlayerReachedSpawnPoint; // 玩家回到出生點事件
 
+    #region Animation & Sound Events
+
+    // Movement events
+    public event System.Action OnStartedMoving;
+    public event System.Action OnStoppedMoving;
+    public event System.Action OnStartedRunning;
+    public event System.Action OnStoppedRunning;
+    public event System.Action<Vector2> OnMovementDirectionChanged;
+    public event System.Action<float> OnSpeedChanged;
+
+    // Hand/Weapon state events
+    public event System.Action OnHandsEmpty;
+    public event System.Action OnWeaponEquipped;
+    public event System.Action OnItemEquipped;
+
+    // Internal tracking
+    private bool wasMoving = false;
+    private bool wasRunning = false;
+    private Vector2 lastDirection = Vector2.zero;
+    private float lastSpeed = 0f;
+    private bool hadWeaponEquipped = false;
+    private Item lastEquippedItem = null;
+
+    #endregion
+
     #region Unity 生命週期
 
     protected override void Awake()
@@ -264,6 +289,9 @@ public class Player : BaseEntity<PlayerState>, IEntity
     {
         base.Update(); // 調用基類 Update
         
+        // Fire animation events
+        CheckAndFireAnimationEvents();
+        
         // 數字鍵快速切換武器：1=Knife, 2=Gun, 3=Empty Hands
         HandleNumberKeyWeaponSwitch();
         
@@ -326,6 +354,84 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         if (playerStateMachine == null)
             Debug.LogError($"{gameObject.name}: Failed to initialize PlayerStateMachine!");
+    }
+
+    #endregion
+
+    #region Animation Event Firing Logic
+
+    /// <summary>
+    /// Check and fire animation events based on player state changes
+    /// </summary>
+    private void CheckAndFireAnimationEvents()
+    {
+        if (playerMovement == null) return;
+
+        // Check movement state - player is moving if has input or move target
+        bool isCurrentlyMoving = playerMovement.MoveInput.sqrMagnitude > 0.01f || playerMovement.HasMoveTarget;
+        if (isCurrentlyMoving != wasMoving)
+        {
+            if (isCurrentlyMoving)
+                OnStartedMoving?.Invoke();
+            else
+                OnStoppedMoving?.Invoke();
+
+            wasMoving = isCurrentlyMoving;
+        }
+
+        // Check running state (sprint)
+        bool isCurrentlyRunning = playerMovement.IsRunning;
+        if (isCurrentlyRunning != wasRunning)
+        {
+            if (isCurrentlyRunning)
+                OnStartedRunning?.Invoke();
+            else
+                OnStoppedRunning?.Invoke();
+
+            wasRunning = isCurrentlyRunning;
+        }
+
+        // Check movement direction changes
+        Vector2 currentDirection = playerMovement.GetMovementDirection();
+        if (Vector2.Distance(currentDirection, lastDirection) > 0.1f && currentDirection.sqrMagnitude > 0.01f)
+        {
+            OnMovementDirectionChanged?.Invoke(currentDirection);
+            lastDirection = currentDirection;
+        }
+
+        // Check speed changes
+        float currentSpeed = playerMovement.GetSpeed();
+        if (Mathf.Abs(currentSpeed - lastSpeed) > 0.01f)
+        {
+            OnSpeedChanged?.Invoke(currentSpeed);
+            lastSpeed = currentSpeed;
+        }
+
+        // Check weapon/item state changes
+        if (itemHolder != null)
+        {
+            Item currentItem = itemHolder.CurrentItem;
+            bool hasWeapon = itemHolder.IsCurrentItemWeapon;
+            
+            // Check if switched to empty hands
+            if (currentItem == null && lastEquippedItem != null)
+            {
+                OnHandsEmpty?.Invoke();
+            }
+            // Check if equipped weapon
+            else if (hasWeapon && !hadWeaponEquipped)
+            {
+                OnWeaponEquipped?.Invoke();
+            }
+            // Check if equipped non-weapon item
+            else if (currentItem != null && !hasWeapon && lastEquippedItem != currentItem)
+            {
+                OnItemEquipped?.Invoke();
+            }
+
+            hadWeaponEquipped = hasWeapon;
+            lastEquippedItem = currentItem;
+        }
     }
 
     #endregion

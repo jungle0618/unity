@@ -26,6 +26,11 @@ public abstract class RangedWeapon : Weapon, IAmmoWeapon
 
     // Events for ammo changes
     public event Action<int, int> OnAmmoChanged; // current, max
+    
+    // Reload events
+    public event Action OnAmmoEmpty; // 彈藥耗盡時
+    public event Action OnReloadStarted; // 開始換彈時
+    public event Action OnReloadCompleted; // 換彈完成時
 
     protected override void Awake()
     {
@@ -50,6 +55,12 @@ public abstract class RangedWeapon : Weapon, IAmmoWeapon
         {
             _currentAmmo--;
             OnAmmoChanged?.Invoke(_currentAmmo, MaxAmmo);
+            
+            // Fire empty event when ammo runs out
+            if (_currentAmmo <= 0)
+            {
+                OnAmmoEmpty?.Invoke();
+            }
         }
     }
 
@@ -60,10 +71,14 @@ public abstract class RangedWeapon : Weapon, IAmmoWeapon
     {
         if (amount <= 0) return;
 
+        OnReloadStarted?.Invoke();
+        
         int oldAmmo = _currentAmmo;
         _currentAmmo += amount;
         
         OnAmmoChanged?.Invoke(_currentAmmo, MaxAmmo);
+        OnReloadCompleted?.Invoke();
+        
         Debug.Log($"[{GetType().Name}] Reloaded {amount} bullets. Total: {_currentAmmo}");
     }
 
@@ -72,8 +87,12 @@ public abstract class RangedWeapon : Weapon, IAmmoWeapon
     /// </summary>
     public void FullReload()
     {
+        OnReloadStarted?.Invoke();
+        
         _currentAmmo = startingAmmo;
         OnAmmoChanged?.Invoke(_currentAmmo, MaxAmmo);
+        OnReloadCompleted?.Invoke();
+        
         Debug.Log($"[{GetType().Name}] Fully reloaded! Ammo: {_currentAmmo}");
     }
 

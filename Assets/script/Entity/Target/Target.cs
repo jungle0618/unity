@@ -82,6 +82,36 @@ public class Target : BaseEntity<TargetState>, IEntity
     public event System.Action<Target> OnTargetDied;
     public event System.Action<Target> OnTargetReachedEscapePoint;
 
+    #region Animation & Sound Events
+
+    // State transition events - expose from state machine
+    public event System.Action<TargetState, TargetState> OnTargetStateChanged
+    {
+        add { if (targetStateMachineInstance != null) targetStateMachineInstance.OnStateChanged += value; }
+        remove { if (targetStateMachineInstance != null) targetStateMachineInstance.OnStateChanged -= value; }
+    }
+    
+    public event System.Action OnStartedMoving;
+    public event System.Action OnStoppedMoving;
+    public event System.Action OnStartedEscaping;
+    public event System.Action OnStoppedEscaping;
+
+    // Escape events
+    public event System.Action OnPlayerSpotted;
+    public event System.Action<float> OnEscapeProgressChanged;
+
+    // Movement events
+    public event System.Action<Vector2> OnMovementDirectionChanged;
+
+    // Internal tracking for events
+    private bool wasMoving = false;
+    private Vector2 lastDirection = Vector2.zero;
+    private TargetState lastState = TargetState.Dead;
+    private bool hadPlayerInSight = false;
+    private float lastEscapeProgress = 0f;
+
+    #endregion
+
     // 公共屬性
     public TargetState CurrentState => targetStateMachine?.CurrentState ?? TargetState.Stay;
     public int CurrentHealth => entityHealth != null ? entityHealth.CurrentHealth : 0;
@@ -179,6 +209,9 @@ public class Target : BaseEntity<TargetState>, IEntity
         
         // 更新快取位置
         UpdateCachedData();
+        
+        // Fire animation events based on state changes
+        CheckAndFireAnimationEvents();
     }
 
     protected override void FixedUpdate()
@@ -241,12 +274,6 @@ public class Target : BaseEntity<TargetState>, IEntity
         if (targetDetection != null && targetStateMachineInstance != null)
         {
             targetDetection.SetStateMachine(targetStateMachineInstance);
-        }
-
-        // 監聽狀態變更事件
-        if (targetStateMachineInstance != null)
-        {
-            targetStateMachineInstance.OnStateChanged += OnStateChanged;
         }
 
         // 初始化快取數據
@@ -317,6 +344,91 @@ public class Target : BaseEntity<TargetState>, IEntity
             }
 
             cacheUpdateTime = Time.time;
+        }
+    }
+
+    #endregion
+
+    #region Animation Event Firing Logic
+
+    /// <summary>
+    /// Check and fire animation events based on state and movement changes
+    /// </summary>
+    private void CheckAndFireAnimationEvents()
+    {
+        if (!isInitialized || targetStateMachine == null) return;
+
+        // Check state changes
+        TargetState currentState = targetStateMachine.CurrentState;
+        if (currentState != lastState)
+        {
+            // Fire state-specific events
+            if (currentState == TargetState.Escape)
+            {
+                OnStartedEscaping?.Invoke();
+            }
+            else if (lastState == TargetState.Escape)
+            {
+                OnStoppedEscaping?.Invoke();
+            }
+
+            lastState = currentState;
+        }
+
+        // Check movement state
+        bool isCurrentlyMoving = targetMovement != null && targetMovement.GetSpeed() > 0.01f;
+        if (isCurrentlyMoving != wasMoving)
+        {
+            if (isCurrentlyMoving)
+                OnStartedMoving?.Invoke();
+            else
+                OnStoppedMoving?.Invoke();
+
+            wasMoving = isCurrentlyMoving;
+        }
+
+        // Check movement direction changes
+        if (targetMovement != null)
+        {
+            Vector2 currentDirection = targetMovement.GetMovementDirection();
+            if (Vector2.Distance(currentDirection, lastDirection) > 0.1f)
+            {
+                OnMovementDirectionChanged?.Invoke(currentDirection);
+                lastDirection = currentDirection;
+            }
+        }
+
+        // Check player detection changes
+        bool currentlySeesPlayer = targetDetection != null && targetDetection.CanSeePlayer();
+        if (currentlySeesPlayer != hadPlayerInSight)
+        {
+            if (currentlySeesPlayer)
+                OnPlayerSpotted?.Invoke();
+
+            hadPlayerInSight = currentlySeesPlayer;
+        }
+
+        // Check escape progress changes (only when escaping)
+        if (currentState == TargetState.Escape && aiHandler != null)
+        {
+            Vector3 escapePoint = aiHandler.GetEscapePoint();
+            Vector3 startPosition = patrolLocations != null && patrolLocations.Length > 0 
+                ? patrolLocations[0] 
+                : transform.position;
+            
+            float totalDistance = Vector3.Distance(startPosition, escapePoint);
+            if (totalDistance > 0f)
+            {
+                float currentDistance = Vector3.Distance(transform.position, escapePoint);
+                float traveledDistance = totalDistance - currentDistance;
+                float currentProgress = Mathf.Clamp01(traveledDistance / totalDistance);
+
+                if (Mathf.Abs(currentProgress - lastEscapeProgress) > 0.05f)
+                {
+                    OnEscapeProgressChanged?.Invoke(currentProgress);
+                    lastEscapeProgress = currentProgress;
+                }
+            }
         }
     }
 
@@ -570,6 +682,10 @@ public class Target : BaseEntity<TargetState>, IEntity
             Debug.Log($"{gameObject.name}: FOV倍數設定為 {multiplier}");
         }
     }
+
+    #endregion
+
+    #region Public Methods
 
     /// <summary>
     /// 根據危險等級更新所有屬性

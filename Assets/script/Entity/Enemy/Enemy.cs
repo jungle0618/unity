@@ -124,6 +124,41 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     // 事件
     public System.Action<Enemy> OnEnemyDied;
 
+    #region Animation & Sound Events
+
+    // State transition events - expose from state machine
+    public event System.Action<EnemyState, EnemyState> OnEnemyStateChanged
+    {
+        add { if (enemyStateMachineInstance != null) enemyStateMachineInstance.OnStateChanged += value; }
+        remove { if (enemyStateMachineInstance != null) enemyStateMachineInstance.OnStateChanged -= value; }
+    }
+    
+    public event System.Action OnStartedMoving;
+    public event System.Action OnStoppedMoving;
+    public event System.Action OnStartedChasing;
+    public event System.Action OnStoppedChasing;
+    public event System.Action OnEnteredPatrol;
+    public event System.Action OnEnteredAlert;
+    public event System.Action OnEnteredSearch;
+    public event System.Action OnEnteredReturn;
+
+    // Detection events
+    public event System.Action OnPlayerSpotted;
+    public event System.Action OnPlayerLost;
+
+    // Movement events
+    public event System.Action<Vector2> OnMovementDirectionChanged;
+    public event System.Action<float> OnSpeedChanged;
+
+    // Internal tracking for movement events
+    private bool wasMoving = false;
+    private Vector2 lastDirection = Vector2.zero;
+    private float lastSpeed = 0f;
+    private EnemyState lastState = EnemyState.Dead;
+    private bool hadPlayerInSight = false;
+
+    #endregion
+
     #region Unity 生命週期
 
     protected override void Awake()
@@ -171,6 +206,9 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         
         // 更新快取位置
         UpdateCachedData();
+        
+        // Fire animation events based on state changes
+        CheckAndFireAnimationEvents();
     }
 
     protected override void FixedUpdate()
@@ -243,12 +281,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         if (enemyDetection != null && enemyStateMachineInstance != null)
         {
             enemyDetection.SetStateMachine(enemyStateMachineInstance);
-        }
-
-        // 監聽狀態變更事件
-        if (enemyStateMachineInstance != null)
-        {
-            enemyStateMachineInstance.OnStateChanged += OnStateChanged;
         }
 
         // 初始化快取數據
@@ -595,6 +627,101 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         }
     }
 
+    #endregion
+
+    #region Animation Event Firing Logic
+
+    /// <summary>
+    /// Check and fire animation events based on state and movement changes
+    /// </summary>
+    private void CheckAndFireAnimationEvents()
+    {
+        if (!isInitialized || enemyStateMachine == null) return;
+
+        // Check state changes
+        EnemyState currentState = enemyStateMachine.CurrentState;
+        if (currentState != lastState)
+        {
+            // Fire state-specific enter events
+            switch (currentState)
+            {
+                case EnemyState.Patrol:
+                    OnEnteredPatrol?.Invoke();
+                    break;
+                case EnemyState.Alert:
+                    OnEnteredAlert?.Invoke();
+                    break;
+                case EnemyState.Chase:
+                    OnStartedChasing?.Invoke();
+                    break;
+                case EnemyState.Search:
+                    OnEnteredSearch?.Invoke();
+                    break;
+                case EnemyState.Return:
+                    OnEnteredReturn?.Invoke();
+                    break;
+            }
+
+            // Fire exit events for previous state
+            if (lastState == EnemyState.Chase)
+            {
+                OnStoppedChasing?.Invoke();
+            }
+
+            lastState = currentState;
+        }
+
+        // Check movement state
+        bool isCurrentlyMoving = enemyMovement != null && enemyMovement.GetSpeed() > 0.01f;
+        if (isCurrentlyMoving != wasMoving)
+        {
+            if (isCurrentlyMoving)
+                OnStartedMoving?.Invoke();
+            else
+                OnStoppedMoving?.Invoke();
+
+            wasMoving = isCurrentlyMoving;
+        }
+
+        // Check movement direction changes
+        if (enemyMovement != null)
+        {
+            Vector2 currentDirection = enemyMovement.GetMovementDirection();
+            if (Vector2.Distance(currentDirection, lastDirection) > 0.1f)
+            {
+                OnMovementDirectionChanged?.Invoke(currentDirection);
+                lastDirection = currentDirection;
+            }
+        }
+
+        // Check speed changes
+        if (enemyMovement != null)
+        {
+            float currentSpeed = enemyMovement.GetSpeed();
+            if (Mathf.Abs(currentSpeed - lastSpeed) > 0.01f)
+            {
+                OnSpeedChanged?.Invoke(currentSpeed);
+                lastSpeed = currentSpeed;
+            }
+        }
+
+        // Check player detection changes
+        bool currentlySeesPlayer = enemyDetection != null && enemyDetection.CanSeePlayer();
+        if (currentlySeesPlayer != hadPlayerInSight)
+        {
+            if (currentlySeesPlayer)
+                OnPlayerSpotted?.Invoke();
+            else
+                OnPlayerLost?.Invoke();
+
+            hadPlayerInSight = currentlySeesPlayer;
+        }
+    }
+
+    #endregion
+
+    #region Public Methods
+
     /// <summary>
     /// 根據危險等級更新所有屬性
     /// </summary>
@@ -728,48 +855,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     // 注意：AI 邏輯已移至 EnemyAIHandler 組件
     // 這裡保留區域標記以維持代碼結構
 
-    #endregion
-
-    #region 事件處理
-
-    private void OnStateChanged(EnemyState oldState, EnemyState newState)
-    {
-        // 處理狀態轉換的特殊邏輯
-        switch (newState)
-        {
-            case EnemyState.Dead:
-                HandleDeathState();
-                break;
-
-            case EnemyState.Alert:
-                // 可以在此處播放警戒音效或動畫
-                break;
-
-            case EnemyState.Chase:
-                // 可以在此處播放追擊音效或動畫
-                break;
-
-            case EnemyState.Search:
-                // 可以在此處播放搜索音效或動畫
-                break;
-        }
-
-        // 降低日誌頻率
-        if (Time.frameCount % 60 == 0) // 每 60 幀才輸出一次
-        {
-            Debug.Log($"{gameObject.name}: State changed from {oldState} to {newState}");
-        }
-    }
-
-    private void HandleDeathState()
-    {
-        // 禁用遊戲物件或播放死亡動畫
-        // 注意：Die() 方法中已經調用了 SetActive(false)，這裡作為備份確保物件被禁用
-        if (gameObject.activeSelf)
-        {
-            gameObject.SetActive(false);
-        }
-    }
 
     #endregion
 
@@ -780,11 +865,8 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         // 調用基類的 OnDestroy 進行基礎清理
         base.OnDestroy();
         
-        // 處理 Enemy 特定的清理邏輯
-        if (enemyStateMachineInstance != null)
-        {
-            enemyStateMachineInstance.OnStateChanged -= OnStateChanged;
-        }
+        // Enemy 特定的清理邏輯
+        // 注意：狀態機事件現在通過 OnEnemyStateChanged 屬性暴露，不需要在這裡取消訂閱
     }
 
     #endregion

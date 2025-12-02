@@ -66,10 +66,27 @@ public abstract class Weapon : Item
     public event Action<GameObject> OnAttackPerformed; // 攻擊事件
     public event Action<int, int> OnDurabilityChanged; // 當前耐久度, 最大耐久度
     public event Action OnWeaponBroken; // 武器損壞事件
+    
+    // New equipment events
+    public event Action OnEquipped; // 武器裝備時
+    public event Action OnUnequipped; // 武器卸下時
+    public event Action OnBecameReady; // 裝備延遲結束，武器就緒
+
+    private bool hasFireReadyEvent = false;
 
     protected virtual void Awake()
     {
         currentDurability = maxDurability;
+    }
+
+    protected virtual void Update()
+    {
+        // Check if weapon just became ready
+        if (!hasFireReadyEvent && IsReady)
+        {
+            OnBecameReady?.Invoke();
+            hasFireReadyEvent = true;
+        }
     }
     
     /// <summary>
@@ -80,6 +97,8 @@ public abstract class Weapon : Item
         base.OnEquip();
         // 記錄裝備時間，用於計算掏槍延遲
         equipTime = Time.time;
+        hasFireReadyEvent = false; // Reset ready event flag
+        OnEquipped?.Invoke();
     }
     
     /// <summary>
@@ -88,7 +107,7 @@ public abstract class Weapon : Item
     public override void OnUnequip()
     {
         base.OnUnequip();
-        // 武器卸下時的邏輯
+        OnUnequipped?.Invoke();
     }
     
     /// <summary>
