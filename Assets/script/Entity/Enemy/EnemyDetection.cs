@@ -8,6 +8,7 @@ using UnityEngine;
 /// 
 /// 【封裝說明】
 /// 此類的屬性（如 viewRange, viewAngle, chaseRange）應通過 Enemy 類的公共方法進行修改，而不是直接訪問。
+/// 注意：chaseRange 是 Enemy 專屬功能，不在基類中。
 /// 正確方式：使用 Enemy.UpdateDangerLevelStats() 來更新偵測參數。
 /// </summary>
 public class EnemyDetection : BaseDetection
@@ -197,21 +198,7 @@ public class EnemyDetection : BaseDetection
         return playerHasWeapon;
     }
 
-    /// <summary>
-    /// 設定偵測目標（覆寫基類方法）
-    /// </summary>
-    public override void SetTarget(Transform playerTarget)
-    {
-        base.SetTarget(playerTarget);
-    }
-
-    /// <summary>
-    /// 檢查是否可以看到玩家（保留向後兼容的別名）
-    /// </summary>
-    public bool CanSeePlayer()
-    {
-        return CanSeeCurrentTarget();
-    }
+    // CanSeePlayer() 已由基類 BaseDetection 統一提供
 
     /// <summary>
     /// 檢查是否可以看到指定目標（覆寫基類抽象方法）
@@ -258,11 +245,14 @@ public class EnemyDetection : BaseDetection
     /// </summary>
     public override void SetDetectionParameters(params object[] parameters)
     {
-        if (parameters.Length >= 3)
+        if (parameters.Length >= 2)
         {
             currentViewRange = (float)parameters[0];
             currentViewAngle = (float)parameters[1];
-            chaseRange = (float)parameters[2];
+        }
+        if (parameters.Length >= 3)
+        {
+            chaseRange = (float)parameters[2]; // 更新追擊範圍
         }
     }
 
@@ -274,11 +264,11 @@ public class EnemyDetection : BaseDetection
     {
         currentViewRange = newViewRange;
         currentViewAngle = newViewAngle;
-        chaseRange = newChaseRange;
+        chaseRange = newChaseRange; // 更新追擊範圍
     }
 
     /// <summary>
-    /// 檢查目標是否超出追擊範圍
+    /// 檢查目標是否超出追擊範圍（僅 Enemy 使用）
     /// </summary>
     public bool IsTargetOutOfChaseRange()
     {
@@ -286,41 +276,10 @@ public class EnemyDetection : BaseDetection
         return Vector2.Distance(transform.position, GetTarget().position) > chaseRange;
     }
 
-    /// <summary>
-    /// 獲取朝向目標的方向（覆寫基類方法）
-    /// </summary>
-    public override Vector2 GetDirectionToTarget()
-    {
-        return base.GetDirectionToTarget();
-    }
-
-    /// <summary>
-    /// 獲取到目標的距離（覆寫基類方法）
-    /// </summary>
-    public override float GetDistanceToTarget()
-    {
-        return base.GetDistanceToTarget();
-    }
-
     // IsBlockedByObstacle 已移至 BaseDetection
+    // SetTarget, GetDirectionToTarget, GetDistanceToTarget, HasValidTarget, ClearTarget 已由基類 BaseDetection 統一提供
 
     public void SetRaycastDetection(bool enabled) => useRaycastDetection = enabled;
-
-    /// <summary>
-    /// 檢查是否有有效的目標（覆寫基類方法）
-    /// </summary>
-    public override bool HasValidTarget()
-    {
-        return base.HasValidTarget();
-    }
-
-    /// <summary>
-    /// 清除目標（覆寫基類方法）
-    /// </summary>
-    public override void ClearTarget()
-    {
-        base.ClearTarget();
-    }
 
     /// <summary>
     /// 面向目標方向
@@ -417,7 +376,7 @@ public class EnemyDetection : BaseDetection
     /// 檢查是否應該更新 AI 邏輯（考慮攝影機剔除）
     /// 根據 enemy_ai.md：當不在 Chase 或 Search 狀態且不在攝影機範圍內時，不更新 AI
     /// </summary>
-    public bool ShouldUpdateAI()
+    public override bool ShouldUpdateAI()
     {
         if (stateMachine == null) return false;
         

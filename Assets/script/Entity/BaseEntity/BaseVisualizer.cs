@@ -52,10 +52,6 @@ public abstract class BaseVisualizer : MonoBehaviour
     private int wallsLayerIndex = -1;
     private bool layerCacheInitialized = false;
     
-    // 視野更新快取
-    protected Vector3[] lastVisionPoints;
-    protected bool visionNeedsUpdate = true;
-    
     /// <summary>
     /// 設置是否在運行時顯示視野範圍
     /// </summary>
@@ -143,14 +139,6 @@ public abstract class BaseVisualizer : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 設定視覺化顏色（由子類別實現具體邏輯）
-    /// </summary>
-    public virtual void SetVisualizationColors(params Color[] colors)
-    {
-        // 子類別可以覆寫此方法
-    }
-    
     private void Awake()
     {
         // 初始化圖層快取
@@ -422,8 +410,6 @@ public abstract class BaseVisualizer : MonoBehaviour
         {
             UpdateVisionMesh(center, rayEndPoints, color);
         }
-        
-        lastVisionPoints = rayEndPoints;
     }
     
     /// <summary>

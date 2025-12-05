@@ -24,16 +24,23 @@ public class WinConditionManager : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool showDebugLogs = true;
     
+    [Header("Win Condition Options")]
+    [Tooltip("勝利條件：玩家到達出口點（true）或出生點（false）")]
+    [SerializeField] private bool useExitPoint = true; // true = 出口點，false = 出生點
+    
     // 狀態追蹤
     private bool targetKilled = false;
+    private bool allTargetsKilled = false;
     private bool targetEscaped = false;
     private bool playerReachedExit = false;
+    private bool playerReachedSpawnPoint = false;
+    private bool playerDied = false;
     private bool winConditionChecked = false;
     
     // 系統引用
     private GameManager gameManager;
-    private EntityManager entityManager;
     private Player player;
+    private EntityManager entityManager;
     
     // 目標引用
     private List<Target> targets = new List<Target>();
@@ -48,28 +55,18 @@ public class WinConditionManager : MonoBehaviour
     {
         exitPoint = exitPosition;
         
-        // 獲取系統引用 - GameManager 可能還沒初始化，延後獲取
-        entityManager = FindFirstObjectByType<EntityManager>();
-        player = FindFirstObjectByType<Player>();
-        
-        if (player == null)
-        {
-            if (showDebugLogs)
-            {
-                Debug.LogWarning("[WinCondition] Player 尚未創建，將在後續獲取");
-            }
-        }
+        // 獲取系統引用 - GameManager 和 Player 可能還沒初始化，延後獲取
+        GetPlayer();
+        GetEntityManager();
         
         // 訂閱事件
-        SubscribeToEvents();
-        
-        // 不在初始化時顯示出口點，等目標被殺死後再顯示
-        // ShowExitPointOnMap(); // 移除 - 將在 OnTargetKilled 中調用
-        // CreateExitPointMarker(); // 移除 - 將在 OnTargetKilled 中調用
+        TrySubscribeToTargets();
+        TrySubscribeToPlayerEvents();
         
         if (showDebugLogs)
         {
-            Debug.Log($"[WinCondition] 初始化完成，出口點: {exitPoint}（將在目標被殺死後顯示）");
+            string winLocation = useExitPoint ? "出口點" : "出生點";
+            Debug.Log($"[WinCondition] 初始化完成，{winLocation}: {exitPoint}（將在目標被殺死後顯示）");
         }
     }
     
@@ -175,93 +172,80 @@ public class WinConditionManager : MonoBehaviour
     {
         if (gameManager == null)
         {
-            gameManager = GameManager.Instance;
-            
-            // If Instance is null, try to find it in the scene
-            if (gameManager == null)
-            {
-                gameManager = FindFirstObjectByType<GameManager>();
-                
-                if (showDebugLogs && gameManager != null)
-                {
-                    Debug.LogWarning("[WinCondition] GameManager found via FindFirstObjectByType (Instance was null)");
-                }
-            }
+            gameManager = GameManager.Instance ?? FindFirstObjectByType<GameManager>();
         }
         return gameManager;
     }
     
-    private void SubscribeToEvents()
+    /// <summary>
+    /// 獲取 Player（延遲獲取，避免初始化順序問題）
+    /// </summary>
+    private Player GetPlayer()
     {
-        // 訂閱目標死亡事件
-        if (entityManager != null)
+        if (player == null)
         {
-            // 獲取所有目標並訂閱
-            Target[] allTargets = FindObjectsByType<Target>(FindObjectsSortMode.None);
-            foreach (var target in allTargets)
+            player = FindFirstObjectByType<Player>();
+            if (player == null && showDebugLogs)
             {
-                if (target != null)
-                {
-                    targets.Add(target);
-                    target.OnTargetDied += OnTargetKilled;
-                    target.OnTargetReachedEscapePoint += OnTargetEscaped;
-                }
+                Debug.LogWarning("[WinCondition] Player 尚未創建，將在後續獲取");
             }
         }
-        else
+        return player;
+    }
+    
+    /// <summary>
+    /// 獲取 EntityManager（延遲獲取，避免初始化順序問題）
+    /// </summary>
+    private EntityManager GetEntityManager()
+    {
+        if (entityManager == null)
         {
-            if (showDebugLogs)
-            {
-                Debug.LogWarning("[WinCondition] EntityManager 未找到，將稍後訂閱事件");
-            }
+            entityManager = FindFirstObjectByType<EntityManager>();
+        }
+        return entityManager;
+    }
+    
+    /// <summary>
+    /// 嘗試訂閱玩家事件（持續嘗試直到找到玩家）
+    /// </summary>
+    private void TrySubscribeToPlayerEvents()
+    {
+        Player currentPlayer = GetPlayer();
+        if (currentPlayer == null) return;
+        
+        // 先取消訂閱（避免重複訂閱）
+        currentPlayer.OnPlayerDied -= OnPlayerDied;
+        currentPlayer.OnPlayerReachedSpawnPoint -= OnPlayerReachedSpawnPoint;
+        
+        // 再訂閱
+        currentPlayer.OnPlayerDied += OnPlayerDied;
+        currentPlayer.OnPlayerReachedSpawnPoint += OnPlayerReachedSpawnPoint;
+        
+        if (showDebugLogs)
+        {
+            Debug.Log("[WinCondition] 已訂閱玩家事件");
         }
     }
     
     private void Start()
     {
-        // 如果 Player 還沒找到，在 Start 中再次嘗試
-        if (player == null)
-        {
-            player = FindFirstObjectByType<Player>();
-        }
+        // 嘗試獲取 Player 和 EntityManager
+        GetPlayer();
+        GetEntityManager();
         
         // 如果還沒有訂閱目標事件，再次嘗試
         if (targets.Count == 0)
         {
-            Target[] allTargets = FindObjectsByType<Target>(FindObjectsSortMode.None);
-            
-            if (showDebugLogs)
-            {
-                Debug.LogWarning($"[WinCondition] Start: 找到 {allTargets.Length} 個目標，正在訂閱事件...");
-            }
-            
-            foreach (var target in allTargets)
-            {
-                if (target != null && !targets.Contains(target))
-                {
-                    targets.Add(target);
-                    target.OnTargetDied += OnTargetKilled;
-                    target.OnTargetReachedEscapePoint += OnTargetEscaped;
-                    
-                    if (showDebugLogs)
-                    {
-                        Debug.LogWarning($"[WinCondition] Start: ✓ 已訂閱目標事件: {target.name}");
-                    }
-                }
-            }
+            TrySubscribeToTargets();
         }
-        else
-        {
-            if (showDebugLogs)
-            {
-                Debug.LogWarning($"[WinCondition] Start: 已有 {targets.Count} 個目標訂閱");
-            }
-        }
+        
+        // 如果還沒有訂閱玩家事件，再次嘗試
+        TrySubscribeToPlayerEvents();
     }
     
     private void OnDestroy()
     {
-        // 取消訂閱事件
+        // 取消訂閱 Target 事件
         foreach (var target in targets)
         {
             if (target != null)
@@ -269,6 +253,13 @@ public class WinConditionManager : MonoBehaviour
                 target.OnTargetDied -= OnTargetKilled;
                 target.OnTargetReachedEscapePoint -= OnTargetEscaped;
             }
+        }
+        
+        // 取消訂閱 Player 事件
+        if (player != null)
+        {
+            player.OnPlayerDied -= OnPlayerDied;
+            player.OnPlayerReachedSpawnPoint -= OnPlayerReachedSpawnPoint;
         }
         
         // 清理出口點標記
@@ -294,17 +285,22 @@ public class WinConditionManager : MonoBehaviour
             TrySubscribeToTargets();
         }
         
-        // 如果 Player 還沒找到，嘗試獲取
+        // 如果還沒訂閱玩家事件，持續嘗試
         if (player == null)
         {
-            player = FindFirstObjectByType<Player>();
-            if (player == null) return;
+            TrySubscribeToPlayerEvents();
         }
         
-        if (player.IsDead) return;
+        // 獲取 Player 引用
+        Player currentPlayer = GetPlayer();
+        if (currentPlayer == null) return;
         
-        // 檢查玩家是否到達出口
-        CheckPlayerReachedExit();
+        // 注意：玩家死亡和到達出生點的檢查已通過事件處理（OnPlayerDied, OnPlayerReachedSpawnPoint）
+        // 這裡只需要檢查出口點（如果使用出口點）
+        if (useExitPoint)
+        {
+            CheckPlayerReachedExit();
+        }
         
         // 檢查勝利條件
         CheckWinCondition();
@@ -317,27 +313,23 @@ public class WinConditionManager : MonoBehaviour
     {
         Target[] allTargets = FindObjectsByType<Target>(FindObjectsSortMode.None);
         
-        if (allTargets.Length > 0)
+        if (allTargets.Length == 0) return;
+        
+        int subscribedCount = 0;
+        foreach (var target in allTargets)
         {
-            if (showDebugLogs)
+            if (target != null && !targets.Contains(target))
             {
-                Debug.LogWarning($"[WinCondition] Update: 找到 {allTargets.Length} 個目標，正在訂閱事件...");
+                targets.Add(target);
+                target.OnTargetDied += OnTargetKilled;
+                target.OnTargetReachedEscapePoint += OnTargetEscaped;
+                subscribedCount++;
             }
-            
-            foreach (var target in allTargets)
-            {
-                if (target != null && !targets.Contains(target))
-                {
-                    targets.Add(target);
-                    target.OnTargetDied += OnTargetKilled;
-                    target.OnTargetReachedEscapePoint += OnTargetEscaped;
-                    
-                    if (showDebugLogs)
-                    {
-                        Debug.LogWarning($"[WinCondition] Update: ✓ 已訂閱目標事件: {target.name}");
-                    }
-                }
-            }
+        }
+        
+        if (showDebugLogs && subscribedCount > 0)
+        {
+            Debug.LogWarning($"[WinCondition] 已訂閱 {subscribedCount} 個目標事件（總共 {targets.Count} 個）");
         }
     }
     
@@ -348,7 +340,10 @@ public class WinConditionManager : MonoBehaviour
     {
         if (playerReachedExit) return;
         
-        float distance = Vector3.Distance(player.transform.position, exitPoint);
+        Player currentPlayer = GetPlayer();
+        if (currentPlayer == null) return;
+        
+        float distance = Vector3.Distance(currentPlayer.transform.position, exitPoint);
         
         if (distance <= exitReachDistance)
         {
@@ -364,6 +359,55 @@ public class WinConditionManager : MonoBehaviour
         }
     }
     
+    // 注意：玩家到達出生點的檢查已由 Player 的 OnPlayerReachedSpawnPoint 事件處理
+    // 不需要在 Update 中重複檢查，直接使用事件回調 OnPlayerReachedSpawnPoint()
+    
+    /// <summary>
+    /// 玩家死亡事件處理
+    /// </summary>
+    private void OnPlayerDied()
+    {
+        if (playerDied) return;
+        
+        playerDied = true;
+        winConditionChecked = true;
+        
+        if (showDebugLogs)
+        {
+            Debug.LogWarning("[WinCondition] ✗ 玩家已死亡！任務失敗！");
+        }
+        
+        // 玩家死亡 = 任務失敗 → 觸發 GameOver
+        GameManager gm = GetGameManager();
+        if (gm != null)
+        {
+            gm.GameOver("Player died");
+        }
+        else
+        {
+            Debug.LogError("[WinCondition] 無法觸發失敗：GameManager 未找到！");
+        }
+    }
+    
+    /// <summary>
+    /// 玩家到達出生點事件處理（如果使用出生點作為勝利條件）
+    /// </summary>
+    private void OnPlayerReachedSpawnPoint()
+    {
+        if (!useExitPoint)
+        {
+            playerReachedSpawnPoint = true;
+            
+            if (showDebugLogs)
+            {
+                Debug.LogWarning("[WinCondition] ✓ 玩家已到達出生點！");
+            }
+            
+            // 立即檢查勝利條件
+            CheckWinCondition();
+        }
+    }
+    
     /// <summary>
     /// 目標被殺死事件處理
     /// </summary>
@@ -371,29 +415,82 @@ public class WinConditionManager : MonoBehaviour
     {
         targetKilled = true;
         
+        // 檢查是否所有 Target 都已死亡
+        CheckAllTargetsKilled();
+        
         if (showDebugLogs)
         {
             Debug.LogWarning($"[WinCondition] ✓ 目標已被殺死: {target.name}");
         }
         
-        // 目標被殺死後，顯示出口點
-        ShowExitPointOnMap();
-        CreateExitPointMarker();
-        
-        // Show notification to guide player to exit
-        NotificationUIManager notificationUI = FindFirstObjectByType<NotificationUIManager>();
-        if (notificationUI != null)
+        // 如果所有目標都已死亡，顯示出口點/出生點提示
+        if (allTargetsKilled)
         {
-            notificationUI.ShowNotification("Target eliminated! Head to the exit point to complete the mission!", 5f);
-        }
-        
-        if (showDebugLogs)
-        {
-            Debug.LogWarning($"[WinCondition] 出口點現已顯示，請前往 {exitPoint} 完成任務！");
+            if (useExitPoint)
+            {
+                // 目標被殺死後，顯示出口點
+                ShowExitPointOnMap();
+                CreateExitPointMarker();
+                
+                // Show notification to guide player to exit
+                NotificationUIManager notificationUI = FindFirstObjectByType<NotificationUIManager>();
+                if (notificationUI != null)
+                {
+                    notificationUI.ShowNotification("Target eliminated! Head to the exit point to complete the mission!", 5f);
+                }
+                
+                if (showDebugLogs)
+                {
+                    Debug.LogWarning($"[WinCondition] 出口點現已顯示，請前往 {exitPoint} 完成任務！");
+                }
+            }
+            else
+            {
+                // 如果使用出生點，顯示提示
+                NotificationUIManager notificationUI = FindFirstObjectByType<NotificationUIManager>();
+                if (notificationUI != null)
+                {
+                    notificationUI.ShowNotification("All targets eliminated! Return to spawn point to complete the mission!", 5f);
+                }
+                
+                if (showDebugLogs)
+                {
+                    Debug.LogWarning("[WinCondition] 所有目標已消滅，請返回出生點完成任務！");
+                }
+            }
         }
         
         // 檢查勝利條件
         CheckWinCondition();
+    }
+    
+    /// <summary>
+    /// 檢查是否所有 Target 都已死亡（使用 EntityManager 的現有方法）
+    /// </summary>
+    private void CheckAllTargetsKilled()
+    {
+        if (allTargetsKilled) return;
+        
+        // 直接使用 EntityManager 的現有方法
+        EntityManager em = GetEntityManager();
+        if (em != null)
+        {
+            allTargetsKilled = em.AreAllTargetsDead();
+        }
+        else
+        {
+            // 如果 EntityManager 不可用，回退到本地檢查
+            bool allDead = true;
+            foreach (var target in targets)
+            {
+                if (target != null && !target.IsDead)
+                {
+                    allDead = false;
+                    break;
+                }
+            }
+            allTargetsKilled = allDead;
+        }
     }
     
     /// <summary>
@@ -410,12 +507,15 @@ public class WinConditionManager : MonoBehaviour
         }
         
         // 目標逃脫 = 任務失敗 → 觸發 GameOver
-        winConditionChecked = true; // 標記為已檢查，避免重複觸發
+        winConditionChecked = true;
         
         GameManager gm = GetGameManager();
         if (gm != null)
         {
-            Debug.LogWarning("[WinCondition] 觸發遊戲失敗...");
+            if (showDebugLogs)
+            {
+                Debug.LogWarning("[WinCondition] 觸發遊戲失敗...");
+            }
             gm.GameOver("Target escaped");
         }
         else
@@ -431,23 +531,38 @@ public class WinConditionManager : MonoBehaviour
     {
         if (winConditionChecked) return;
         
-        // 檢查失敗條件
-        if (targetEscaped)
+        // 檢查失敗條件（優先級最高）
+        if (playerDied)
         {
-            // 目標逃脫 = 任務失敗（不觸發勝利）
-            if (showDebugLogs)
-            {
-                Debug.LogWarning("[WinCondition] 任務失敗：目標已逃脫");
-            }
-            winConditionChecked = true;
+            // 玩家死亡 = 任務失敗（已在 OnPlayerDied 中處理）
             return;
         }
         
-        // 檢查勝利條件
-        bool targetConditionMet = !requireTargetKilled || targetKilled;
-        bool exitConditionMet = !requireReachExit || playerReachedExit;
+        if (targetEscaped)
+        {
+            // 目標逃脫 = 任務失敗（已在 OnTargetEscaped 中處理）
+            return;
+        }
         
-        if (targetConditionMet && exitConditionMet)
+        // 檢查是否所有 Target 都已死亡
+        CheckAllTargetsKilled();
+        
+        // 檢查勝利條件
+        bool targetConditionMet = !requireTargetKilled || allTargetsKilled;
+        bool locationConditionMet;
+        
+        if (useExitPoint)
+        {
+            // 使用出口點作為勝利條件
+            locationConditionMet = !requireReachExit || playerReachedExit;
+        }
+        else
+        {
+            // 使用出生點作為勝利條件
+            locationConditionMet = !requireReachExit || playerReachedSpawnPoint;
+        }
+        
+        if (targetConditionMet && locationConditionMet)
         {
             // 所有條件滿足 = 勝利！
             TriggerWin();
@@ -489,6 +604,11 @@ public class WinConditionManager : MonoBehaviour
     /// </summary>
     public string GetStatusText()
     {
+        if (playerDied)
+        {
+            return "任務失敗：玩家已死亡";
+        }
+        
         if (targetEscaped)
         {
             return "任務失敗：目標已逃脫";
@@ -498,12 +618,14 @@ public class WinConditionManager : MonoBehaviour
         
         if (requireTargetKilled)
         {
-            status += targetKilled ? "✓ 殺死目標\n" : "○ 殺死目標\n";
+            status += allTargetsKilled ? "✓ 殺死所有目標\n" : "○ 殺死所有目標\n";
         }
         
         if (requireReachExit)
         {
-            status += playerReachedExit ? "✓ 到達出口\n" : "○ 到達出口\n";
+            string locationName = useExitPoint ? "出口" : "出生點";
+            bool locationReached = useExitPoint ? playerReachedExit : playerReachedSpawnPoint;
+            status += locationReached ? $"✓ 到達{locationName}\n" : $"○ 到達{locationName}\n";
         }
         
         return status;

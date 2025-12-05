@@ -250,7 +250,9 @@ MonoBehaviour:
   spawnPointTolerance: 2
   chaseSpeedMultiplier: 1
   squatSpeedMultiplier: 0.5
-  pickupRange: 2
+  pickupRange: 1
+  enableAutoPickup: 1
+  autoPickupCheckInterval: 0.2
 --- !u!114 &952130877989713656
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -266,6 +268,7 @@ MonoBehaviour:
   itemPrefabs: []
   equipOnStart: 1
   allowDynamicEquipping: 1
+  useEmptyHands: 1
 --- !u!114 &2632004612931945290
 MonoBehaviour:
   m_ObjectHideFlags: 0

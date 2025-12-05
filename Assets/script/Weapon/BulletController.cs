@@ -43,7 +43,8 @@ public class BulletController : MonoBehaviour
         if (enemy != null)
         {
             Debug.Log($"子彈擊中敵人: {enemy.gameObject.name}");
-            enemy.Die();
+            // 使用 TakeDamage 統一處理傷害和死亡流程
+            enemy.TakeDamage(damage, "Bullet");
             DestroyBullet();
             return;
         }

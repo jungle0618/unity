@@ -12472,7 +12472,6 @@ MonoBehaviour:
   showDebugGizmos: 1
   guardAreaColor: {r: 1, g: 1, b: 1, a: 1}
   showOnMapUI: 1
-  mapGuardAreaColor: {r: 1, g: 0, b: 0, a: 0.5}
   showPlayerAreaInConsole: 1
   areaCheckInterval: 1
 --- !u!1 &1183782473
@@ -14167,8 +14166,6 @@ MonoBehaviour:
     type: 3}
   targetPrefab: {fileID: 8141156174479725341, guid: 11afc04c7d7d42c439a87ec4db6d7057,
     type: 3}
-  maxActiveEnemies: 40
-  poolSize: 40
   itemMappings:
   - itemName: Knife
     itemPrefab: {fileID: 1938176382142088636, guid: f8dc36b07280b9343a9d4aa34addd39d,
@@ -14182,10 +14179,7 @@ MonoBehaviour:
   - itemName: RedKey
     itemPrefab: {fileID: 304660910618937950, guid: aceb3bdeeff2d594286ec64cc0bfb373,
       type: 3}
-  patrolDataFile: {fileID: 4900000, guid: 0845f5be78c0e794bb2e8ddfff931b62, type: 3}
-  cullingDistance: 40
-  updateInterval: 0.2
-  enemiesPerFrameUpdate: 5
+  patrolDataFile: {fileID: 4900000, guid: 4163401be3b02784ebaf922b89fe21a1, type: 3}
   aiUpdateInterval: 0.15
   showDebugInfo: 0
   enablePlayerDetection: 1
@@ -14769,6 +14763,16 @@ Tilemap:
   m_GameObject: {fileID: 1685907481}
   m_Enabled: 1
   m_Tiles:
+  - first: {x: 0, y: 0, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
   - first: {x: 1, y: 0, z: 0}
     second:
       serializedVersion: 2
@@ -23653,7 +23657,7 @@ Tilemap:
   m_TileAssetArray:
   - m_RefCount: 10
     m_Data: {fileID: 11400000, guid: 694c62b9b4b97814187f4b31011fc63f, type: 2}
-  - m_RefCount: 878
+  - m_RefCount: 879
     m_Data: {fileID: 11400000, guid: f5945c4f4a016ae419bd0fb1152e2d1a, type: 2}
   - m_RefCount: 0
     m_Data: {fileID: 0}
@@ -23662,14 +23666,14 @@ Tilemap:
   m_TileSpriteArray:
   - m_RefCount: 10
     m_Data: {fileID: 21300028, guid: a07735877a3bd644094331b137b71878, type: 3}
-  - m_RefCount: 878
+  - m_RefCount: 879
     m_Data: {fileID: 21300018, guid: a07735877a3bd644094331b137b71878, type: 3}
   - m_RefCount: 0
     m_Data: {fileID: 0}
   - m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileMatrixArray:
-  - m_RefCount: 888
+  - m_RefCount: 889
     m_Data:
       e00: 1
       e01: 0
@@ -23688,7 +23692,7 @@ Tilemap:
       e32: 0
       e33: 1
   m_TileColorArray:
-  - m_RefCount: 888
+  - m_RefCount: 889
     m_Data: {r: 1, g: 1, b: 1, a: 1}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1

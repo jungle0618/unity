@@ -911,10 +911,9 @@ public class ItemHolder : MonoBehaviour
     /// <summary>
     /// 從 prefab 添加物品到列表（不裝備，用於撿取物品）
     /// 規則：
-    /// 1. 如果是武器且當前沒有裝備武器，自動裝備該武器
-    /// 2. 如果是武器且已有武器，不裝備（實體最多持有一個武器）
-    /// 3. 如果是非武器物品（如鑰匙），添加到列表但不裝備
-    /// 4. 如果當前是空手且添加了武器，自動裝備武器
+    /// 1. 只將物品添加到列表中，不自動裝備
+    /// 2. 保持當前裝備的物品不變（即使是空手狀態）
+    /// 3. 玩家需要手動切換物品才能使用新撿起的物品
     /// </summary>
     /// <param name="prefab">物品 prefab</param>
     /// <returns>添加的 Item 組件，失敗則返回 null</returns>
@@ -936,69 +935,20 @@ public class ItemHolder : MonoBehaviour
         bool isWeapon = item is Weapon;
         bool currentIsWeapon = IsCurrentItemWeapon;
         bool currentIsEmptyHands = IsEmptyHands();
-        bool hadNoItems = availableItems.Count == 0; // 添加前是否沒有物品
         
-        Debug.Log($"[ItemHolder] AddItemFromPrefab called on {gameObject.name}: item={item.ItemName}, isWeapon={isWeapon}, currentItem={currentItem?.ItemName ?? "null"}, currentIsWeapon={currentIsWeapon}, currentIsEmptyHands={currentIsEmptyHands}, hadNoItems={hadNoItems}");
+        Debug.Log($"[ItemHolder] AddItemFromPrefab called on {gameObject.name}: item={item.ItemName}, isWeapon={isWeapon}, currentItem={currentItem?.ItemName ?? "null"}, currentIsWeapon={currentIsWeapon}, currentIsEmptyHands={currentIsEmptyHands}");
         
         // 加入到可用物品列表尾端
         availableItems.Add(item);
         itemToPrefabMap[item] = prefab; // 記錄對應的 Prefab
         
-        // 決定是否裝備這個物品
-        bool shouldEquip = false;
+        // 不裝備，只是加入列表（保持當前裝備的物品不變）
+        item.gameObject.SetActive(false);
         
-        // 規則：如果這是第一個物品（之前沒有任何物品），總是裝備它
-        if (hadNoItems)
-        {
-            shouldEquip = true;
-            Debug.Log($"[ItemHolder] ✅ 裝備第一個物品 {item.ItemName} 到 {gameObject.name} (這是第一個添加的物品)");
-        }
-        else if (isWeapon)
-        {
-            // 如果是武器，且當前沒有武器或只有空手，則裝備
-            if (!currentIsWeapon || currentIsEmptyHands)
-            {
-                shouldEquip = true;
-                Debug.Log($"[ItemHolder] ✅ 裝備武器 {item.ItemName} 到 {gameObject.name} (當前沒有武器或是空手)");
-            }
-            else
-            {
-                // 已經有武器了，不裝備新武器（但會加入列表）
-                Debug.Log($"[ItemHolder] ❌ {gameObject.name} 已有武器 {(currentItem != null ? currentItem.ItemName : "Unknown")}，將 {item.ItemName} 加入列表但不裝備");
-            }
-        }
-        else
-        {
-            // 非武器物品（如鑰匙）
-            // 只在當前是空手時才裝備
-            if (currentIsEmptyHands)
-            {
-                shouldEquip = true;
-                Debug.Log($"[ItemHolder] ✅ 裝備非武器物品 {item.ItemName} 到 {gameObject.name} (當前是空手)");
-            }
-            else
-            {
-                Debug.Log($"[ItemHolder] ❌ 將非武器物品 {item.ItemName} 加入 {gameObject.name} 的列表 (當前已有 {currentItem?.ItemName})");
-            }
-        }
+        // 觸發物品變更事件以更新 UI（讓 UI 知道有新物品加入）
+        OnItemChanged?.Invoke(currentItem);
         
-        if (shouldEquip)
-        {
-            item.gameObject.SetActive(false); // 先設為不啟用
-            Debug.Log($"[ItemHolder] Calling SwitchToItem({availableItems.Count - 1}) for {item.ItemName} on {gameObject.name}");
-            SwitchToItem(availableItems.Count - 1); // 切換到剛加入的物品
-            Debug.Log($"[ItemHolder] After SwitchToItem: currentItem={currentItem?.ItemName ?? "null"}, active={currentItem?.gameObject.activeSelf}");
-        }
-        else
-        {
-            // 不裝備，只是加入列表
-            item.gameObject.SetActive(false);
-            
-            // 觸發物品變更事件以更新 UI
-            OnItemChanged?.Invoke(currentItem); // 保持當前物品不變，但通知 UI 更新
-        }
-        
-        Debug.Log($"[ItemHolder] ✅ Finished AddItemFromPrefab: {item.ItemName} added to {gameObject.name}. Total items: {availableItems.Count}, Currently equipped: {(currentItem != null ? currentItem.ItemName : "None")}, Item active: {currentItem?.gameObject.activeSelf}");
+        Debug.Log($"[ItemHolder] ✅ Finished AddItemFromPrefab: {item.ItemName} added to {gameObject.name}. Total items: {availableItems.Count}, Currently equipped: {(currentItem != null ? currentItem.ItemName : "None")}");
         
         return item;
     }

@@ -17,7 +17,7 @@ namespace Game.EntityManager
         private Player player;
         // 注意：activeTargets 已移至 EntityEventManager，統一管理
 
-        private EntityPool entityPool;
+        private List<Enemy> spawnedEnemies = new List<Enemy>();
         private EntityDataLoader dataLoader;
         private EntityItemManager itemManager;
         private EntityEventManager eventManager;
@@ -28,7 +28,6 @@ namespace Game.EntityManager
         private bool enablePlayerDetection;
         private bool autoRegisterWithPlayerDetection;
 
-        private int maxActiveEnemies;
         private float aiUpdateInterval;
         private bool showDebugInfo = false;
 
@@ -40,12 +39,12 @@ namespace Game.EntityManager
         // 注意：ActiveTargets 已移至 EntityEventManager
         public Vector3 PlayerInitialPosition { get; private set; }
         public List<string> PlayerInitialItems { get; private set; }
+        public List<Enemy> SpawnedEnemies => spawnedEnemies;
 
         public EntitySpawner(
             GameObject playerPrefab,
             GameObject enemyPrefab,
             GameObject targetPrefab,
-            EntityPool entityPool,
             EntityDataLoader dataLoader,
             EntityItemManager itemManager,
             EntityEventManager eventManager,
@@ -54,7 +53,6 @@ namespace Game.EntityManager
             PlayerDetection playerDetection,
             bool enablePlayerDetection,
             bool autoRegisterWithPlayerDetection,
-            int maxActiveEnemies,
             float aiUpdateInterval,
             System.Func<DangerousManager.DangerLevel, DangerLevelMultipliers> getMultipliersForLevel,
             bool showDebugInfo = false)
@@ -62,7 +60,6 @@ namespace Game.EntityManager
             this.playerPrefab = playerPrefab;
             this.enemyPrefab = enemyPrefab;
             this.targetPrefab = targetPrefab;
-            this.entityPool = entityPool;
             this.dataLoader = dataLoader;
             this.itemManager = itemManager;
             this.eventManager = eventManager;
@@ -71,7 +68,6 @@ namespace Game.EntityManager
             this.playerDetection = playerDetection;
             this.enablePlayerDetection = enablePlayerDetection;
             this.autoRegisterWithPlayerDetection = autoRegisterWithPlayerDetection;
-            this.maxActiveEnemies = maxActiveEnemies;
             this.aiUpdateInterval = aiUpdateInterval;
             this.getMultipliersForLevel = getMultipliersForLevel;
             this.showDebugInfo = showDebugInfo;
@@ -128,21 +124,6 @@ namespace Game.EntityManager
                 return;
             }
             
-            if (entityPool.ActiveEnemyCount >= maxActiveEnemies)
-            {
-                if (showDebugInfo)
-                    Debug.LogWarning("EntitySpawner: Reached maximum active enemies limit");
-                return;
-            }
-
-            Enemy enemy = entityPool.GetPooledEnemy();
-            if (enemy == null)
-            {
-                if (showDebugInfo)
-                    Debug.LogWarning("EntitySpawner: No enemy available in pool!");
-                return;
-            }
-
             // 獲取實體資料（只查找 Enemy 類型的資料）
             var enemyDataList = dataLoader.GetEntitiesByType(EntityDataLoader.EntityType.Enemy);
             EntityDataLoader.EntityData enemyData = null;
@@ -161,15 +142,23 @@ namespace Game.EntityManager
             if (enemyData == null || enemyData.patrolPoints == null || enemyData.patrolPoints.Length == 0)
             {
                 Debug.LogError($"EntitySpawner: No valid enemy data for enemy index {enemyIndex}");
-                entityPool.ReturnEnemyToPool(enemy);
                 return;
             }
 
-            // 檢查敵人組件是否已初始化
-            if (enemy.Movement == null || enemy.Detection == null)
+            // 直接實例化 Enemy
+            if (enemyPrefab == null)
             {
-                Debug.LogError($"EntitySpawner: Enemy components not initialized! Movement: {enemy.Movement != null}, Detection: {enemy.Detection != null}");
-                entityPool.ReturnEnemyToPool(enemy);
+                Debug.LogError("EntitySpawner: Enemy prefab is not assigned!");
+                return;
+            }
+
+            GameObject enemyGO = Object.Instantiate(enemyPrefab);
+            Enemy enemy = enemyGO.GetComponent<Enemy>();
+
+            if (enemy == null)
+            {
+                Debug.LogError($"EntitySpawner: Enemy prefab missing Enemy component! Prefab: {enemyPrefab.name}");
+                Object.Destroy(enemyGO);
                 return;
             }
 
@@ -181,7 +170,7 @@ namespace Game.EntityManager
             }
 
             // 設定名稱
-            enemy.gameObject.name = $"Enemy_{enemyData.entityIndex}_{enemyData.entityType}";
+            enemy.gameObject.name = $"Enemy_{enemyData.entityIndex}_{enemyData.type}";
 
             // 先設定 patrol locations
             enemy.SetPatrolLocations(enemyData.patrolPoints);
@@ -193,9 +182,11 @@ namespace Game.EntityManager
             if (enemyData.patrolPoints != null && enemyData.patrolPoints.Length > 0)
             {
                 enemy.transform.position = enemyData.patrolPoints[0];
+                // 設定初始朝向
+                enemy.transform.rotation = Quaternion.Euler(0f, 0f, enemyData.initialRotation);
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntitySpawner: Moved enemy to spawn point {enemyData.patrolPoints[0]}");
+                    Debug.Log($"EntitySpawner: Moved enemy to spawn point {enemyData.patrolPoints[0]} with rotation {enemyData.initialRotation}°");
                 }
             }
 
@@ -207,8 +198,8 @@ namespace Game.EntityManager
                 Debug.Log($"EntitySpawner: Initialized enemy at {enemy.transform.position}, Active: {enemy.gameObject.activeSelf}");
             }
 
-            // 標記為活躍
-            entityPool.MarkEnemyActive(enemy);
+            // 加入已生成列表
+            spawnedEnemies.Add(enemy);
 
             // 註冊到統一實體註冊表（通過 AttackSystem）
             if (enemy is IEntity entity)
@@ -243,7 +234,7 @@ namespace Game.EntityManager
             if (showDebugInfo)
             {
                 string itemsStr = enemyData.itemNames.Count > 0 ? string.Join(", ", enemyData.itemNames) : "None";
-                Debug.Log($"EntitySpawner: Spawned enemy {enemyData.entityIndex} ({enemyData.entityType}) at {enemy.transform.position} with items [{itemsStr}] and {enemyData.patrolPoints.Length} patrol points");
+                Debug.Log($"EntitySpawner: Spawned enemy {enemyData.entityIndex} ({enemyData.type}) at {enemy.transform.position} with items [{itemsStr}] and {enemyData.patrolPoints.Length} patrol points");
             }
         }
 
@@ -278,8 +269,18 @@ namespace Game.EntityManager
             // 設置名稱
             target.gameObject.name = $"Target_{targetIndex}";
 
-            // 設置位置
+            // 獲取 Target 數據（在設置位置和朝向之前）
+            var targetData = dataLoader.GetEntityData(targetIndex, EntityDataLoader.EntityType.Target);
+
+            // 設置位置和朝向
             target.transform.position = position;
+            // 設定初始朝向（從數據中獲取，如果沒有則使用預設值 0）
+            float targetRotation = 0f;
+            if (targetData != null)
+            {
+                targetRotation = targetData.initialRotation;
+            }
+            target.transform.rotation = Quaternion.Euler(0f, 0f, targetRotation);
 
             // 初始化 Target（設置逃亡點）
             if (target is IEntity targetEntity)
@@ -288,8 +289,7 @@ namespace Game.EntityManager
                 attackSystem.ActiveEntities.Add(targetEntity);
             }
 
-            // 獲取 Target 數據並裝備物品（itemManager 已驗證）
-            var targetData = dataLoader.GetEntityData(targetIndex, EntityDataLoader.EntityType.Target);
+            // 裝備物品（itemManager 已驗證）
             if (targetData != null)
             {
                 // 裝備物品
@@ -343,13 +343,15 @@ namespace Game.EntityManager
             {
                 PlayerInitialPosition = playerData.patrolPoints[0];
                 player.transform.position = PlayerInitialPosition;
+                // 設定初始朝向
+                player.transform.rotation = Quaternion.Euler(0f, 0f, playerData.initialRotation);
 
                 // 保存玩家初始物品
                 PlayerInitialItems = new List<string>(playerData.itemNames);
 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntitySpawner: Set player initial position to {PlayerInitialPosition}");
+                    Debug.Log($"EntitySpawner: Set player initial position to {PlayerInitialPosition} with rotation {playerData.initialRotation}°");
                 }
             }
             else
@@ -386,22 +388,21 @@ namespace Game.EntityManager
             // 生成所有 Enemy
             var enemyDataList = dataLoader.GetEntitiesByType(EntityDataLoader.EntityType.Enemy);
             int enemyCount = enemyDataList.Count;
-            int enemiesToSpawn = Mathf.Min(maxActiveEnemies, enemyCount);
 
-            Debug.Log($"EntitySpawner: Attempting to spawn {enemiesToSpawn} enemies from {enemyCount} available enemy data");
+            Debug.Log($"EntitySpawner: Attempting to spawn {enemyCount} enemies");
 
             // 生成所有 Enemy 類型的實體
             int enemyIndex = 0;
             foreach (var data in enemyDataList)
             {
-                if (data.type == EntityDataLoader.EntityType.Enemy && entityPool.ActiveEnemyCount < maxActiveEnemies)
+                if (data.type == EntityDataLoader.EntityType.Enemy)
                 {
                     SpawnEnemy(Vector3.zero, enemyIndex);
                     enemyIndex++;
                 }
             }
 
-            Debug.Log($"EntitySpawner: Successfully spawned {entityPool.ActiveEnemyCount} enemies and {eventManager.ActiveTargets.Count} targets");
+            Debug.Log($"EntitySpawner: Successfully spawned {spawnedEnemies.Count} enemies and {eventManager.ActiveTargets.Count} targets");
         }
 
         /// <summary>

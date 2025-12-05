@@ -9,9 +9,6 @@ public abstract class BaseMovement : MonoBehaviour
 {
     protected Rigidbody2D rb;
 
-    // 基礎屬性
-    public Vector2 Position => transform.position;
-
     protected virtual void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -53,7 +50,7 @@ public abstract class BaseMovement : MonoBehaviour
     /// </summary>
     public virtual Vector2 GetDirectionToTarget(Vector2 target)
     {
-        return (target - Position).normalized;
+        return (target - (Vector2)transform.position).normalized;
     }
 
     /// <summary>
@@ -63,7 +60,7 @@ public abstract class BaseMovement : MonoBehaviour
     /// <param name="threshold">到達閾值</param>
     public virtual bool HasArrivedAt(Vector2 target, float threshold = 0.2f)
     {
-        return Vector2.Distance(Position, target) < threshold;
+        return Vector2.Distance(transform.position, target) < threshold;
     }
 
     /// <summary>

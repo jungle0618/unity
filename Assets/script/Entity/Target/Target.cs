@@ -44,8 +44,7 @@ public class Target : BaseEntity<TargetState>, IEntity
     private TargetMovement targetMovement => movement as TargetMovement;
     private TargetDetection targetDetection => detection as TargetDetection;
     private TargetVisualizer targetVisualizer => visualizer as TargetVisualizer;
-    // 注意：entityHealth 已移至基類 BaseEntity
-    private EntityStats entityStats;
+    // 注意：entityHealth 和 entityStats 已移至基類 BaseEntity
     private TargetAIHandler aiHandler;
     // 狀態機需要單獨存儲，因為它是在運行時創建的，不是組件
     [System.NonSerialized] private TargetStateMachine targetStateMachineInstance;
@@ -114,17 +113,9 @@ public class Target : BaseEntity<TargetState>, IEntity
 
     // 公共屬性
     public TargetState CurrentState => targetStateMachine?.CurrentState ?? TargetState.Stay;
-    public int CurrentHealth => entityHealth != null ? entityHealth.CurrentHealth : 0;
-    public int MaxHealth => entityHealth != null ? entityHealth.MaxHealth : 0;
-    public float HealthPercentage => entityHealth != null ? entityHealth.HealthPercentage : 0f;
+    // 血量相關屬性（MaxHealth, CurrentHealth, HealthPercentage）已由基類 BaseEntity 統一提供
     // IsDead 和 Position 已由基類 BaseEntity 提供，無需重複定義
-    
-    // 血量變化事件（委託給 EntityHealth）
-    public event System.Action<int, int> OnHealthChanged
-    {
-        add { if (entityHealth != null) entityHealth.OnHealthChanged += value; }
-        remove { if (entityHealth != null) entityHealth.OnHealthChanged -= value; }
-    }
+    // 血量變化事件（OnHealthChanged）已由基類 BaseEntity 統一提供
     
     /// <summary>
     /// 設定是否可以視覺化（由 EnemyManager 調用）
@@ -175,11 +166,7 @@ public class Target : BaseEntity<TargetState>, IEntity
             aiHandler.OnTargetReachedEscapePoint += HandleTargetReachedEscapePoint;
         }
         
-        // 訂閱 EntityHealth 的死亡事件
-        if (entityHealth != null)
-        {
-            entityHealth.OnEntityDied += HandleTargetDied;
-        }
+        // 注意：死亡事件由基類 BaseEntity 統一處理，不需要在此處訂閱
         
         InitializeTargetComponents();
     }
@@ -218,7 +205,7 @@ public class Target : BaseEntity<TargetState>, IEntity
     {
         base.FixedUpdate(); // 調用基類 FixedUpdate（會調用 FixedUpdateEntity）
         
-        if ((entityHealth != null && entityHealth.IsDead) || !isInitialized) return;
+        if (IsDead || !isInitialized) return;
 
         // AI 決策使用間隔更新（減少 CPU 負載）
         if (Time.time - lastAIUpdateTime >= aiUpdateInterval)
@@ -337,7 +324,7 @@ public class Target : BaseEntity<TargetState>, IEntity
             cachedPosition = transform.position;
 
             // 只在需要時更新偵測資訊
-            if (targetDetection != null && (entityHealth == null || !entityHealth.IsDead))
+            if (targetDetection != null && !IsDead)
             {
                 cachedCanSeePlayer = targetDetection.CanSeePlayer();
                 cachedDirectionToPlayer = targetDetection.GetDirectionToTarget();
@@ -462,7 +449,7 @@ public class Target : BaseEntity<TargetState>, IEntity
         // 初始化 TargetDetection 的當前視野範圍和角度（使用基礎值）
         if (targetDetection != null)
         {
-            targetDetection.SetDetectionParameters(baseViewRange, baseViewAngle, targetDetection.ChaseRange);
+            targetDetection.SetDetectionParameters(baseViewRange, baseViewAngle, 0f); // Target 不使用 chaseRange
         }
     }
 
@@ -510,10 +497,7 @@ public class Target : BaseEntity<TargetState>, IEntity
             Debug.LogError($"{gameObject.name}: Failed to initialize TargetAIHandler!");
         }
 
-        if (targetDetection != null)
-        {
-            targetDetection.SetTarget(playerTarget);
-        }
+        SetTarget(playerTarget);
 
         // 初始化patrol locations
         InitializePatrolLocations();
@@ -549,17 +533,8 @@ public class Target : BaseEntity<TargetState>, IEntity
     /// </summary>
     /// <param name="damage">傷害值</param>
     /// <param name="source">傷害來源</param>
-    public void TakeDamage(int damage, string source = "")
-    {
-        if (entityHealth == null) return;
-        
-        // 應用傷害減少（從 EntityStats 獲取）
-        float damageReduction = entityStats != null ? entityStats.DamageReduction : 0f;
-        entityHealth.SetDamageReduction(damageReduction);
-        
-        // 使用 EntityHealth 處理傷害（死亡事件會自動觸發 Die()）
-        entityHealth.TakeDamage(damage, source, gameObject.name);
-    }
+    // TakeDamage() 已由基類 BaseEntity 統一實現
+    // 基類會自動處理傷害減少（從 EntityStats 獲取）和死亡流程
     
     /// <summary>
     /// 獲取實體類型（實現 IEntity 接口）
@@ -570,25 +545,17 @@ public class Target : BaseEntity<TargetState>, IEntity
     }
 
     /// <summary>
-    /// 目標死亡處理（覆寫基類方法，處理 Target 特定邏輯）
+    /// 目標死亡處理（覆寫基類方法）
     /// </summary>
     protected override void OnDeath()
     {
-        // 檢查是否已經處理過死亡（避免重複處理）
-        if (targetStateMachine != null && targetStateMachine.CurrentState == TargetState.Dead)
-        {
-            return;
-        }
-
-        // 改變狀態為 Dead
         targetStateMachine?.ChangeState(TargetState.Dead);
-
-        // 通知外部（觸發 Target 特定事件）
+        gameObject.SetActive(false);
         OnTargetDied?.Invoke(this);
         
-        Debug.Log($"{gameObject.name}: Target died, dropping all items");
-        
-        // 注意：基類的 Die() 會自動調用 DropAllItems()，無需在此處調用
+        // Target 特定邏輯：清除地圖上的逃亡路徑
+        MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
+        mapUI?.HideEscapePoint();
     }
 
     /// <summary>
@@ -703,7 +670,7 @@ public class Target : BaseEntity<TargetState>, IEntity
         {
             float newViewRange = BaseViewRange * viewRangeMultiplier;
             float newViewAngle = BaseViewAngle * viewAngleMultiplier;
-            targetDetection.SetDetectionParameters(newViewRange, newViewAngle, targetDetection.ChaseRange);
+            targetDetection.SetDetectionParameters(newViewRange, newViewAngle, 0f); // Target 不使用 chaseRange
         }
         
         // 更新移動速度（使用基類的基礎數值）
@@ -753,13 +720,7 @@ public class Target : BaseEntity<TargetState>, IEntity
         }
     }
     
-    /// <summary>
-    /// 獲取傷害減少值（用於計算實際傷害）
-    /// </summary>
-    public float GetDamageReduction()
-    {
-        return entityStats != null ? entityStats.GetDamageReduction() : 0f;
-    }
+    // GetDamageReduction() 已由基類 BaseEntity 統一提供
 
     /// <summary>
     /// 通知目標玩家的位置（由外部系統呼叫，如槍聲警報）
@@ -768,7 +729,7 @@ public class Target : BaseEntity<TargetState>, IEntity
     /// <param name="playerPosition">玩家位置</param>
     public void NotifyPlayerPosition(Vector2 playerPosition)
     {
-        if (entityHealth != null && entityHealth.IsDead) return;
+        if (IsDead) return;
 
         // 檢查是否應該對槍聲做出反應（考慮攝影機剔除）
         // 根據 target_ai.md：視野外且不在 Escape 狀態時，不應對外在事物做出反應
@@ -828,24 +789,6 @@ public class Target : BaseEntity<TargetState>, IEntity
         gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// 處理目標死亡（由 EntityHealth.OnEntityDied 調用）
-    /// </summary>
-    private void HandleTargetDied()
-    {
-        Debug.LogWarning($"[Target] {gameObject.name} 已死亡！");
-        
-        // 清除地圖上的逃亡路徑
-        MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();
-        if (mapUI != null)
-        {
-            mapUI.HideEscapePoint();
-            Debug.Log($"[Target] {gameObject.name} 死亡，已清除地圖上的逃亡路徑");
-        }
-        
-        // 觸發事件通知外部系統（WinConditionManager）
-        OnTargetDied?.Invoke(this);
-    }
 
     /// <summary>
     /// 處理目標到達逃亡點（由 TargetAIHandler 調用）
@@ -879,11 +822,6 @@ public class Target : BaseEntity<TargetState>, IEntity
             aiHandler.OnTargetReachedEscapePoint -= HandleTargetReachedEscapePoint;
         }
         
-        // 取消訂閱 EntityHealth 事件
-        if (entityHealth != null)
-        {
-            entityHealth.OnEntityDied -= HandleTargetDied;
-        }
     }
 
     #endregion

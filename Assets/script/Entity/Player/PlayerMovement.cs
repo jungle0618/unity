@@ -179,7 +179,7 @@ public class PlayerMovement : BaseMovement
         // 點擊移動
         if (hasMoveTarget)
         {
-            Vector2 currentPos = Position;
+            Vector2 currentPos = transform.position;
             Vector2 toTarget = moveTarget - currentPos;
 
             if (toTarget.sqrMagnitude <= arrivalThreshold * arrivalThreshold)
@@ -219,7 +219,7 @@ public class PlayerMovement : BaseMovement
         float halfWidth = playerCamera.aspect * halfHeight;
         
         Vector3 cameraPos = playerCamera.transform.position;
-        Vector2 playerPos = Position;
+        Vector2 playerPos = transform.position;
         
         float leftEdge = cameraPos.x - halfWidth;
         float rightEdge = cameraPos.x + halfWidth;

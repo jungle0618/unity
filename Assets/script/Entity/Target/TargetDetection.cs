@@ -7,15 +7,13 @@ using UnityEngine;
 /// - 與 DangerousManager 串接危險係數更新
 /// 
 /// 【封裝說明】
-/// 此類的屬性（如 viewRange, viewAngle, chaseRange）應通過 Target 類的公共方法進行修改，而不是直接訪問。
+/// 此類的屬性（如 viewRange, viewAngle）應通過 Target 類的公共方法進行修改，而不是直接訪問。
 /// 正確方式：使用 Target.UpdateDangerLevelStats() 來更新偵測參數。
 /// </summary>
 public class TargetDetection : BaseDetection
 {
     [Header("偵測參數")]
     [SerializeField] private TargetStateMachine stateMachine;
-    [Tooltip("追擊範圍（與視野範圍獨立）")]
-    [SerializeField] private float chaseRange = 15f;
     
     /// <summary>
     /// 設定狀態機引用（由 Target 調用）
@@ -41,7 +39,6 @@ public class TargetDetection : BaseDetection
 
     public float ViewRange => GetViewRange();
     public float ViewAngle => GetViewAngle();
-    public float ChaseRange => chaseRange;
     
     // 當前應用的視野範圍和角度（由 Target.UpdateDangerLevelStats 設定）
     private float currentViewRange = 8f;
@@ -106,21 +103,7 @@ public class TargetDetection : BaseDetection
         // 這裡可以保留空實現或移除
     }
 
-    /// <summary>
-    /// 設定偵測目標（覆寫基類方法）
-    /// </summary>
-    public override void SetTarget(Transform playerTarget)
-    {
-        base.SetTarget(playerTarget);
-    }
-
-    /// <summary>
-    /// 檢查是否可以看到玩家（保留向後兼容的別名）
-    /// </summary>
-    public bool CanSeePlayer()
-    {
-        return CanSeeCurrentTarget();
-    }
+    // CanSeePlayer() 已由基類 BaseDetection 統一提供
 
     /// <summary>
     /// 檢查是否可以看到指定目標（覆寫基類抽象方法）
@@ -160,72 +143,37 @@ public class TargetDetection : BaseDetection
     /// <summary>
     /// 設定偵測參數（覆寫基類方法）
     /// 注意：此方法設置的是當前應用的視野範圍和角度（基礎值 × 倍數）
+    /// Target 不使用 chaseRange，所以只處理前兩個參數
     /// </summary>
     public override void SetDetectionParameters(params object[] parameters)
     {
-        if (parameters.Length >= 3)
+        if (parameters.Length >= 2)
         {
             currentViewRange = (float)parameters[0];
             currentViewAngle = (float)parameters[1];
-            chaseRange = (float)parameters[2];
         }
     }
 
     /// <summary>
     /// 設定偵測參數（保留原有方法以維持向後兼容）
     /// 注意：此方法設置的是當前應用的視野範圍和角度（基礎值 × 倍數）
+    /// Target 不使用 chaseRange，所以忽略第三個參數
     /// </summary>
     public void SetDetectionParameters(float newViewRange, float newViewAngle, float newChaseRange)
     {
         currentViewRange = newViewRange;
         currentViewAngle = newViewAngle;
-        chaseRange = newChaseRange;
-    }
-
-    /// <summary>
-    /// 檢查目標是否超出追擊範圍
-    /// </summary>
-    public bool IsTargetOutOfChaseRange()
-    {
-        if (!HasValidTarget()) return true;
-        return Vector2.Distance(transform.position, GetTarget().position) > chaseRange;
-    }
-
-    /// <summary>
-    /// 獲取朝向目標的方向（覆寫基類方法）
-    /// </summary>
-    public override Vector2 GetDirectionToTarget()
-    {
-        return base.GetDirectionToTarget();
-    }
-
-    /// <summary>
-    /// 獲取到目標的距離（覆寫基類方法）
-    /// </summary>
-    public override float GetDistanceToTarget()
-    {
-        return base.GetDistanceToTarget();
+        // Target 不使用 chaseRange，忽略第三個參數
     }
 
     // IsBlockedByObstacle 已移至 BaseDetection
+    // SetTarget, GetDirectionToTarget, GetDistanceToTarget, HasValidTarget 已由基類 BaseDetection 統一提供
 
     public void SetRaycastDetection(bool enabled) => useRaycastDetection = enabled;
 
     /// <summary>
-    /// 檢查是否有有效的目標（覆寫基類方法）
-    /// </summary>
-    public override bool HasValidTarget()
-    {
-        return base.HasValidTarget();
-    }
-
-    /// <summary>
     /// 清除目標（覆寫基類方法）
     /// </summary>
-    public override void ClearTarget()
-    {
-        base.ClearTarget();
-    }
 
     /// <summary>
     /// 面向目標方向
@@ -320,7 +268,7 @@ public class TargetDetection : BaseDetection
     /// 檢查是否應該更新 AI 邏輯（考慮攝影機剔除）
     /// 根據 target_ai.md：當不在 Escape 狀態且不在攝影機範圍內時，不更新 AI
     /// </summary>
-    public bool ShouldUpdateAI()
+    public override bool ShouldUpdateAI()
     {
         if (stateMachine == null) return false;
         

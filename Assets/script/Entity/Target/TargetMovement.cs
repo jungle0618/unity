@@ -118,7 +118,7 @@ public class TargetMovement : BaseMovement
         Vector2 targetPos = patrolPoints[patrolIndex].position;
         MoveTowards(targetPos, 1f);
 
-        if (Vector2.Distance(Position, targetPos) < arriveThreshold)
+        if (Vector2.Distance(transform.position, targetPos) < arriveThreshold)
         {
             AdvancePatrolIndex();
         }
@@ -144,7 +144,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public bool HasArrivedAtLocation(Vector3 location)
     {
-        return Vector2.Distance(Position, location) < arriveThreshold;
+        return Vector2.Distance(transform.position, location) < arriveThreshold;
     }
 
     /// <summary>
@@ -155,7 +155,7 @@ public class TargetMovement : BaseMovement
         if (rb == null) return;
 
         float baseSpeed = GetBaseSpeed();
-        Vector2 direction = (target - Position).normalized;
+        Vector2 direction = (target - (Vector2)transform.position).normalized;
         rb.linearVelocity = direction * baseSpeed * speedMultiplier;
     }
     
@@ -244,10 +244,10 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public bool CanReachDirectly(Vector2 target)
     {
-        Vector2 direction = (target - Position).normalized;
-        float distance = Vector2.Distance(Position, target);
+        Vector2 direction = (target - (Vector2)transform.position).normalized;
+        float distance = Vector2.Distance(transform.position, target);
         
-        RaycastHit2D hit = Physics2D.CircleCast(Position, directChaseCheckRadius, direction, distance, obstaclesLayerMask);
+        RaycastHit2D hit = Physics2D.CircleCast(transform.position, directChaseCheckRadius, direction, distance, obstaclesLayerMask);
         return hit.collider == null;
     }
 
@@ -259,7 +259,7 @@ public class TargetMovement : BaseMovement
         if (rb == null) return;
         float baseSpeed = GetBaseSpeed();
         // Target 不使用 chaseSpeedMultiplier，直接使用基礎速度
-        rb.linearVelocity = (targetPos - Position).normalized * baseSpeed;
+        rb.linearVelocity = (targetPos - (Vector2)transform.position).normalized * baseSpeed;
     }
 
     /// <summary>
@@ -285,7 +285,7 @@ public class TargetMovement : BaseMovement
                 ChaseTargetDirect(targetPos);
                 
                 // 朝向目標
-                Vector2 directionToTarget = (targetPos - Position).normalized;
+                Vector2 directionToTarget = (targetPos - (Vector2)transform.position).normalized;
                 if (directionToTarget.magnitude > 0.1f && detection != null)
                 {
                     detection.SetViewDirection(directionToTarget);
@@ -367,7 +367,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public override bool HasArrivedAt(Vector2 target, float threshold = 0.2f)
     {
-        return Vector2.Distance(Position, target) < threshold;
+        return Vector2.Distance(transform.position, target) < threshold;
     }
 
     /// <summary>
@@ -409,7 +409,7 @@ public class TargetMovement : BaseMovement
     /// </summary>
     public override Vector2 GetDirectionToTarget(Vector2 target)
     {
-        return (target - Position).normalized;
+        return (target - (Vector2)transform.position).normalized;
     }
 
     /// <summary>
@@ -420,7 +420,7 @@ public class TargetMovement : BaseMovement
         if (currentPath != null && currentPathIndex < currentPath.Count)
         {
             Vector2 nextPoint = currentPath[currentPathIndex].worldPosition;
-            return (nextPoint - Position).normalized;
+            return (nextPoint - (Vector2)transform.position).normalized;
         }
         return Vector2.zero;
     }
@@ -473,7 +473,7 @@ public class TargetMovement : BaseMovement
         }
 
         // 如果敵人移動了足夠的距離，需要更新路徑
-        float movedDistance = Vector2.Distance(Position, lastPathUpdatePosition);
+        float movedDistance = Vector2.Distance(transform.position, lastPathUpdatePosition);
         if (movedDistance > pathUpdateDistance)
         {
             return true;
@@ -506,7 +506,7 @@ public class TargetMovement : BaseMovement
         }
 
         // 如果敵人移動了足夠的距離，需要更新路徑（追擊時使用更小的距離閾值）
-        float movedDistance = Vector2.Distance(Position, lastPathUpdatePosition);
+        float movedDistance = Vector2.Distance(transform.position, lastPathUpdatePosition);
         if (movedDistance > chasePathUpdateDistance)
         {
             return true;
@@ -625,7 +625,7 @@ public class TargetMovement : BaseMovement
         }
 
         Vector2 targetPosition = currentPath[currentPathIndex].worldPosition;
-        Vector2 direction = (targetPosition - Position).normalized;
+        Vector2 direction = (targetPosition - (Vector2)transform.position).normalized;
         
         if (rb != null)
         {
@@ -634,7 +634,7 @@ public class TargetMovement : BaseMovement
         }
 
         // 檢查是否到達當前路徑點
-        if (Vector2.Distance(Position, targetPosition) < pathReachThreshold)
+        if (Vector2.Distance(transform.position, targetPosition) < pathReachThreshold)
         {
             currentPathIndex++;
         }
@@ -652,7 +652,7 @@ public class TargetMovement : BaseMovement
         }
 
         Vector2 targetPosition = currentPath[currentPathIndex].worldPosition;
-        Vector2 direction = (targetPosition - Position).normalized;
+        Vector2 direction = (targetPosition - (Vector2)transform.position).normalized;
         
         if (rb != null)
         {
@@ -661,7 +661,7 @@ public class TargetMovement : BaseMovement
             rb.linearVelocity = Vector2.Lerp(rb.linearVelocity, targetVelocity, Time.fixedDeltaTime * 8f);
         }
 
-        if (Vector2.Distance(Position, targetPosition) < chasePathReachThreshold)
+        if (Vector2.Distance(transform.position, targetPosition) < chasePathReachThreshold)
         {
             currentPathIndex++;
         }
@@ -704,7 +704,7 @@ public class TargetMovement : BaseMovement
         {
             return currentPath[currentPathIndex].worldPosition;
         }
-        return Position;
+        return transform.position;
     }
 
     /// <summary>
@@ -725,7 +725,7 @@ public class TargetMovement : BaseMovement
             lastStuckTime = Time.time;
         }
 
-        if (Vector2.Distance(Position, lastPosition) < 0.05f && Time.time - lastPositionUpdateTime > 0.5f)
+        if (Vector2.Distance(transform.position, lastPosition) < 0.05f && Time.time - lastPositionUpdateTime > 0.5f)
         {
             return true;
         }
@@ -738,7 +738,7 @@ public class TargetMovement : BaseMovement
         // 更新位置追蹤
         if (Time.time - lastPositionUpdateTime > 0.1f)
         {
-            lastPosition = Position;
+            lastPosition = transform.position;
             lastPositionUpdateTime = Time.time;
         }
     }

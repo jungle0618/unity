@@ -14,8 +14,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     private EnemyMovement enemyMovement => movement as EnemyMovement;
     private EnemyDetection enemyDetection => detection as EnemyDetection;
     private EnemyVisualizer enemyVisualizer => visualizer as EnemyVisualizer;
-    // 注意：entityHealth 已移至基類 BaseEntity
-    private EntityStats entityStats;
+    // 注意：entityHealth 和 entityStats 已移至基類 BaseEntity
     private EnemyAIHandler aiHandler;
     // 狀態機需要單獨存儲，因為它是在運行時創建的，不是組件
     [System.NonSerialized] private EnemyStateMachine enemyStateMachineInstance;
@@ -54,18 +53,10 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
     // 公共屬性
     public EnemyState CurrentState => enemyStateMachine?.CurrentState ?? EnemyState.Dead;
-    public int CurrentHealth => entityHealth != null ? entityHealth.CurrentHealth : 0;
-    public int MaxHealth => entityHealth != null ? entityHealth.MaxHealth : 0;
-    public float HealthPercentage => entityHealth != null ? entityHealth.HealthPercentage : 0f;
     public float ChaseSpeedMultiplier => chaseSpeedMultiplier;
+    // 血量相關屬性（MaxHealth, CurrentHealth, HealthPercentage）已由基類 BaseEntity 統一提供
     // IsDead 和 Position 已由基類 BaseEntity 提供，無需重複定義
-    
-    // 血量變化事件（委託給 EntityHealth）
-    public event System.Action<int, int> OnHealthChanged
-    {
-        add { if (entityHealth != null) entityHealth.OnHealthChanged += value; }
-        remove { if (entityHealth != null) entityHealth.OnHealthChanged -= value; }
-    }
+    // 血量變化事件（OnHealthChanged）已由基類 BaseEntity 統一提供
     
     /// <summary>
     /// 獲取有效攻擊範圍（根據武器類型自動調整）
@@ -215,7 +206,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     {
         base.FixedUpdate(); // 調用基類 FixedUpdate（會調用 FixedUpdateEntity）
         
-        if ((entityHealth != null && entityHealth.IsDead) || !isInitialized) return;
+        if (IsDead || !isInitialized) return;
 
         // AI 決策使用間隔更新（減少 CPU 負載）
         if (Time.time - lastAIUpdateTime >= aiUpdateInterval)
@@ -344,7 +335,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
             cachedPosition = transform.position;
 
             // 只在需要時更新偵測資訊
-            if (enemyDetection != null && (entityHealth == null || !entityHealth.IsDead))
+            if (enemyDetection != null && !IsDead)
             {
                 cachedCanSeePlayer = enemyDetection.CanSeePlayer();
                 cachedDirectionToPlayer = enemyDetection.GetDirectionToTarget();
@@ -434,10 +425,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
             Debug.LogError($"{gameObject.name}: Failed to initialize EnemyAIHandler!");
         }
 
-        if (enemyDetection != null)
-        {
-            enemyDetection.SetTarget(playerTarget);
-        }
+        SetTarget(playerTarget);
 
         // 初始化patrol locations（通過 AI Handler）
         InitializePatrolLocations();
@@ -466,20 +454,8 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     /// </summary>
     /// <param name="damage">傷害值</param>
     /// <param name="source">傷害來源</param>
-    public void TakeDamage(int damage, string source = "")
-    {
-        if (entityHealth == null) return;
-        
-        // 應用傷害減少（從 EntityStats 獲取）
-        float damageReduction = entityStats != null ? entityStats.DamageReduction : 0f;
-        entityHealth.SetDamageReduction(damageReduction);
-        
-        // 使用 EntityHealth 處理傷害
-        if (entityHealth.TakeDamage(damage, source, gameObject.name) && entityHealth.IsDead)
-        {
-            Die();
-        }
-    }
+    // TakeDamage() 已由基類 BaseEntity 統一實現
+    // 基類會自動處理傷害減少（從 EntityStats 獲取）和死亡流程
     
     /// <summary>
     /// 獲取實體類型（實現 IEntity 接口）
@@ -490,26 +466,13 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     }
 
     /// <summary>
-    /// 敵人死亡處理（覆寫基類方法，處理 Enemy 特定邏輯）
+    /// 敵人死亡處理（覆寫基類方法）
     /// </summary>
     protected override void OnDeath()
     {
-        // 檢查是否已經處理過死亡（避免重複處理）
-        if (enemyStateMachine != null && enemyStateMachine.CurrentState == EnemyState.Dead)
-        {
-            return;
-        }
-
-        // 改變狀態為 Dead（會觸發 OnStateChanged 事件，進而調用 HandleDeathState）
         enemyStateMachine?.ChangeState(EnemyState.Dead);
-        
-        // 立即禁用 GameObject，確保敵人立即從畫面消失
         gameObject.SetActive(false);
-
-        // 通知外部（觸發 Enemy 特定事件）
         OnEnemyDied?.Invoke(this);
-        
-        Debug.Log($"{gameObject.name}: Enemy died, GameObject disabled");
     }
 
     /// <summary>
@@ -788,13 +751,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         }
     }
     
-    /// <summary>
-    /// 獲取傷害減少值（用於計算實際傷害）
-    /// </summary>
-    public float GetDamageReduction()
-    {
-        return entityStats != null ? entityStats.GetDamageReduction() : 0f;
-    }
+    // GetDamageReduction() 已由基類 BaseEntity 統一提供
 
     /// <summary>
     /// 通知敵人玩家的位置（由外部系統呼叫，如槍聲警報）
@@ -803,7 +760,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     /// <param name="playerPosition">玩家位置</param>
     public void NotifyPlayerPosition(Vector2 playerPosition)
     {
-        if (entityHealth != null && entityHealth.IsDead) return;
+        if (IsDead) return;
 
         // 檢查是否應該對槍聲做出反應（考慮攝影機剔除）
         // 根據 enemy_ai.md：視野外且不在 Chase/Search 狀態時，不應對外在事物做出反應

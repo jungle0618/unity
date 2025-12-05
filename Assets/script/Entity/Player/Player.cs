@@ -3,37 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
-/// <summary>
-/// 玩家主控制器（繼承 BaseEntity）
-/// 職責：處理輸入、血量管理、武器控制、遊戲邏輯
-/// 移動邏輯已移至 PlayerMovement 組件
-/// 
-/// 【封裝原則】
-/// 所有 Player 狀態的修改都必須通過 Player 類的公共方法進行，禁止直接訪問內部組件來修改狀態。
-/// 
-/// ❌ 錯誤範例（禁止）：
-///   - player.Movement.SetSpeed(2);  // 直接訪問 PlayerMovement
-///   - player.Detection.SetDetectionParameters(...);  // 直接訪問 PlayerDetection
-///   - player.gameObject.GetComponent<PlayerMovement>().moveSpeed = 2;  // 直接修改屬性
-/// 
-/// ✅ 正確範例（推薦）：
-///   - player.TakeDamage(10, "Enemy");
-///   - player.Heal(20);
-///   - player.SetHealth(100);
-///   - player.SetMouseAiming(true);
-///   - player.SetWeaponDirection(direction);
-/// 
-/// 如需修改 Player 的狀態，請使用以下公共方法：
-///   - TakeDamage() - 造成傷害
-///   - Heal() - 治療
-///   - SetHealth() - 設定血量
-///   - FullHeal() - 完全治療
-///   - IncreaseMaxHealth() - 增加最大血量
-///   - SetMouseAiming() - 設定滑鼠瞄準模式
-///   - SetWeaponFollowMovement() - 設定武器是否跟隨移動
-///   - SetWeaponDirection() - 手動設定武器方向
-///   - Resurrect() - 復活玩家
-/// </summary>
+
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerDetection))]
 [RequireComponent(typeof(PlayerVisualizer))]
@@ -81,6 +51,10 @@ public class Player : BaseEntity<PlayerState>, IEntity
     
     [Header("物品撿取設定")]
     [SerializeField] private float pickupRange = 2f; // 物品撿取範圍
+    [Tooltip("是否啟用自動撿起物品（無需按 E 鍵）")]
+    [SerializeField] private bool enableAutoPickup = true; // 是否啟用自動撿起
+    [Tooltip("自動撿起檢查間隔（秒），避免每幀都檢查")]
+    [SerializeField] private float autoPickupCheckInterval = 0.1f; // 自動撿起檢查間隔
     
     // 注意：viewRange 和 viewAngle 現在從基類 BaseEntity 獲取（baseViewRange, baseViewAngle）
     
@@ -90,6 +64,9 @@ public class Player : BaseEntity<PlayerState>, IEntity
     // 遊戲結束條件檢查頻率控制
     private float gameEndCheckTime = 0f;
     private const float GAME_END_CHECK_INTERVAL = 0.5f; // 每 0.5 秒檢查一次
+    
+    // 自動撿起檢查頻率控制
+    private float autoPickupCheckTime = 0f;
 
     // 滑鼠/指標相關
     private Vector2 currentPointerScreenPos;
@@ -104,30 +81,18 @@ public class Player : BaseEntity<PlayerState>, IEntity
     // 輸入系統
     private InputSystem_Actions inputActions;
 
-    // 血量相關屬性（委託給 EntityHealth）
-    public int MaxHealth => entityHealth != null ? entityHealth.MaxHealth : 0;
-    public int CurrentHealth => entityHealth != null ? entityHealth.CurrentHealth : 0;
-    public float HealthPercentage => entityHealth != null ? entityHealth.HealthPercentage : 0f;
-    // IsDead 已由基類 BaseEntity 提供（基於 stateMachine.IsDead）
-    public bool IsInvulnerable => entityHealth != null ? entityHealth.IsInvulnerable : false;
+    // 血量相關屬性已由基類 BaseEntity 統一提供（MaxHealth, CurrentHealth, HealthPercentage, IsInvulnerable）
+    // 視野相關屬性已由基類 BaseEntity 統一提供（ViewRange, ViewAngle）
+    // IsDead 已由基類 BaseEntity 提供（基於 entityHealth.IsDead，即生命值 <= 0）
     
     // 蹲下相關屬性（從 PlayerMovement 獲取）
     public bool IsSquatting => playerMovement != null && playerMovement.IsSquatting;
-    
-    // 視野相關屬性（從基類獲取）
-    public float ViewRange => BaseViewRange;
-    public float ViewAngle => BaseViewAngle;
     
     // 速度乘數屬性
     public float ChaseSpeedMultiplier => chaseSpeedMultiplier;
     public float SquatSpeedMultiplier => squatSpeedMultiplier;
 
-    // 血量變化事件（委託給 EntityHealth）
-    public event System.Action<int, int> OnHealthChanged
-    {
-        add { if (entityHealth != null) entityHealth.OnHealthChanged += value; }
-        remove { if (entityHealth != null) entityHealth.OnHealthChanged -= value; }
-    }
+    // 血量變化事件已由基類 BaseEntity 統一提供
     
     public event System.Action OnPlayerDied; // 玩家死亡事件
     public event System.Action OnPlayerReachedSpawnPoint; // 玩家回到出生點事件
@@ -308,6 +273,13 @@ public class Player : BaseEntity<PlayerState>, IEntity
             CheckPlayerReachedSpawnPoint(); // 檢查玩家是否回到出生點
             gameEndCheckTime = Time.time;
         }
+        
+        // 自動撿起物品（如果啟用）
+        if (enableAutoPickup && Time.time - autoPickupCheckTime >= autoPickupCheckInterval)
+        {
+            TryAutoPickupItem();
+            autoPickupCheckTime = Time.time;
+        }
     }
     
     protected override void FixedUpdate()
@@ -482,36 +454,23 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
-        // 優先處理撿取物品
-        bool itemPickedUp = TryPickupItem();
-        
-        // 如果沒有撿到物品，則嘗試開門
-        if (!itemPickedUp)
-        {
-            TryOpenDoor();
-        }
+        // 只處理開門（撿取物品已改為自動）
+        TryOpenDoor();
     }
     
     /// <summary>
-    /// 嘗試撿取物品
+    /// 自動撿起物品（在 Update 中定期調用）
     /// </summary>
-    /// <returns>是否成功撿取物品</returns>
-    private bool TryPickupItem()
+    private void TryAutoPickupItem()
     {
-        if (itemManager == null || ItemHolder == null)
+        // 如果玩家死亡，不自動撿起
+        if (IsDead || itemManager == null || ItemHolder == null)
         {
-            return false;
+            return;
         }
         
-        // 嘗試撿取最近的物品
-        bool success = itemManager.TryPickupItem(transform.position, ItemHolder, pickupRange);
-        
-        if (success)
-        {
-            Debug.Log($"[Player] 成功撿取物品！當前物品數量: {ItemHolder.ItemCount}");
-        }
-        
-        return success;
+        // 嘗試撿取最近的物品（靜默模式，不輸出日誌）
+        itemManager.TryPickupItem(transform.position, ItemHolder, pickupRange);
     }
     
     /// <summary>
@@ -540,10 +499,20 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
     private void OnSwitchWeaponPerformed(InputAction.CallbackContext ctx)
     {
-        // 切換武器邏輯（只在武器之間循環，不包括鑰匙等）
-        if (ItemHolder != null)
+        if (ItemHolder == null) return;
+
+        // 讀取滾輪值（Vector2）
+        Vector2 scrollValue = ctx.ReadValue<Vector2>();
+        
+        // 滾輪向上（y > 0）：切換到下一個物品
+        if (scrollValue.y > 0.1f)
         {
-            ItemHolder.SwitchToNextWeapon(); // 只切換武器 + 空手
+            ItemHolder.SwitchToNextWeapon();
+        }
+        // 滾輪向下（y < 0）：切換到上一個物品
+        else if (scrollValue.y < -0.1f)
+        {
+            ItemHolder.SwitchToPreviousWeapon();
         }
     }
 
@@ -570,6 +539,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
             return;
         }
     }
+
 
     private void TrySwitchToWeaponType(string typeKey)
     {
@@ -709,12 +679,15 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
     #region 血量管理
 
-    public void TakeDamage(int damage, string source = "")
+    // TakeDamage() 已由基類 BaseEntity 統一實現
+    // 基類會自動處理傷害和死亡流程
+    
+    /// <summary>
+    /// 獲取實體顯示名稱（覆寫以使用"玩家"作為顯示名稱）
+    /// </summary>
+    protected override string GetEntityDisplayName()
     {
-        if (entityHealth == null) return;
-        
-        // 使用 EntityHealth 處理傷害（死亡事件會自動觸發 Die()）
-        entityHealth.TakeDamage(damage, source, "玩家");
+        return "玩家";
     }
     
     /// <summary>
@@ -725,69 +698,16 @@ public class Player : BaseEntity<PlayerState>, IEntity
         return EntityManager.EntityType.Player;
     }
 
-    /// <summary>
-    /// 治療
-    /// </summary>
-    /// <param name="healAmount">治療量</param>
-    public void Heal(int healAmount)
-    {
-        if (entityHealth == null) return;
-        entityHealth.Heal(healAmount);
-    }
+    // 血量管理方法（Heal, FullHeal, SetHealth, IncreaseMaxHealth）已由基類 BaseEntity 統一提供
 
     /// <summary>
-    /// 完全治療
-    /// </summary>
-    public void FullHeal()
-    {
-        if (entityHealth == null) return;
-        entityHealth.FullHeal();
-    }
-
-    /// <summary>
-    /// 設定血量
-    /// </summary>
-    /// <param name="health">新的血量值</param>
-    public void SetHealth(int health)
-    {
-        if (entityHealth == null) return;
-        entityHealth.SetHealth(health);
-        if (entityHealth.IsDead)
-        {
-            Die();
-        }
-    }
-
-    /// <summary>
-    /// 增加最大血量
-    /// </summary>
-    /// <param name="amount">增加的量</param>
-    public void IncreaseMaxHealth(int amount)
-    {
-        if (entityHealth == null) return;
-        entityHealth.IncreaseMaxHealth(amount);
-    }
-
-    /// <summary>
-    /// 玩家死亡處理（覆寫基類方法，處理 Player 特定邏輯）
+    /// 玩家死亡處理（覆寫基類方法）
     /// </summary>
     protected override void OnDeath()
     {
-        // 更新狀態機
         playerStateMachine?.ChangeState(PlayerState.Dead);
-        
-        // 清除移動目標（Player 特定）
-        if (playerMovement != null)
-        {
-            playerMovement.ClearMoveTarget();
-        }
-
-        Debug.Log("玩家死亡！");
-        
-        // 觸發 Player 特定事件，讓 GameManager 處理
+        playerMovement?.ClearMoveTarget();
         OnPlayerDied?.Invoke();
-        
-        // 延遲禁用玩家物件，確保事件處理完成
         StartCoroutine(DisablePlayerAfterDeath());
     }
     
@@ -796,11 +716,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
     /// </summary>
     private System.Collections.IEnumerator DisablePlayerAfterDeath()
     {
-        // 等待一幀，確保事件處理完成
         yield return null;
-        
-        // 可以在這裡添加死亡邏輯
-        // 例如：播放死亡動畫、停止移動、禁用輸入等
         gameObject.SetActive(false);
     }
     
