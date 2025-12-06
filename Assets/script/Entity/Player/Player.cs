@@ -459,21 +459,13 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         UpdateWeaponDirection();
         Debug.Log("[Player] OnAttackPerformed");
-
-        if (ItemHolder.TryAttack(gameObject))
-            animationController.TriggerAttackAnimation3D();
+        ItemHolder.TryAttack(gameObject);
     }
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
-        // 優先處理撿取物品
-        bool itemPickedUp = TryPickupItem();
-        
-        // 如果沒有撿到物品，則嘗試開門
-        if (!itemPickedUp)
-        {
-            TryOpenDoor();
-        }
+        // 只處理開門（撿取物品已改為自動）
+        TryOpenDoor();
     }
     
     /// <summary>
