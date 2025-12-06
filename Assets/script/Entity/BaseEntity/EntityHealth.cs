@@ -18,9 +18,16 @@ public class EntityHealth : MonoBehaviour
     [SerializeField] private float invulnerabilityTime = 0f;
     private float lastDamageTime = -999f;
     
+    [Header("傷害彈出設定")]
+    [Tooltip("是否顯示傷害彈出")]
+    [SerializeField] private bool showDamagePopup = true;
+    [Tooltip("傷害彈出位置偏移（相對於物件中心）")]
+    [SerializeField] private Vector3 popupOffset = new Vector3(0, 1f, 0);
+    
     // 事件
     public event System.Action<int, int> OnHealthChanged; // 當前血量, 最大血量
     public event System.Action OnEntityDied; // 實體死亡事件
+    public event System.Action<int> OnDamageTaken; // 傷害值
     
     // 屬性
     public int MaxHealth 
@@ -71,6 +78,12 @@ public class EntityHealth : MonoBehaviour
         // 記錄傷害時間（用於無敵時間）
         lastDamageTime = Time.time;
         
+        // 顯示傷害彈出
+        if (showDamagePopup)
+        {
+            ShowDamagePopup(finalDamage);
+        }
+        
         // 調試信息
         if (!string.IsNullOrEmpty(source))
         {
@@ -81,9 +94,12 @@ public class EntityHealth : MonoBehaviour
             }
             else
             {
-                Debug.Log($"{name} 受到 {damage} 點傷害 (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
+                Debug.Log($"{name} 受到 {finalDamage} 點傷害 (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
             }
         }
+        
+        // 觸發傷害事件
+        OnDamageTaken?.Invoke(finalDamage);
         
         // 觸發血量變化事件
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
@@ -95,6 +111,18 @@ public class EntityHealth : MonoBehaviour
         }
         
         return true;
+    }
+    
+    /// <summary>
+    /// 顯示傷害彈出文字
+    /// </summary>
+    private void ShowDamagePopup(int damage)
+    {
+        if (DamagePopupManager.Instance != null)
+        {
+            Vector3 popupPosition = transform.position + popupOffset;
+            DamagePopupManager.Instance.ShowDamagePopup(damage, popupPosition);
+        }
     }
     
     /// <summary>
@@ -110,12 +138,30 @@ public class EntityHealth : MonoBehaviour
         currentHealth = Mathf.Min(maxHealth, currentHealth + healAmount);
         int actualHeal = currentHealth - oldHealth;
         
+        // 顯示治療彈出
+        if (showDamagePopup && actualHeal > 0)
+        {
+            ShowHealPopup(actualHeal);
+        }
+        
         // 觸發血量變化事件
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
         
         Debug.Log($"{gameObject.name} 治療 {actualHeal} 點血量，當前血量: {currentHealth}/{maxHealth}");
         
         return actualHeal;
+    }
+    
+    /// <summary>
+    /// 顯示治療彈出文字
+    /// </summary>
+    private void ShowHealPopup(int healAmount)
+    {
+        if (DamagePopupManager.Instance != null)
+        {
+            Vector3 popupPosition = transform.position + popupOffset;
+            DamagePopupManager.Instance.ShowHealPopup(healAmount, popupPosition);
+        }
     }
     
     /// <summary>
