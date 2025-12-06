@@ -56,6 +56,10 @@ public class Player : BaseEntity<PlayerState>, IEntity
     [Tooltip("自動撿起檢查間隔（秒），避免每幀都檢查")]
     [SerializeField] private float autoPickupCheckInterval = 0.1f; // 自動撿起檢查間隔
     
+    [Header("視野設定")]
+    [Tooltip("近距離360度視野範圍（全方向，半徑1-2）")]
+    [SerializeField] private float nearViewRange = 1.5f; // 360度視野範圍
+    
     // 注意：viewRange 和 viewAngle 現在從基類 BaseEntity 獲取（baseViewRange, baseViewAngle）
     
     // ItemManager 引用（用於撿取物品）
@@ -91,6 +95,9 @@ public class Player : BaseEntity<PlayerState>, IEntity
     // 速度乘數屬性
     public float ChaseSpeedMultiplier => chaseSpeedMultiplier;
     public float SquatSpeedMultiplier => squatSpeedMultiplier;
+    
+    // 視野屬性
+    public float NearViewRange => nearViewRange; // 360度視野範圍
 
     // 血量變化事件已由基類 BaseEntity 統一提供
     

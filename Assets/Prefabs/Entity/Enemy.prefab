@@ -194,6 +194,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyMovement
   arriveThreshold: 1
   patrolPoints: []
+  patrolSpeedMultiplier: 0.35
   usePathfinding: 1
   pathUpdateDistance: 2
   pathReachThreshold: 1
@@ -273,6 +274,7 @@ MonoBehaviour:
   chaseSpeedMultiplier: 1.2
   searchSpeedMultiplier: 1.5
   returnSpeedMultiplier: 1
+  patrolPauseDuration: 3
 --- !u!114 &5292676631361536599
 MonoBehaviour:
   m_ObjectHideFlags: 0
