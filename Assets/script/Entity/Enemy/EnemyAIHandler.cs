@@ -165,7 +165,8 @@ public class EnemyAIHandler : MonoBehaviour
                 break;
 
             case MoveType.Return:
-                enemyMovement.MoveTowardsWithPathfinding(currentMoveTarget, 1f);
+                float returnSpeedMultiplier = enemy.GetStateSpeedMultiplier();
+                enemyMovement.MoveTowardsWithPathfinding(currentMoveTarget, returnSpeedMultiplier);
                 break;
         }
     }

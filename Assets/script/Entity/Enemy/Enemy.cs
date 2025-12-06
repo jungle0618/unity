@@ -6,7 +6,6 @@ using static UnityEngine.GraphicsBuffer;
 [RequireComponent(typeof(EnemyDetection))]
 [RequireComponent(typeof(EnemyVisualizer))]
 [RequireComponent(typeof(EntityHealth))]
-[RequireComponent(typeof(EntityStats))]
 [RequireComponent(typeof(EnemyAIHandler))]
 public class Enemy : BaseEntity<EnemyState>, IEntity
 {
@@ -14,7 +13,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     private EnemyMovement enemyMovement => movement as EnemyMovement;
     private EnemyDetection enemyDetection => detection as EnemyDetection;
     private EnemyVisualizer enemyVisualizer => visualizer as EnemyVisualizer;
-    // 注意：entityHealth 和 entityStats 已移至基類 BaseEntity
+    // 注意：entityHealth 已移至基類 BaseEntity
     private EnemyAIHandler aiHandler;
     // 狀態機需要單獨存儲，因為它是在運行時創建的，不是組件
     [System.NonSerialized] private EnemyStateMachine enemyStateMachineInstance;
@@ -32,9 +31,13 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     [Tooltip("是否使用武器的實際攻擊範圍（對持槍敵人啟用此選項）")]
     [SerializeField] private bool useWeaponAttackRange = true;
     
-    [Header("移動速度乘數")]
-    [Tooltip("追擊速度倍數（相對於基礎速度）")]
+    [Header("狀態速度倍數")]
+    [Tooltip("各狀態的速度倍數（相對於基礎速度）")]
+    [SerializeField] private float patrolSpeedMultiplier = 1.0f;
+    [SerializeField] private float alertSpeedMultiplier = 1.0f;
     [SerializeField] private float chaseSpeedMultiplier = 1.5f;
+    [SerializeField] private float searchSpeedMultiplier = 1.5f;
+    [SerializeField] private float returnSpeedMultiplier = 1.0f;
 
     // 效能優化變數
     private float aiUpdateInterval = 0.15f;
@@ -53,7 +56,31 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
     // 公共屬性
     public EnemyState CurrentState => enemyStateMachine?.CurrentState ?? EnemyState.Dead;
-    public float ChaseSpeedMultiplier => chaseSpeedMultiplier;
+    
+    /// <summary>
+    /// 根據當前狀態獲取速度倍數
+    /// </summary>
+    public float GetStateSpeedMultiplier()
+    {
+        if (enemyStateMachine == null) return 1.0f;
+        
+        switch (enemyStateMachine.CurrentState)
+        {
+            case EnemyState.Patrol:
+                return patrolSpeedMultiplier;
+            case EnemyState.Alert:
+                return alertSpeedMultiplier;
+            case EnemyState.Chase:
+                return chaseSpeedMultiplier;
+            case EnemyState.Search:
+                return searchSpeedMultiplier;
+            case EnemyState.Return:
+                return returnSpeedMultiplier;
+            case EnemyState.Dead:
+            default:
+                return 0f; // 死亡狀態不移動
+        }
+    }
     // 血量相關屬性（MaxHealth, CurrentHealth, HealthPercentage）已由基類 BaseEntity 統一提供
     // IsDead 和 Position 已由基類 BaseEntity 提供，無需重複定義
     // 血量變化事件（OnHealthChanged）已由基類 BaseEntity 統一提供
@@ -100,14 +127,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         {
             enemyVisualizer.SetCanVisualize(canVisualize);
         }
-    }
-    
-    /// <summary>
-    /// 獲取是否可以視覺化
-    /// </summary>
-    public bool GetCanVisualize()
-    {
-        return canVisualize;
     }
     
     // 保留 cachedPosition 用於內部優化（性能優化）
@@ -166,7 +185,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         detection = GetComponent<EnemyDetection>();
         visualizer = GetComponent<EnemyVisualizer>();
         // entityHealth 已在基類 BaseEntity.InitializeComponents() 中獲取
-        entityStats = GetComponent<EntityStats>();
         aiHandler = GetComponent<EnemyAIHandler>();
         
         InitializeEnemyComponents();
@@ -315,12 +333,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
             entityHealth = gameObject.AddComponent<EntityHealth>();
         }
         
-        if (entityStats == null)
-        {
-            Debug.LogError($"{gameObject.name}: Missing EntityStats component! Auto-adding...");
-            entityStats = gameObject.AddComponent<EntityStats>();
-        }
-        
         if (aiHandler == null)
         {
             Debug.LogError($"{gameObject.name}: Missing EnemyAIHandler component! Auto-adding...");
@@ -351,15 +363,20 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
     /// <summary>
     /// 初始化基礎數值（覆寫基類方法）
+    /// 
+    /// 【重要】建議在 Inspector 中直接設置 baseSpeed = 6.0，而不是依賴此方法
+    /// 此方法僅作為後備方案，如果 Inspector 中未設置才會使用默認值
     /// </summary>
     protected override void InitializeBaseValues()
     {
         base.InitializeBaseValues(); // 調用基類方法
 
-        // 設定敵人專屬的基礎速度（快於玩家走路的 5f）
-        if (baseSpeed <= 2f) // 如果還是預設值，設定為敵人的基礎速度
+        // 如果基礎速度未在 Inspector 中設定（≤0 或仍為 BaseEntity 的默認值 2f），使用 Enemy 的默認值
+        // 注意：建議在 Inspector 中直接設置 baseSpeed = 6.0
+        if (baseSpeed <= 2f) // 如果還是 BaseEntity 的預設值或未設置
         {
-            baseSpeed = 6.0f; // Enemy 的基礎速度，明顯快於 Player 走路 (5f)
+            baseSpeed = 6.0f; // Enemy 的基礎速度，明顯快於 Player 走路 (5f)（僅作為後備）
+            Debug.LogWarning($"[Enemy] baseSpeed 未在 Inspector 中設置，使用默認值 6.0。建議在 Inspector 中直接設置。");
         }
 
         // 從組件讀取基礎值（如果基類尚未設定）
@@ -392,12 +409,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
             entityHealth = gameObject.AddComponent<EntityHealth>();
         }
         
-        if (entityStats == null)
-        {
-            Debug.LogWarning($"{gameObject.name}: EntityStats is null during Initialize, adding component...");
-            entityStats = gameObject.AddComponent<EntityStats>();
-        }
-        
         if (aiHandler == null)
         {
             Debug.LogWarning($"{gameObject.name}: EnemyAIHandler is null during Initialize, adding component...");
@@ -427,8 +438,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
         SetTarget(playerTarget);
 
-        // 初始化patrol locations（通過 AI Handler）
-        InitializePatrolLocations();
 
         if (enemyStateMachine != null)
         {
@@ -514,58 +523,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
         }
     }
 
-    /// <summary>
-    /// 初始化patrol locations（由EnemyManager設定）
-    /// </summary>
-    private void InitializePatrolLocations()
-    {
-        // Patrol locations現在由EnemyManager在SpawnEnemy時設定
-        // 這裡不需要做任何事情
-    }
-
-    /// <summary>
-    /// 取得當前patrol location
-    /// </summary>
-    public Vector3 GetCurrentPatrolLocation()
-    {
-        if (aiHandler != null)
-        {
-            Vector3[] locations = aiHandler.GetPatrolLocations();
-            if (locations != null && locations.Length > 0)
-            {
-                int index = aiHandler.GetCurrentPatrolIndex();
-                if (index >= 0 && index < locations.Length)
-                {
-                    return locations[index];
-                }
-            }
-        }
-        return transform.position;
-    }
-
-    /// <summary>
-    /// 取得第一個patrol location（spawn point）
-    /// </summary>
-    public Vector3 GetFirstPatrolLocation()
-    {
-        if (aiHandler != null)
-        {
-            Vector3[] locations = aiHandler.GetPatrolLocations();
-            if (locations != null && locations.Length > 0)
-            {
-                return locations[0];
-            }
-        }
-        return transform.position;
-    }
-
-    /// <summary>
-    /// 強制改變狀態（供外部系統使用）
-    /// </summary>
-    public void ForceChangeState(EnemyState newState)
-    {
-        stateMachine?.ChangeState(newState);
-    }
 
     /// <summary>
     /// 嘗試攻擊玩家 - 完全由 ItemHolder 處理攻擊邏輯
@@ -574,20 +531,6 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     {
         if (attackController == null) return false;
         return attackController.TryAttackPlayer(playerTransform);
-    }
-
-    /// <summary>
-    /// 設定FOV倍數（用於危險等級調整）
-    /// </summary>
-    public void SetFovMultiplier(float multiplier)
-    {
-        if (enemyDetection != null)
-        {
-            // 這裡需要根據EnemyDetection的實際API來調整
-            // 假設有SetViewRange方法
-            // enemyDetection.SetViewRange(enemyDetection.ViewRange * multiplier);
-            Debug.Log($"{gameObject.name}: FOV倍數設定為 {multiplier}");
-        }
     }
 
     #endregion
@@ -686,68 +629,16 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     #region Public Methods
 
     /// <summary>
-    /// 根據危險等級更新所有屬性
+    /// 根據危險等級更新視野屬性（只影響視野範圍和視野角度）
     /// </summary>
-    public void UpdateDangerLevelStats(float viewRangeMultiplier, float viewAngleMultiplier, float speedMultiplier, float damageReduction)
+    public void UpdateDangerLevelStats(float viewRangeMultiplier, float viewAngleMultiplier)
     {
-        // 使用 EntityStats 更新屬性乘數
-        if (entityStats != null)
-        {
-            entityStats.UpdateDangerLevelStats(viewRangeMultiplier, viewAngleMultiplier, speedMultiplier, damageReduction);
-        }
-        
-        // 更新視野範圍和角度（使用基類的基礎數值）
+        // 直接更新視野範圍和角度（使用基類的基礎數值）
         if (enemyDetection != null)
         {
             float newViewRange = BaseViewRange * viewRangeMultiplier;
             float newViewAngle = BaseViewAngle * viewAngleMultiplier;
             enemyDetection.SetDetectionParameters(newViewRange, newViewAngle, enemyDetection.ChaseRange);
-        }
-        
-        // 更新移動速度（使用基類的基礎數值）
-        if (enemyMovement != null)
-        {
-            float newSpeed = BaseSpeed * speedMultiplier;
-            enemyMovement.SetSpeed(newSpeed);
-        }
-        
-        // 更新 EntityHealth 的傷害減少
-        if (entityHealth != null)
-        {
-            entityHealth.SetDamageReduction(damageReduction);
-        }
-    }
-    
-    /// <summary>
-    /// 設定移動速度倍數（用於危險等級調整，已廢棄，請使用 UpdateDangerLevelStats）
-    /// </summary>
-    [System.Obsolete("請使用 UpdateDangerLevelStats 方法")]
-    public void SetSpeedMultiplier(float multiplier)
-    {
-        if (entityStats != null)
-        {
-            entityStats.SetSpeedMultiplier(multiplier);
-        }
-        if (enemyMovement != null)
-        {
-            float newSpeed = BaseSpeed * multiplier;
-            enemyMovement.SetSpeed(newSpeed);
-        }
-    }
-
-    /// <summary>
-    /// 設定傷害減少（用於危險等級調整，已廢棄，請使用 UpdateDangerLevelStats）
-    /// </summary>
-    [System.Obsolete("請使用 UpdateDangerLevelStats 方法")]
-    public void SetDamageReduction(float reduction)
-    {
-        if (entityStats != null)
-        {
-            entityStats.SetDamageReduction(reduction);
-        }
-        if (entityHealth != null)
-        {
-            entityHealth.SetDamageReduction(reduction);
         }
     }
     

@@ -24,6 +24,24 @@ public abstract class BaseMovement : MonoBehaviour
     /// <param name="target">目標位置</param>
     /// <param name="speedMultiplier">速度倍數</param>
     public abstract void MoveTowards(Vector2 target, float speedMultiplier);
+    
+    /// <summary>
+    /// 獲取受傷速度倍數（如果受傷則返回 0.7，否則返回 1.0）
+    /// </summary>
+    protected float GetInjurySpeedMultiplier()
+    {
+        // 從 EntityHealth 組件檢查是否受傷
+        EntityHealth health = GetComponent<EntityHealth>();
+        if (health != null && !health.IsDead)
+        {
+            // 如果當前血量小於最大血量，表示受傷
+            if (health.CurrentHealth < health.MaxHealth)
+            {
+                return 0.7f; // 受傷時速度乘以 0.7
+            }
+        }
+        return 1.0f; // 未受傷時正常速度
+    }
 
     /// <summary>
     /// 停止移動

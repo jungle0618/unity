@@ -59,12 +59,12 @@ public class EntityManager : MonoBehaviour
     public class DangerLevelMultipliers : Game.EntityManager.EntitySpawner.DangerLevelMultipliers { }
     
     [Header("危險等級調整參數")]
-    [Tooltip("五種危險等級對應的屬性乘數")]
-    [SerializeField] private DangerLevelMultipliers safeLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.0f, viewAngleMultiplier = 1.0f, speedMultiplier = 1.0f, damageReduction = 0f };
-    [SerializeField] private DangerLevelMultipliers lowLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.1f, viewAngleMultiplier = 1.1f, speedMultiplier = 1.1f, damageReduction = 0.1f };
-    [SerializeField] private DangerLevelMultipliers mediumLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.3f, viewAngleMultiplier = 1.3f, speedMultiplier = 1.3f, damageReduction = 0.2f };
-    [SerializeField] private DangerLevelMultipliers highLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.6f, viewAngleMultiplier = 1.6f, speedMultiplier = 1.6f, damageReduction = 0.3f };
-    [SerializeField] private DangerLevelMultipliers criticalLevel = new DangerLevelMultipliers { viewRangeMultiplier = 2.0f, viewAngleMultiplier = 2.0f, speedMultiplier = 2.0f, damageReduction = 0.5f };
+    [Tooltip("五種危險等級對應的視野屬性乘數（只影響視野範圍和視野角度）")]
+    [SerializeField] private DangerLevelMultipliers safeLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.0f, viewAngleMultiplier = 1.0f };
+    [SerializeField] private DangerLevelMultipliers lowLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.1f, viewAngleMultiplier = 1.1f };
+    [SerializeField] private DangerLevelMultipliers mediumLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.3f, viewAngleMultiplier = 1.3f };
+    [SerializeField] private DangerLevelMultipliers highLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.6f, viewAngleMultiplier = 1.6f };
+    [SerializeField] private DangerLevelMultipliers criticalLevel = new DangerLevelMultipliers { viewRangeMultiplier = 2.0f, viewAngleMultiplier = 2.0f };
 
     // 實體類型枚舉（保留用於 IEntity 接口，但內部統一使用 EntityDataLoader.EntityType）
     public enum EntityType
@@ -457,9 +457,7 @@ public class EntityManager : MonoBehaviour
             {
                 enemy.UpdateDangerLevelStats(
                     multipliers.viewRangeMultiplier,
-                    multipliers.viewAngleMultiplier,
-                    multipliers.speedMultiplier,
-                    multipliers.damageReduction
+                    multipliers.viewAngleMultiplier
                 );
             }
         }
@@ -500,9 +498,7 @@ public class EntityManager : MonoBehaviour
         return new Game.EntityManager.EntitySpawner.DangerLevelMultipliers
         {
             viewRangeMultiplier = multipliers.viewRangeMultiplier,
-            viewAngleMultiplier = multipliers.viewAngleMultiplier,
-            speedMultiplier = multipliers.speedMultiplier,
-            damageReduction = multipliers.damageReduction
+            viewAngleMultiplier = multipliers.viewAngleMultiplier
         };
     }
 

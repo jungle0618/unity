@@ -169,17 +169,20 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
     /// <summary>
     /// 初始化基礎數值（覆寫基類方法）
+    /// 
+    /// 【重要】建議在 Inspector 中直接設置 baseSpeed = 5.0，而不是依賴此方法
+    /// 此方法僅作為後備方案，如果 Inspector 中未設置才會使用默認值
     /// </summary>
     protected override void InitializeBaseValues()
     {
         base.InitializeBaseValues(); // 調用基類方法
 
-        // 從組件讀取基礎值（如果基類尚未設定）
-        // 注意：Player 的基礎速度應該在 Inspector 中設定
-        // 如果未設定，使用預設值（Player 的預設基礎速度為 5）
-        if (playerMovement != null && baseSpeed <= 0f)
+        // 如果基礎速度未在 Inspector 中設定（≤0），使用 Player 的默認值
+        // 注意：建議在 Inspector 中直接設置 baseSpeed = 5.0
+        if (baseSpeed <= 0f)
         {
-            baseSpeed = 5f; // Player 的預設基礎速度
+            baseSpeed = 5f; // Player 的預設基礎速度（僅作為後備）
+            Debug.LogWarning($"[Player] baseSpeed 未在 Inspector 中設置，使用默認值 5.0。建議在 Inspector 中直接設置。");
         }
         
         // 視野範圍和角度從 PlayerDetection 讀取（如果尚未設定）

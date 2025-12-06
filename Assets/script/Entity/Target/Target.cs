@@ -17,14 +17,14 @@ using static UnityEngine.GraphicsBuffer;
 ///   - target.gameObject.GetComponent<TargetMovement>().speed = 2;  // 直接修改屬性
 /// 
 /// ✅ 正確範例（推薦）：
-///   - target.UpdateDangerLevelStats(viewRangeMult, viewAngleMult, speedMult, damageReduction);
+///   - target.UpdateDangerLevelStats(viewRangeMult, viewAngleMult);
 ///   - target.TakeDamage(10, "Player");
 ///   - target.SetCanVisualize(false);
 ///   - target.NotifyPlayerPosition(position);
 ///   - target.SetEscapePoint(position);
 /// 
 /// 如需修改 Target 的狀態，請使用以下公共方法：
-///   - UpdateDangerLevelStats() - 更新危險等級相關屬性（速度、視野、傷害減少）
+///   - UpdateDangerLevelStats() - 更新危險等級相關視野屬性（只影響視野範圍和視野角度）
 ///   - TakeDamage() - 造成傷害
 ///   - SetCanVisualize() - 設定視覺化狀態
 ///   - NotifyPlayerPosition() - 通知玩家位置（用於槍聲警報等）
@@ -36,7 +36,6 @@ using static UnityEngine.GraphicsBuffer;
 [RequireComponent(typeof(TargetDetection))]
 [RequireComponent(typeof(TargetVisualizer))]
 [RequireComponent(typeof(EntityHealth))]
-[RequireComponent(typeof(EntityStats))]
 [RequireComponent(typeof(TargetAIHandler))]
 public class Target : BaseEntity<TargetState>, IEntity
 {
@@ -44,7 +43,7 @@ public class Target : BaseEntity<TargetState>, IEntity
     private TargetMovement targetMovement => movement as TargetMovement;
     private TargetDetection targetDetection => detection as TargetDetection;
     private TargetVisualizer targetVisualizer => visualizer as TargetVisualizer;
-    // 注意：entityHealth 和 entityStats 已移至基類 BaseEntity
+    // 注意：entityHealth 已移至基類 BaseEntity
     private TargetAIHandler aiHandler;
     // 狀態機需要單獨存儲，因為它是在運行時創建的，不是組件
     [System.NonSerialized] private TargetStateMachine targetStateMachineInstance;
@@ -53,9 +52,10 @@ public class Target : BaseEntity<TargetState>, IEntity
     // 基類已經有這些，但我們需要具體類型的引用
     // BaseMovement, BaseDetection, BaseVisualizer 已由基類管理
 
-    [Header("逃亡設定")]
-    [Tooltip("逃亡速度")]
-    [SerializeField] private float escapeSpeed = 1.5f;
+    [Header("狀態速度倍數")]
+    [Tooltip("各狀態的速度倍數（相對於基礎速度）")]
+    [SerializeField] private float staySpeedMultiplier = 0f; // 停留狀態不移動
+    [SerializeField] private float escapeSpeedMultiplier = 0.75f; // 逃亡速度倍數（相對於基礎速度）
     
 
     // 效能優化變數
@@ -113,6 +113,25 @@ public class Target : BaseEntity<TargetState>, IEntity
 
     // 公共屬性
     public TargetState CurrentState => targetStateMachine?.CurrentState ?? TargetState.Stay;
+    
+    /// <summary>
+    /// 根據當前狀態獲取速度倍數
+    /// </summary>
+    public float GetStateSpeedMultiplier()
+    {
+        if (targetStateMachine == null) return 0f;
+        
+        switch (targetStateMachine.CurrentState)
+        {
+            case TargetState.Stay:
+                return staySpeedMultiplier; // 0f，不移動
+            case TargetState.Escape:
+                return escapeSpeedMultiplier;
+            case TargetState.Dead:
+            default:
+                return 0f; // 死亡狀態不移動
+        }
+    }
     // 血量相關屬性（MaxHealth, CurrentHealth, HealthPercentage）已由基類 BaseEntity 統一提供
     // IsDead 和 Position 已由基類 BaseEntity 提供，無需重複定義
     // 血量變化事件（OnHealthChanged）已由基類 BaseEntity 統一提供
@@ -129,14 +148,6 @@ public class Target : BaseEntity<TargetState>, IEntity
         {
             targetVisualizer.SetCanVisualize(canVisualize);
         }
-    }
-    
-    /// <summary>
-    /// 獲取是否可以視覺化
-    /// </summary>
-    public bool GetCanVisualize()
-    {
-        return canVisualize;
     }
     
     // 保留 cachedPosition 用於內部優化（性能優化）
@@ -157,7 +168,6 @@ public class Target : BaseEntity<TargetState>, IEntity
         detection = GetComponent<TargetDetection>();
         visualizer = GetComponent<TargetVisualizer>();
         entityHealth = GetComponent<EntityHealth>();
-        entityStats = GetComponent<EntityStats>();
         aiHandler = GetComponent<TargetAIHandler>();
         
         // 訂閱 AI Handler 的事件
@@ -304,12 +314,6 @@ public class Target : BaseEntity<TargetState>, IEntity
             entityHealth = gameObject.AddComponent<EntityHealth>();
         }
         
-        if (entityStats == null)
-        {
-            Debug.LogError($"{gameObject.name}: Missing EntityStats component! Auto-adding...");
-            entityStats = gameObject.AddComponent<EntityStats>();
-        }
-        
         if (aiHandler == null)
         {
             Debug.LogError($"{gameObject.name}: Missing TargetAIHandler component! Auto-adding...");
@@ -440,10 +444,12 @@ public class Target : BaseEntity<TargetState>, IEntity
             if (baseViewAngle <= 0f) baseViewAngle = 90f; // Target 的預設視野角度
         }
         
-        if (targetMovement != null)
+        // 如果基礎速度未在 Inspector 中設定（≤0），使用 Target 的默認值
+        // 注意：建議在 Inspector 中直接設置 baseSpeed = 2.0
+        if (baseSpeed <= 0f)
         {
-            // 如果基礎速度未設定，使用預設值
-            if (baseSpeed <= 0f) baseSpeed = 2f; // Target 的預設基礎速度
+            baseSpeed = 2f; // Target 的預設基礎速度（僅作為後備）
+            Debug.LogWarning($"[Target] baseSpeed 未在 Inspector 中設置，使用默認值 2.0。建議在 Inspector 中直接設置。");
         }
         
         // 初始化 TargetDetection 的當前視野範圍和角度（使用基礎值）
@@ -465,12 +471,6 @@ public class Target : BaseEntity<TargetState>, IEntity
             entityHealth = gameObject.AddComponent<EntityHealth>();
         }
         
-        if (entityStats == null)
-        {
-            Debug.LogWarning($"{gameObject.name}: EntityStats is null during Initialize, adding component...");
-            entityStats = gameObject.AddComponent<EntityStats>();
-        }
-        
         if (aiHandler == null)
         {
             Debug.LogWarning($"{gameObject.name}: TargetAIHandler is null during Initialize, adding component...");
@@ -490,7 +490,7 @@ public class Target : BaseEntity<TargetState>, IEntity
         // 初始化 AI Handler
         if (aiHandler != null)
         {
-            aiHandler.Initialize(escapePointPosition, escapeSpeed);
+            aiHandler.Initialize(escapePointPosition);
         }
         else
         {
@@ -499,8 +499,6 @@ public class Target : BaseEntity<TargetState>, IEntity
 
         SetTarget(playerTarget);
 
-        // 初始化patrol locations
-        InitializePatrolLocations();
 
         // 設定目標位置到第一個location
         if (patrolLocations != null && patrolLocations.Length > 0)
@@ -559,14 +557,6 @@ public class Target : BaseEntity<TargetState>, IEntity
     }
 
     /// <summary>
-    /// 設定巡邏點
-    /// </summary>
-        public void SetPatrolPoints(Transform[] points)
-    {
-        targetMovement?.SetPatrolPoints(points);
-    }
-
-    /// <summary>
     /// 設定patrol locations（用於初始位置）
     /// </summary>
     public void SetPatrolLocations(Vector3[] locations)
@@ -586,137 +576,21 @@ public class Target : BaseEntity<TargetState>, IEntity
         }
     }
 
-    /// <summary>
-    /// 初始化patrol locations（由EnemyManager設定）
-    /// </summary>
-    private void InitializePatrolLocations()
-    {
-        // Patrol locations現在由EnemyManager在SpawnEnemy時設定
-        // 這裡不需要做任何事情
-    }
-
-    /// <summary>
-    /// 取得當前patrol location
-    /// </summary>
-    public Vector3 GetCurrentPatrolLocation()
-    {
-        if (patrolLocations != null && patrolLocations.Length > 0)
-        {
-            return patrolLocations[currentPatrolIndex];
-        }
-        return transform.position;
-    }
-
-    /// <summary>
-    /// 取得第一個patrol location（spawn point）
-    /// </summary>
-    public Vector3 GetFirstPatrolLocation()
-    {
-        if (patrolLocations != null && patrolLocations.Length > 0)
-        {
-            return patrolLocations[0];
-        }
-        return transform.position;
-    }
-
-    /// <summary>
-    /// 強制改變狀態（供外部系統使用）
-    /// </summary>
-    public void ForceChangeState(TargetState newState)
-    {
-        stateMachine?.ChangeState(newState);
-    }
-
-    /// <summary>
-    /// 目標不需要攻擊功能
-    /// </summary>
-    public bool TryAttackPlayer(Transform playerTransform)
-    {
-        // 目標不攻擊，總是返回 false
-        return false;
-    }
-
-    /// <summary>
-    /// 設定FOV倍數（用於危險等級調整）
-    /// </summary>
-    public void SetFovMultiplier(float multiplier)
-    {
-        if (targetDetection != null)
-        {
-            // 這裡需要根據TargetDetection的實際API來調整
-            // 假設有SetViewRange方法
-            // targetDetection.SetViewRange(targetDetection.ViewRange * multiplier);
-            Debug.Log($"{gameObject.name}: FOV倍數設定為 {multiplier}");
-        }
-    }
-
     #endregion
 
     #region Public Methods
 
     /// <summary>
-    /// 根據危險等級更新所有屬性
+    /// 根據危險等級更新視野屬性（只影響視野範圍和視野角度）
     /// </summary>
-    public void UpdateDangerLevelStats(float viewRangeMultiplier, float viewAngleMultiplier, float speedMultiplier, float damageReduction)
+    public void UpdateDangerLevelStats(float viewRangeMultiplier, float viewAngleMultiplier)
     {
-        // 使用 EntityStats 更新屬性乘數
-        if (entityStats != null)
-        {
-            entityStats.UpdateDangerLevelStats(viewRangeMultiplier, viewAngleMultiplier, speedMultiplier, damageReduction);
-        }
-        
-        // 更新視野範圍和角度（使用基類的基礎數值）
+        // 直接更新視野範圍和角度（使用基類的基礎數值）
         if (targetDetection != null)
         {
             float newViewRange = BaseViewRange * viewRangeMultiplier;
             float newViewAngle = BaseViewAngle * viewAngleMultiplier;
             targetDetection.SetDetectionParameters(newViewRange, newViewAngle, 0f); // Target 不使用 chaseRange
-        }
-        
-        // 更新移動速度（使用基類的基礎數值）
-        if (targetMovement != null)
-        {
-            float newSpeed = BaseSpeed * speedMultiplier;
-            targetMovement.SetSpeed(newSpeed);
-        }
-        
-        // 更新 EntityHealth 的傷害減少
-        if (entityHealth != null)
-        {
-            entityHealth.SetDamageReduction(damageReduction);
-        }
-    }
-    
-    /// <summary>
-    /// 設定移動速度倍數（用於危險等級調整，已廢棄，請使用 UpdateDangerLevelStats）
-    /// </summary>
-    [System.Obsolete("請使用 UpdateDangerLevelStats 方法")]
-    public void SetSpeedMultiplier(float multiplier)
-    {
-        if (entityStats != null)
-        {
-            entityStats.SetSpeedMultiplier(multiplier);
-        }
-        if (targetMovement != null)
-        {
-            float newSpeed = BaseSpeed * multiplier;
-            targetMovement.SetSpeed(newSpeed);
-        }
-    }
-
-    /// <summary>
-    /// 設定傷害減少（用於危險等級調整，已廢棄，請使用 UpdateDangerLevelStats）
-    /// </summary>
-    [System.Obsolete("請使用 UpdateDangerLevelStats 方法")]
-    public void SetDamageReduction(float reduction)
-    {
-        if (entityStats != null)
-        {
-            entityStats.SetDamageReduction(reduction);
-        }
-        if (entityHealth != null)
-        {
-            entityHealth.SetDamageReduction(reduction);
         }
     }
     

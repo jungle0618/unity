@@ -221,8 +221,7 @@ namespace Game.EntityManager
                 DangerousManager.DangerLevel currentLevel = dangerousManager.CurrentDangerLevelType;
                 DangerLevelMultipliers multipliers = getMultipliersForLevel(currentLevel);
 
-                enemy.UpdateDangerLevelStats(multipliers.viewRangeMultiplier, multipliers.viewAngleMultiplier,
-                                            multipliers.speedMultiplier, multipliers.damageReduction);
+                enemy.UpdateDangerLevelStats(multipliers.viewRangeMultiplier, multipliers.viewAngleMultiplier);
             }
 
             // 註冊到玩家偵測系統
@@ -430,8 +429,6 @@ namespace Game.EntityManager
         {
             public float viewRangeMultiplier = 1.0f;
             public float viewAngleMultiplier = 1.0f;
-            public float speedMultiplier = 1.0f;
-            public float damageReduction = 0f;
         }
     }
 }

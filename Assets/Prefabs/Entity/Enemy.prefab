@@ -19,7 +19,6 @@ GameObject:
   - component: {fileID: 5228463781032995454}
   - component: {fileID: 5292676631361536599}
   - component: {fileID: 9133391537299838568}
-  - component: {fileID: 8295663647284906817}
   - component: {fileID: 8702932840761697106}
   m_Layer: 9
   m_Name: Enemy
@@ -269,7 +268,11 @@ MonoBehaviour:
   attackCooldown: 0.5
   attackDetectionRange: 3
   useWeaponAttackRange: 1
+  patrolSpeedMultiplier: 1
+  alertSpeedMultiplier: 1
   chaseSpeedMultiplier: 1.2
+  searchSpeedMultiplier: 1.5
+  returnSpeedMultiplier: 1
 --- !u!114 &5292676631361536599
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -301,18 +304,6 @@ MonoBehaviour:
   currentHealth: 100
   damageReduction: 0
   invulnerabilityTime: 0
---- !u!114 &8295663647284906817
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 485149705416051441}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e05a2ee1a786e734fa3ba040d50d91c6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EntityStats
 --- !u!114 &8702932840761697106
 MonoBehaviour:
   m_ObjectHideFlags: 0

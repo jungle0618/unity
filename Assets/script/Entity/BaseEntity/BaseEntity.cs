@@ -16,7 +16,6 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     [System.NonSerialized] protected BaseVisualizer visualizer;
     [System.NonSerialized] protected ItemHolder itemHolder; // 已實作好的組件
     [System.NonSerialized] protected EntityHealth entityHealth; // 血量管理組件
-    [System.NonSerialized] protected EntityStats entityStats; // 屬性管理組件（Enemy 和 Target 使用，Player 不使用）
     
     // 死亡處理標記
     private bool isHandleDie = false;
@@ -50,7 +49,12 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     }
 
     [Header("基礎屬性（遊戲開始後不會改變）")]
-    [Tooltip("基礎移動速度（遊戲開始後不會改變）")]
+    [Tooltip("基礎移動速度（遊戲開始後不會改變）\n" +
+             "建議在 Inspector 中直接設置此值：\n" +
+             "- Player: 5.0\n" +
+             "- Enemy: 6.0\n" +
+             "- Target: 2.0\n" +
+             "如果未設置（≤0），子類會在初始化時使用默認值")]
     [SerializeField] protected float baseSpeed = 2f;
     [Tooltip("基礎視野範圍（遊戲開始後不會改變）")]
     [SerializeField] protected float baseViewRange = 8f;
@@ -101,7 +105,6 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
         visualizer = GetComponent<BaseVisualizer>();
         itemHolder = GetComponent<ItemHolder>();
         entityHealth = GetComponent<EntityHealth>();
-        entityStats = GetComponent<EntityStats>(); // 可選組件（Enemy 和 Target 使用）
 
         // 訂閱 EntityHealth 的死亡事件（統一處理）
         if (entityHealth != null)
@@ -127,17 +130,21 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     /// <summary>
     /// 初始化基礎數值（從組件讀取，如果尚未設定）
     /// 這些值在遊戲開始後不會改變
+    /// 
+    /// 【重要】建議在 Inspector 中直接設置 baseSpeed，而不是依賴此方法
+    /// 子類別可以覆寫此方法來設置特定類型的默認值（僅作為後備方案）
     /// </summary>
     protected virtual void InitializeBaseValues()
     {
-        // 如果基礎數值未設定（為 0 或負數），從組件讀取
+        // 如果基礎速度未在 Inspector 中設定（為 0 或負數），嘗試從組件讀取
+        // 注意：這只是後備方案，建議在 Inspector 中直接設置
         if (baseSpeed <= 0f && movement != null)
         {
             baseSpeed = movement.GetSpeed();
         }
 
         // 基礎數值一旦設定就不應該再改變
-        // 子類別可以覆寫此方法來從特定組件讀取初始值（如 baseViewRange, baseViewAngle）
+        // 子類別可以覆寫此方法來設置特定類型的默認值（如 baseViewRange, baseViewAngle）
     }
 
     /// <summary>
@@ -193,13 +200,7 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     {
         if (entityHealth == null) return;
         
-        // 如果有 EntityStats 組件，從中獲取傷害減少並設置到 EntityHealth
-        // （Enemy 和 Target 使用，Player 不使用 EntityStats）
-        if (entityStats != null)
-        {
-            float damageReduction = entityStats.DamageReduction;
-            entityHealth.SetDamageReduction(damageReduction);
-        }
+        // 注意：傷害減少直接從 EntityHealth 獲取
         
         // 使用 EntityHealth 處理傷害
         // 如果生命值歸零，EntityHealth 會觸發 OnEntityDied 事件
@@ -348,7 +349,8 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     /// </summary>
     public virtual float GetDamageReduction()
     {
-        return entityStats?.DamageReduction ?? 0f;
+        // 注意：傷害減少現在直接從 EntityHealth 獲取，不再從 EntityStats 獲取
+        return entityHealth?.DamageReduction ?? 0f;
     }
 
     #endregion

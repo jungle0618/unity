@@ -25,7 +25,6 @@ public class TargetAIHandler : MonoBehaviour
     
     // 逃亡設定
     private Vector3 escapePoint = Vector3.zero;
-    private float escapeSpeed = 3f;
     
     [Header("逃亡行為設定")]
     [Tooltip("是否無條件直接前往逃亡點（不經過守衛）。如果為 true，則忽略危險等級，直接前往逃亡點")]
@@ -72,14 +71,13 @@ public class TargetAIHandler : MonoBehaviour
     /// <summary>
     /// 初始化 AI Handler（由 Target 調用）
     /// </summary>
-    public void Initialize(Vector3 escapePointPosition, float escapeSpeed)
+    public void Initialize(Vector3 escapePointPosition)
     {
         this.escapePoint = escapePointPosition;
-        this.escapeSpeed = escapeSpeed;
         
         if (showDebugInfo)
         {
-            Debug.Log($"{gameObject.name}: TargetAIHandler 初始化 - 逃亡點: {escapePoint}, 速度: {escapeSpeed}");
+            Debug.Log($"{gameObject.name}: TargetAIHandler 初始化 - 逃亡點: {escapePoint}");
         }
     }
     
@@ -98,10 +96,6 @@ public class TargetAIHandler : MonoBehaviour
     /// <summary>
     /// 設定逃亡速度
     /// </summary>
-    public void SetEscapeSpeed(float speed)
-    {
-        this.escapeSpeed = speed;
-    }
     
     /// <summary>
     /// 獲取逃亡點位置（用於調試和外部訪問）
@@ -176,7 +170,7 @@ public class TargetAIHandler : MonoBehaviour
         if (targetMovement == null) return;
 
         // 逃亡狀態：向當前逃亡目標移動
-        targetMovement.MoveTowardsEscape(currentEscapeTarget, escapeSpeed);
+        targetMovement.MoveTowardsEscape(currentEscapeTarget);
     }
     
     /// <summary>

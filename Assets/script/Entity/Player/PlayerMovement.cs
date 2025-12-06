@@ -152,16 +152,24 @@ public class PlayerMovement : BaseMovement
         
         // 從 Player 獲取基礎速度和乘數
         float baseSpeed = GetBaseSpeed();
-        float speedMultiplier = isRunning ? runSpeedMultiplier : normalSpeedMultiplier;
         
-        // 蹲下時應用蹲下速度倍數（從 Player 獲取）
+        // 速度乘數：蹲下、跑步、正常移動（不會同時蹲下和跑步）
+        float speedMultiplier;
         if (isSquatting)
         {
-            float squatMultiplier = GetSquatSpeedMultiplier();
-            speedMultiplier *= squatMultiplier;
+            speedMultiplier = GetSquatSpeedMultiplier();
+        }
+        else if (isRunning)
+        {
+            speedMultiplier = runSpeedMultiplier;
+        }
+        else
+        {
+            speedMultiplier = normalSpeedMultiplier;
         }
         
-        float currentSpeed = baseSpeed * speedMultiplier;
+        float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
+        float currentSpeed = baseSpeed * speedMultiplier * injuryMultiplier;
 
         // 使用 WASD 鍵盤輸入進行移動
         if (moveInput.sqrMagnitude > 0.0001f)
@@ -412,12 +420,24 @@ public class PlayerMovement : BaseMovement
     public override float GetSpeed()
     {
         float baseSpeed = GetBaseSpeed();
-        float speedMultiplier = isRunning ? runSpeedMultiplier : normalSpeedMultiplier;
+        
+        // 速度乘數：蹲下、跑步、正常移動（不會同時蹲下和跑步）
+        float speedMultiplier;
         if (isSquatting)
         {
-            speedMultiplier *= GetSquatSpeedMultiplier();
+            speedMultiplier = GetSquatSpeedMultiplier();
         }
-        return baseSpeed * speedMultiplier;
+        else if (isRunning)
+        {
+            speedMultiplier = runSpeedMultiplier;
+        }
+        else
+        {
+            speedMultiplier = normalSpeedMultiplier;
+        }
+        
+        float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
+        return baseSpeed * speedMultiplier * injuryMultiplier;
     }
 }
 

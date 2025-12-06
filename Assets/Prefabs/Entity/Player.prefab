@@ -181,7 +181,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   updateInterval: 0.1
-  entitiesPerFrameCheck: 5
+  entitiesPerFrameCheck: 40
   visibleEntityColor: {r: 0, g: 1, b: 0, a: 1}
   hiddenEntityColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &3466779162516708361

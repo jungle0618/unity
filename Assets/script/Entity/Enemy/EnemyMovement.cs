@@ -12,10 +12,10 @@ using System.Collections.Generic;
 public class EnemyMovement : BaseMovement
 {
     [Header("移動參數")]
-    // 注意：speed 和 chaseSpeedMultiplier 不再在這裡定義
+    // 注意：speed 不再在這裡定義
     // speed 應從 Enemy 的 BaseSpeed 獲取
-    // chaseSpeedMultiplier 應從 Enemy.ChaseSpeedMultiplier 獲取
-    // 實際速度 = Enemy.BaseSpeed * 當前速度倍數
+    // 速度倍數應從 Enemy.GetStateSpeedMultiplier() 獲取（根據當前狀態）
+    // 實際速度 = Enemy.BaseSpeed * Enemy.GetStateSpeedMultiplier()
     [SerializeField] private float arriveThreshold = 0.2f;
 
     [Header("巡邏路徑")]
@@ -111,7 +111,8 @@ public class EnemyMovement : BaseMovement
         }
 
         Vector2 targetPos = patrolPoints[patrolIndex].position;
-        MoveTowards(targetPos, 1f);
+        float speedMultiplier = GetStateSpeedMultiplier();
+        MoveTowards(targetPos, speedMultiplier);
 
         if (Vector2.Distance(transform.position, targetPos) < arriveThreshold)
         {
@@ -131,7 +132,8 @@ public class EnemyMovement : BaseMovement
         }
 
         Vector2 targetPos = locations[currentIndex];
-        MoveTowards(targetPos, 1f);
+        float speedMultiplier = GetStateSpeedMultiplier();
+        MoveTowards(targetPos, speedMultiplier);
     }
 
     /// <summary>
@@ -150,8 +152,9 @@ public class EnemyMovement : BaseMovement
         if (rb == null) return;
 
         float baseSpeed = GetBaseSpeed();
+        float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
         Vector2 direction = (target - (Vector2)transform.position).normalized;
-        rb.linearVelocity = direction * baseSpeed * speedMultiplier;
+        rb.linearVelocity = direction * baseSpeed * speedMultiplier * injuryMultiplier;
     }
     
     /// <summary>
@@ -169,17 +172,17 @@ public class EnemyMovement : BaseMovement
     }
     
     /// <summary>
-    /// 獲取追擊速度倍數（從 Enemy 組件）
+    /// 根據當前狀態獲取速度倍數（從 Enemy 組件）
     /// </summary>
-    private float GetChaseSpeedMultiplier()
+    private float GetStateSpeedMultiplier()
     {
         Enemy enemy = GetComponent<Enemy>();
         if (enemy != null)
         {
-            return enemy.ChaseSpeedMultiplier;
+            return enemy.GetStateSpeedMultiplier();
         }
         // 如果找不到 Enemy 組件，返回預設值（向後兼容）
-        return 1.5f;
+        return 1.0f;
     }
 
     /// <summary>
@@ -210,14 +213,14 @@ public class EnemyMovement : BaseMovement
         }
 
         // 根據檢查結果選擇追擊方式
-        float chaseMultiplier = GetChaseSpeedMultiplier();
+        float speedMultiplier = GetStateSpeedMultiplier();
         if (isUsingDirectChase)
         {
             ChaseTargetDirect(targetPos);
         }
         else
         {
-            MoveTowardsWithChasePathfinding(targetPos, chaseMultiplier);
+            MoveTowardsWithChasePathfinding(targetPos, speedMultiplier);
         }
     }
 
@@ -240,8 +243,9 @@ public class EnemyMovement : BaseMovement
     {
         if (rb == null) return;
         float baseSpeed = GetBaseSpeed();
-        float chaseMultiplier = GetChaseSpeedMultiplier();
-        rb.linearVelocity = (targetPos - (Vector2)transform.position).normalized * baseSpeed * chaseMultiplier;
+        float speedMultiplier = GetStateSpeedMultiplier();
+        float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
+        rb.linearVelocity = (targetPos - (Vector2)transform.position).normalized * baseSpeed * speedMultiplier * injuryMultiplier;
     }
 
     /// <summary>
@@ -278,8 +282,8 @@ public class EnemyMovement : BaseMovement
         }
 
         // 使用路徑規劃
-        float chaseMultiplier = GetChaseSpeedMultiplier();
-        MoveTowardsWithChasePathfinding(targetPos, chaseMultiplier);
+        float speedMultiplier = GetStateSpeedMultiplier();
+        MoveTowardsWithChasePathfinding(targetPos, speedMultiplier);
         
         // 讓敵人朝向路徑的下一個點
         Vector2 directionToNextPoint = GetDirectionToNextPathPoint();
@@ -529,7 +533,8 @@ public class EnemyMovement : BaseMovement
         if (rb != null)
         {
             float baseSpeed = GetBaseSpeed();
-            rb.linearVelocity = direction * baseSpeed * speedMultiplier;
+            float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
+            rb.linearVelocity = direction * baseSpeed * speedMultiplier * injuryMultiplier;
         }
 
         // 檢查是否到達當前路徑點

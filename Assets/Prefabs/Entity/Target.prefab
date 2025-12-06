@@ -14,7 +14,6 @@ GameObject:
   - component: {fileID: 6961152772875002742}
   - component: {fileID: 8300288366461873639}
   - component: {fileID: 6284012439364513415}
-  - component: {fileID: 815362223394836551}
   - component: {fileID: 3859831413402824987}
   - component: {fileID: 7955070925422119352}
   - component: {fileID: -4752818439337429296}
@@ -113,7 +112,6 @@ MonoBehaviour:
   objectsLayerMask:
     serializedVersion: 2
     m_Bits: 128
-  chaseRange: 15
   useRaycastDetection: 1
   lookAtTarget: 0
   enableCameraCulling: 1
@@ -163,18 +161,6 @@ MonoBehaviour:
   currentHealth: 0
   damageReduction: 0
   invulnerabilityTime: 0
---- !u!114 &815362223394836551
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8141156174479725341}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e05a2ee1a786e734fa3ba040d50d91c6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EntityStats
 --- !u!114 &3859831413402824987
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -204,7 +190,8 @@ MonoBehaviour:
   baseSpeed: 5
   baseViewRange: 8
   baseViewAngle: 90
-  escapeSpeed: 5
+  staySpeedMultiplier: 0
+  escapeSpeedMultiplier: 0.75
 --- !u!212 &-4752818439337429296
 SpriteRenderer:
   m_ObjectHideFlags: 0
