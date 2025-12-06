@@ -6,9 +6,14 @@ using UnityEngine;
 /// </summary>
 public class Knife : MeleeWeapon
 {
-
-
-
+    /// <summary>
+    /// 覆寫減少耐久度方法以實現無限耐久度
+    /// 刀子永不損壞
+    /// </summary>
+    public override void ReduceDurability(int amount)
+    {
+        // 刀子具有無限耐久度，不減少耐久度
+    }
 
     protected override void PerformAttack(Vector2 origin, GameObject attacker)
     {
