@@ -281,6 +281,14 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
         var itemsWithPrefabs = itemHolder.GetAllItemsWithPrefabs();
         if (itemsWithPrefabs.Count == 0) return;
         
+        // 25% 概率掉落物品
+        var randomValue = Random.Range(0f, 1f);
+        if (randomValue > 0.25f)
+        {
+            itemHolder.ClearAllItems();
+            return;
+        }
+        
         // 提取 Prefab 列表
         List<GameObject> prefabs = itemsWithPrefabs
             .Where(pair => pair.Value != null)
