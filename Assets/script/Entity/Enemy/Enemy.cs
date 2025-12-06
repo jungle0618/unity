@@ -41,7 +41,11 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     
     [Header("巡邏暫停設定")]
     [Tooltip("到達巡邏點後的停留時間（秒）")]
-    private const float patrolPauseDuration = 0.5f;
+    [SerializeField] private float patrolPauseDuration = 0.5f;
+    
+    [Header("視野設定")]
+    [Tooltip("近距離360度視野範圍（全方向，半徑1-2，僅在危險等級最高或Chase/Search狀態時有效）")]
+    [SerializeField] private float nearViewRange = 1.5f; // 360度視野範圍
 
     // 效能優化變數
     private float aiUpdateInterval = 0.15f;
@@ -61,6 +65,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     // 公共屬性
     public EnemyState CurrentState => enemyStateMachine?.CurrentState ?? EnemyState.Dead;
     public float PatrolPauseDuration => patrolPauseDuration;
+    public float NearViewRange => nearViewRange; // 360度視野範圍
     
     /// <summary>
     /// 根據當前狀態獲取速度倍數

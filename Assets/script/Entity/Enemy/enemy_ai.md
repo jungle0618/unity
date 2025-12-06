@@ -138,8 +138,6 @@ FixedUpdate (Enemy)
     │
     └──> aiHandler.UpdateAIDecision() # AI 決策更新（間隔更新）
             │
-            ├──> 檢查 ShouldUpdateAI() # 攝影機剔除檢查
-            │
             ├──> 更新 Alert Timer
             │
             └──> 根據當前狀態執行對應處理
@@ -160,20 +158,6 @@ Update (Enemy)
 - **AI 決策更新**：`aiUpdateInterval`（預設 0.15 秒，約 6-7 FPS）
 - **移動執行**：每幀更新（確保移動流暢）
 - **快取數據更新**：`CACHE_UPDATE_INTERVAL`（預設 0.1 秒）
-
-### 攝影機剔除優化
-
-當敵人不在攝影機範圍內 **且** 不在 Chase 或 Search 狀態時，跳過 AI 決策更新：
-
-```csharp
-if (!enemyDetection.ShouldUpdateAI())
-{
-    // 視野外且不在 Chase/Search 狀態，跳過 AI 更新
-    return;
-}
-```
-
-**注意**：移動邏輯仍會在 `ExecuteMovement()` 中執行，確保敵人能繼續移動。
 
 ---
 

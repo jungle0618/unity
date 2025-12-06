@@ -23,6 +23,10 @@ public class EnemyAIHandler : MonoBehaviour
     private Vector3[] patrolLocations;
     private int currentPatrolIndex = 0;
     
+    // 巡邏暫停相關
+    private bool isPausedAtPatrolPoint = false;
+    private float patrolPauseEndTime = 0f;
+    
     // 追擊相關變數
     private Vector2 lastSeenPlayerPosition;
     private bool hasLastSeenPosition = false;
@@ -110,15 +114,6 @@ public class EnemyAIHandler : MonoBehaviour
     {
         if (enemyStateMachine == null || enemyDetection == null || enemyMovement == null) return;
 
-        // 檢查是否應該更新 AI（考慮攝影機剔除）
-        // 根據 enemy_ai.md：當不在 Chase 或 Search 狀態且不在攝影機範圍內時，不執行 AI 更新
-        if (!enemyDetection.ShouldUpdateAI())
-        {
-            // 視野外且不在 Chase/Search 狀態，跳過 AI 更新
-            // 移動邏輯仍會在 ExecuteMovement() 中執行
-            return;
-        }
-
         // 更新計時器
         enemyStateMachine.UpdateAlertTimer();
 
@@ -157,16 +152,9 @@ public class EnemyAIHandler : MonoBehaviour
         switch (currentMoveType)
         {
             case MoveType.Chase:
-                enemyMovement.ChaseTarget(currentMoveTarget);
-                break;
-
             case MoveType.ChaseWithRotation:
-                enemyMovement.ChaseTargetWithRotation(currentMoveTarget, enemyDetection);
-                break;
-
             case MoveType.Return:
-                float returnSpeedMultiplier = enemy.GetStateSpeedMultiplier();
-                enemyMovement.MoveTowardsWithPathfinding(currentMoveTarget, returnSpeedMultiplier);
+                enemyMovement.MoveTowards(currentMoveTarget);
                 break;
         }
     }
@@ -275,45 +263,60 @@ public class EnemyAIHandler : MonoBehaviour
 
     private void HandlePatrolState()
     {
-        if (cachedCanSeePlayer)
+        // 只有在看到玩家且在 camera 內時才進入 Alert 狀態
+        if (cachedCanSeePlayer && enemyDetection != null && enemyDetection.ShouldUpdateAI())
         {
             enemyStateMachine?.ChangeState(EnemyState.Alert);
             return;
         }
 
-        // 沿著locations移動
-        if (enemyMovement != null)
+        // 檢查是否有巡邏點
+        if (patrolLocations == null || patrolLocations.Length == 0)
         {
-            if (patrolLocations != null && patrolLocations.Length > 0)
+            if (enemyMovement != null)
             {
-                enemyMovement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
-                
-                // 更新視野方向跟隨移動方向
-                Vector2 movementDirection = enemyMovement.GetMovementDirection();
-                if (movementDirection.magnitude > 0.1f)
-                {
-                    enemyDetection?.SetViewDirection(movementDirection);
-                }
-                
-                // 檢查是否需要前進到下一個巡邏點（暫停結束時）
-                if (enemyMovement.ShouldAdvancePatrolIndex())
-                {
-                    int oldIndex = currentPatrolIndex;
-                    currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
-                    Debug.LogWarning($"[{enemy.gameObject.name}] PATROL INDEX ADVANCED: {oldIndex} -> {currentPatrolIndex}");
-                }
+                enemyMovement.StopMovement();
             }
-            else
+            return;
+        }
+
+        if (enemyMovement == null) return;
+
+        Vector2 currentPatrolTarget = patrolLocations[currentPatrolIndex];
+        
+        // 檢查是否正在巡邏點暫停
+        if (isPausedAtPatrolPoint)
+        {
+            enemyMovement.StopMovement();
+            
+            if (Time.time >= patrolPauseEndTime)
             {
-                enemyMovement.PerformPatrol();
-                
-                // 更新視野方向跟隨移動方向
-                Vector2 movementDirection = enemyMovement.GetMovementDirection();
-                if (movementDirection.magnitude > 0.1f)
-                {
-                    enemyDetection?.SetViewDirection(movementDirection);
-                }
+                // 暫停結束，前進到下一個巡邏點
+                isPausedAtPatrolPoint = false;
+                currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
             }
+            return;
+        }
+
+        // 檢查是否到達巡邏點
+        if (enemyMovement.HasArrivedAtLocation(currentPatrolTarget))
+        {
+            // 到達巡邏點，開始暫停
+            isPausedAtPatrolPoint = true;
+            float pauseDuration = enemy != null ? enemy.PatrolPauseDuration : 0.5f;
+            patrolPauseEndTime = Time.time + pauseDuration;
+            enemyMovement.StopMovement();
+            return;
+        }
+
+        // 往指定地點移動
+        enemyMovement.MoveTowards(currentPatrolTarget);
+        
+        // 更新視野方向跟隨移動方向
+        Vector2 movementDirection = enemyMovement.GetMovementDirection();
+        if (movementDirection.magnitude > 0.1f)
+        {
+            enemyDetection?.SetViewDirection(movementDirection);
         }
     }
 
@@ -321,44 +324,26 @@ public class EnemyAIHandler : MonoBehaviour
     {
         if (cachedCanSeePlayer)
         {
-            // 【新增】檢查是否應該追擊玩家（基於區域和玩家狀態）
+            // 檢查是否應該追擊玩家（基於區域和玩家狀態）
             if (ShouldChasePlayer())
             {
+                // 看到玩家且該追擊 → 切換成 Chase
                 enemyStateMachine?.ChangeState(EnemyState.Chase);
             }
-            // 如果不應該追擊，保持在 Alert 狀態
-        }
-        else if (enemyStateMachine?.IsAlertTimeUp() == true)
-        {
-            enemyStateMachine?.ChangeState(EnemyState.Patrol);
-        }
-        else
-        {
-            // 在Alert狀態時也沿著locations移動
-            if (enemyMovement != null)
+            else
             {
-                if (patrolLocations != null && patrolLocations.Length > 0)
-                {
-                    enemyMovement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
-                    
-                    // 更新視野方向跟隨移動方向
-                    Vector2 movementDirection = enemyMovement.GetMovementDirection();
-                    if (movementDirection.magnitude > 0.1f)
-                    {
-                        enemyDetection?.SetViewDirection(movementDirection);
-                    }
-                    
-                    // 檢查是否到達當前location
-                    if (enemyMovement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
-                    {
-                        currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
-                    }
-                }
-                else
+                // 看到玩家但不該追擊 → 不做事（停止移動）
+                if (enemyMovement != null)
                 {
                     enemyMovement.StopMovement();
                 }
+                // 保持在 Alert 狀態，不做其他事情
             }
+        }
+        else
+        {
+            // 沒看到玩家 → 切回 Patrol
+            enemyStateMachine?.ChangeState(EnemyState.Patrol);
         }
     }
 
@@ -478,6 +463,39 @@ public class EnemyAIHandler : MonoBehaviour
         currentMoveTarget = lastSeenPlayerPosition;
         currentMoveType = MoveType.ChaseWithRotation;
         shouldMove = true;
+
+        // 更新視野方向：優先使用路徑方向，如果沒有路徑則使用移動方向
+        if (enemyMovement != null && enemyDetection != null)
+        {
+            Vector2 viewDirection = Vector2.zero;
+            
+            // 優先使用路徑的下一個點的方向
+            Vector2 directionToNextPathPoint = enemyMovement.GetDirectionToNextPathPoint();
+            if (directionToNextPathPoint.magnitude > 0.1f)
+            {
+                viewDirection = directionToNextPathPoint;
+            }
+            else
+            {
+                // 如果沒有路徑點，使用移動方向
+                Vector2 movementDirection = enemyMovement.GetMovementDirection();
+                if (movementDirection.magnitude > 0.1f)
+                {
+                    viewDirection = movementDirection;
+                }
+                else
+                {
+                    // 如果沒有移動，使用朝向目標的方向
+                    viewDirection = (lastSeenPlayerPosition - cachedPosition).normalized;
+                }
+            }
+            
+            // 更新視野方向（避免頻繁更新造成閃爍）
+            if (viewDirection.magnitude > 0.1f)
+            {
+                enemyDetection.SetViewDirection(viewDirection);
+            }
+        }
 
         // 檢查是否到達最後看到的位置
         if (Vector2.Distance(cachedPosition, lastSeenPlayerPosition) < 1f)

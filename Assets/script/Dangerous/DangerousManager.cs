@@ -57,11 +57,20 @@ public class DangerousManager : MonoBehaviour
     
     private float lastAutoDecreaseTime;
     
-    // 來自敵人的知覺聚合（本幀）
-    private bool anyEnemySeesPlayer = false; // 任何敵人看到玩家（會觸發危險值增加）
-    private bool anyEnemyActuallySeesPlayer = false; // 任何敵人實際看到玩家（用於防止危險值下降，不論區域或武器）
-    private float minDistanceToPlayer = float.PositiveInfinity;
+    // 來自敵人和target的知覺聚合（本幀）
+    private bool anyEnemySeesPlayer = false; // 任何敵人看到玩家
+    private bool anyTargetSeesPlayer = false; // 任何target看到玩家
+    private float bestEnemyViewRangeMinusDistance = 0f; // 看到玩家的敵人中最優的 (視野半徑 - 距離) 值
     private float dangerFloatAccumulator = 0f; // 用於累積小數部分避免抖動
+    
+    // 追蹤連續看不到玩家的時間
+    private float lastSeenTime = 0f; // 最後一次看到玩家的時間
+    private const float NO_VISION_DECREASE_DELAY = 5f; // 連續5秒看不到玩家後開始減少
+    private const int NO_VISION_DECREASE_RATE = 20; // 每秒減少20
+    
+    // 玩家引用（用於檢查武器和區域）
+    private Player player;
+    private ItemHolder playerItemHolder;
     
     private void Awake()
     {
@@ -79,12 +88,33 @@ public class DangerousManager : MonoBehaviour
         
         // 初始化危險指數
         currentDangerLevel = Mathf.Clamp(currentDangerLevel, minDangerLevel, maxDangerLevel);
+        
+        // 初始化最後看到時間
+        lastSeenTime = Time.time;
     }
     
     private void Start()
     {
         // 觸發初始危險等級事件
         OnDangerLevelTypeChanged?.Invoke(CurrentDangerLevelType);
+        
+        // 查找玩家引用
+        FindPlayer();
+    }
+    
+    /// <summary>
+    /// 查找玩家引用
+    /// </summary>
+    private void FindPlayer()
+    {
+        if (player == null)
+        {
+            player = FindFirstObjectByType<Player>();
+            if (player != null)
+            {
+                playerItemHolder = player.GetComponent<ItemHolder>();
+            }
+        }
     }
     
     private void Update()
@@ -92,20 +122,10 @@ public class DangerousManager : MonoBehaviour
         // 根據本幀敵人聚合輸入來更新危險係數
         ApplyAggregatedPerception(Time.deltaTime);
         
-        // 備用的自動減少（若無任何敵人資訊）
-        if (!anyEnemySeesPlayer && float.IsPositiveInfinity(minDistanceToPlayer))
-        {
-            if (enableAutoDecrease && Time.time >= lastAutoDecreaseTime + autoDecreaseInterval)
-            {
-                DecreaseDangerLevel(autoDecreaseAmount);
-                lastAutoDecreaseTime = Time.time;
-            }
-        }
-        
         // 重置聚合狀態，供下一幀使用
         anyEnemySeesPlayer = false;
-        anyEnemyActuallySeesPlayer = false;
-        minDistanceToPlayer = float.PositiveInfinity;
+        anyTargetSeesPlayer = false;
+        bestEnemyViewRangeMinusDistance = 0f;
     }
     
     /// <summary>
@@ -321,103 +341,177 @@ public class DangerousManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 由敵人偵測回報玩家距離與是否被看見（每幀可呼叫多次，系統會聚合）
+    /// 由敵人偵測回報玩家距離、視野半徑與是否被看見（每幀可呼叫多次，系統會聚合）
     /// </summary>
-    public void ReportEnemyPerception(float distanceToPlayer, bool canSeePlayer)
+    /// <param name="distanceToPlayer">敵人到玩家的距離</param>
+    /// <param name="viewRange">敵人當前的視野半徑（最終值，不是base）</param>
+    /// <param name="canSeePlayer">是否看到玩家</param>
+    public void ReportEnemyPerception(float distanceToPlayer, float viewRange, bool canSeePlayer)
     {
         if (canSeePlayer)
         {
             anyEnemySeesPlayer = true;
+            // 計算視野半徑 - 距離，記錄最優的值（最大的）
+            float viewRangeMinusDistance = viewRange - distanceToPlayer;
+            if (viewRangeMinusDistance > bestEnemyViewRangeMinusDistance)
+            {
+                bestEnemyViewRangeMinusDistance = viewRangeMinusDistance;
+            }
         }
-        
-        if (distanceToPlayer >= 0f && distanceToPlayer < minDistanceToPlayer)
+    }
+    
+    /// <summary>
+    /// 由target偵測回報是否看到玩家
+    /// </summary>
+    /// <param name="canSeePlayer">是否看到玩家</param>
+    public void ReportTargetPerception(bool canSeePlayer)
+    {
+        if (canSeePlayer)
         {
-            minDistanceToPlayer = distanceToPlayer;
+            anyTargetSeesPlayer = true;
         }
     }
     
     /// <summary>
     /// 回報敵人是否實際看到玩家（不論是否應該增加危險值）
-    /// 用於防止危險值在被追擊時下降
+    /// 用於防止危險值在被追擊時下降（保留以維持向後兼容）
     /// </summary>
+    [System.Obsolete("此方法已棄用，請使用 ReportEnemyPerception")]
     public void ReportEnemyActuallySeesPlayer(bool actuallySeesPlayer)
     {
-        if (actuallySeesPlayer)
-        {
-            anyEnemyActuallySeesPlayer = true;
-        }
+        // 保留空實現以維持向後兼容
     }
 
     /// <summary>
     /// 根據聚合的敵人資訊，依規則更新危險係數。
-    /// 規則：
-    /// - 視野內：立即 100
-    /// - 視野外：
-    ///   - 5 格以內：每秒 +20
-    ///   - 5~10 格：不變
-    ///   - 10 以上：每秒 -20
-    /// - 【新增】當危險等級不是 Safe 且任何敵人實際看到玩家時，危險值不會下降
+    /// 新規則：
+    /// 1. 當任何敵人跟target都沒看到player時，永遠不會增加
+    /// 2. 當其中一個敵人看到player時，會根據enemy當前的視野半徑減掉player離enemy的距離來決定dangerous的增加速度(增加速度是每秒增加5*那個值)
+    /// 3. target看到player時直接變成100
+    /// 4. 如果連續5秒以上任何敵人跟target都沒看到player時，危險程度每秒-20
     /// </summary>
     private void ApplyAggregatedPerception(float deltaTime)
     {
+        // 規則3：target看到player時直接變成100
+        if (anyTargetSeesPlayer)
+        {
+            SetDangerLevel(maxDangerLevel, "Target sees player");
+            lastSeenTime = Time.time; // 更新最後看到時間
+            return;
+        }
+        
+        // 規則2：當其中一個敵人看到player時，根據視野半徑和距離計算增加速度
         if (anyEnemySeesPlayer)
         {
-            SetDangerLevel(maxDangerLevel, "Enemy sees player");
+            // 【新增】檢查玩家是否沒拿武器且不在警戒區
+            // 如果滿足條件，永遠不會增加危險值
+            if (ShouldPreventDangerIncrease())
+            {
+                // 玩家沒拿武器且不在警戒區，不增加危險值
+                return;
+            }
+            
+            lastSeenTime = Time.time; // 更新最後看到時間
+            
+            // 使用最優的 (視野半徑 - 距離) 值
+            // 增加速度 = 每秒增加 5 * (視野半徑 - 距離)
+            if (bestEnemyViewRangeMinusDistance > 0f)
+            {
+                float increaseRatePerSecond = 5f * bestEnemyViewRangeMinusDistance;
+                
+                dangerFloatAccumulator += increaseRatePerSecond * deltaTime;
+                int deltaInt = 0;
+                if (dangerFloatAccumulator >= 1f)
+                {
+                    deltaInt = Mathf.FloorToInt(dangerFloatAccumulator);
+                    dangerFloatAccumulator -= deltaInt;
+                }
+                
+                if (deltaInt > 0)
+                {
+                    IncreaseDangerLevel(deltaInt, "Enemy sees player (view range based)");
+                }
+            }
+            // 如果視野半徑 - 距離 <= 0，不增加危險值（規則1）
             return;
         }
         
-        // 若沒有任何敵人回報，交由自動減少（已於 Update 內處理）
-        if (float.IsPositiveInfinity(minDistanceToPlayer))
+        // 規則1：當任何敵人跟target都沒看到player時，永遠不會增加
+        // 規則4：如果連續5秒以上任何敵人跟target都沒看到player時，危險程度每秒-20
+        float timeSinceLastSeen = Time.time - lastSeenTime;
+        if (timeSinceLastSeen >= NO_VISION_DECREASE_DELAY)
         {
-            return;
+            // 連續5秒以上看不到玩家，每秒減少20
+            dangerFloatAccumulator -= NO_VISION_DECREASE_RATE * deltaTime;
+            int deltaInt = 0;
+            if (dangerFloatAccumulator <= -1f)
+            {
+                deltaInt = Mathf.CeilToInt(dangerFloatAccumulator);
+                dangerFloatAccumulator -= deltaInt;
+            }
+            
+            if (deltaInt < 0)
+            {
+                DecreaseDangerLevel(-deltaInt, "No vision for 5+ seconds");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 檢查是否應該阻止危險值增加（玩家沒拿武器且不在警戒區）
+    /// </summary>
+    /// <returns>如果應該阻止增加，返回 true</returns>
+    private bool ShouldPreventDangerIncrease()
+    {
+        // 如果找不到玩家，不阻止（向後兼容）
+        if (player == null)
+        {
+            FindPlayer();
+            if (player == null) return false;
         }
         
-        int ratePerSecond = 0;
-        if (minDistanceToPlayer <= nearDistanceThreshold)
+        // 檢查是否啟用 Guard Area System
+        // 如果停用，不阻止（向後兼容）
+        if (GameSettings.Instance != null && !GameSettings.Instance.UseGuardAreaSystem)
         {
-            ratePerSecond = nearIncreasePerSecond;
+            return false;
         }
-        else if (minDistanceToPlayer <= midDistanceThreshold)
+        
+        // 檢查玩家是否在警戒區
+        Vector3 playerPosition = player.transform.position;
+        bool isInGuardArea = false;
+        if (AreaManager.Instance != null)
         {
-            ratePerSecond = 0;
+            isInGuardArea = AreaManager.Instance.IsInGuardArea(playerPosition);
         }
         else
         {
-            ratePerSecond = -farDecreasePerSecond;
+            // 如果 AreaManager 不存在，默認為不在警戒區（向後兼容）
+            isInGuardArea = false;
         }
         
-        // 【修正】當危險等級不是 Safe 且任何敵人實際看到玩家時，不允許危險值下降
-        // 這確保當敵人正在追擊玩家時，即使玩家切換到空手，危險值也不會下降
-        // 只有當玩家完全脫離所有敵人視線時，危險值才會自然下降
-        if (ratePerSecond < 0 && CurrentDangerLevelType != DangerLevel.Safe && anyEnemyActuallySeesPlayer)
+        // 如果在警戒區，不阻止
+        if (isInGuardArea)
         {
-            // 危險等級不是 Safe 且有敵人看到玩家時，不允許降低危險值
-            Debug.Log("[DangerousManager] Danger level is not Safe and enemy can see player - preventing danger decrease");
-            return;
+            return false;
         }
         
-        if (ratePerSecond == 0 || deltaTime <= 0f) return;
-        
-        dangerFloatAccumulator += ratePerSecond * deltaTime;
-        int deltaInt = 0;
-        if (dangerFloatAccumulator >= 1f)
+        // 在 Safe Area 中，檢查玩家是否持有武器
+        if (playerItemHolder == null)
         {
-            deltaInt = Mathf.FloorToInt(dangerFloatAccumulator);
-            dangerFloatAccumulator -= deltaInt;
-        }
-        else if (dangerFloatAccumulator <= -1f)
-        {
-            deltaInt = Mathf.CeilToInt(dangerFloatAccumulator);
-            dangerFloatAccumulator -= deltaInt;
+            playerItemHolder = player.GetComponent<ItemHolder>();
         }
         
-        if (deltaInt > 0)
+        if (playerItemHolder == null)
         {
-            IncreaseDangerLevel(deltaInt, "Distance rule");
+            // 找不到 ItemHolder，不阻止（向後兼容）
+            return false;
         }
-        else if (deltaInt < 0)
-        {
-            DecreaseDangerLevel(-deltaInt, "Distance rule");
-        }
+        
+        // 檢查玩家是否持有武器
+        bool playerHasWeapon = playerItemHolder.IsCurrentItemWeapon;
+        
+        // 如果玩家沒拿武器且不在警戒區，阻止增加
+        return !playerHasWeapon;
     }
 }

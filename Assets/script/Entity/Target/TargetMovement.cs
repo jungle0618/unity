@@ -19,7 +19,7 @@ public class TargetMovement : BaseMovement
     [SerializeField] private float arriveThreshold = 0.2f;
 
     [Header("巡邏路徑")]
-    [SerializeField] private Transform[] patrolPoints;
+    // 注意：patrolPoints 已移至基類 BaseMovement
 
     [Header("路徑規劃")]
     [SerializeField] private bool usePathfinding = true;
@@ -35,33 +35,19 @@ public class TargetMovement : BaseMovement
     [SerializeField] private LayerMask obstaclesLayerMask;
     [SerializeField] private float directChaseCheckRadius = 0.3f;
 
-    private Vector2 spawnPoint;
-    private int patrolIndex = 0;
     private GreedyPathfinding greedyPathfinding;
     private AStarPathfinding aStarPathfinding;
-    
-    // 路徑規劃
-    private List<PathfindingNode> currentPath = new List<PathfindingNode>();
-    private int currentPathIndex = 0;
-    private Vector3 lastPathUpdatePosition;
-    private Vector3 lastTargetPosition;
 
     // 直線追擊
     private bool isUsingDirectChase = false;
     private float lastDirectChaseCheckTime = 0f;
     private const float DIRECT_CHASE_CHECK_INTERVAL = 0.1f;
-    
-    // 卡住檢測
-    private Vector2 lastPosition;
-    private float lastPositionUpdateTime;
-    private float lastStuckTime;
 
     public Vector2 SpawnPoint => spawnPoint;
 
     protected override void Awake()
     {
         base.Awake();
-        spawnPoint = transform.position;
 
         // 自動查找路徑規劃組件
         greedyPathfinding = FindFirstObjectByType<GreedyPathfinding>();
@@ -82,22 +68,12 @@ public class TargetMovement : BaseMovement
             if (objectsLayer != -1) obstaclesLayerMask |= (1 << objectsLayer);
             if (obstaclesLayer != -1) obstaclesLayerMask |= (1 << obstaclesLayer);
         }
-
-        // 初始化
-        lastStuckTime = Time.time;
-        lastPosition = transform.position;
-        lastPositionUpdateTime = Time.time;
-        lastPathUpdatePosition = transform.position;
     }
 
     /// <summary>
-    /// 設定巡邏點
+    /// 覆寫基類方法以提供 Target 特定的 arriveThreshold
     /// </summary>
-    public void SetPatrolPoints(Transform[] points)
-    {
-        patrolPoints = points;
-        patrolIndex = 0;
-    }
+    protected override float GetArriveThreshold() => arriveThreshold;
 
     /// <summary>
     /// 執行巡邏移動
@@ -142,31 +118,20 @@ public class TargetMovement : BaseMovement
         MoveTowards(targetPos, speedMultiplier);
     }
 
-    /// <summary>
-    /// 檢查是否到達指定的location
-    /// </summary>
-    public bool HasArrivedAtLocation(Vector3 location)
-    {
-        return Vector2.Distance(transform.position, location) < arriveThreshold;
-    }
 
     /// <summary>
-    /// 向目標移動（覆寫基類方法）
+    /// 向目標移動（覆寫基類方法，使用智能移動邏輯）
     /// </summary>
     public override void MoveTowards(Vector2 target, float speedMultiplier)
     {
-        if (rb == null) return;
-
-        float baseSpeed = GetBaseSpeed();
-        float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
-        Vector2 direction = (target - (Vector2)transform.position).normalized;
-        rb.linearVelocity = direction * baseSpeed * speedMultiplier * injuryMultiplier;
+        // 使用基類的智能移動邏輯（自動獲取速度倍數）
+        base.MoveTowards(target);
     }
     
     /// <summary>
-    /// 獲取基礎速度（從 Target 組件）
+    /// 獲取基礎速度（從 Target 組件，實現基類抽象方法）
     /// </summary>
-    private float GetBaseSpeed()
+    protected override float GetBaseSpeed()
     {
         Target target = GetComponent<Target>();
         if (target != null)
@@ -190,14 +155,58 @@ public class TargetMovement : BaseMovement
         // 如果找不到 Target 組件，返回預設值（向後兼容）
         return 0f;
     }
-    
+
     /// <summary>
-    /// 檢查是否有可用的路徑規劃組件
+    /// 獲取速度倍數（覆寫基類方法，自動從 Target 組件獲取）
     /// </summary>
-    private bool HasPathfinding()
+    protected override float GetSpeedMultiplier()
+    {
+        return GetStateSpeedMultiplier();
+    }
+
+    /// <summary>
+    /// 檢查是否有可用的路徑規劃組件（實現基類抽象方法）
+    /// </summary>
+    protected override bool HasPathfinding()
+    {
+        return usePathfinding && HasPathfindingInternal();
+    }
+
+    /// <summary>
+    /// 檢查是否有可用的路徑規劃組件（內部方法）
+    /// </summary>
+    private bool HasPathfindingInternal()
     {
         return (useAStar && aStarPathfinding != null) || greedyPathfinding != null;
     }
+
+    /// <summary>
+    /// 獲取路徑規劃組件並計算路徑（實現基類抽象方法）
+    /// </summary>
+    protected override List<PathfindingNode> FindPath(Vector2 start, Vector2 target)
+    {
+        // 優先使用 A* 算法
+        if (useAStar && aStarPathfinding != null)
+        {
+            return aStarPathfinding.FindPath(start, target);
+        }
+        else if (greedyPathfinding != null)
+        {
+            return greedyPathfinding.FindPath(start, target);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 覆寫基類的虛擬方法以提供 Target 特定的參數
+    /// </summary>
+    protected override bool UsePathfinding() => usePathfinding;
+    protected override float GetPathUpdateDistance() => pathUpdateDistance;
+    protected override float GetPathReachThreshold() => pathReachThreshold;
+    protected override float GetTargetPositionChangeThreshold() => targetPositionChangeThreshold;
+    protected override LayerMask GetObstaclesLayerMask() => obstaclesLayerMask;
+    protected override float GetDirectChaseCheckRadius() => directChaseCheckRadius;
+    
     
     /// <summary>
     /// 逃亡移動（使用路徑規劃，最短路徑到目標）
@@ -256,17 +265,6 @@ public class TargetMovement : BaseMovement
         }
     }
 
-    /// <summary>
-    /// 檢查是否能直線到達目標
-    /// </summary>
-    public bool CanReachDirectly(Vector2 target)
-    {
-        Vector2 direction = (target - (Vector2)transform.position).normalized;
-        float distance = Vector2.Distance(transform.position, target);
-        
-        RaycastHit2D hit = Physics2D.CircleCast(transform.position, directChaseCheckRadius, direction, distance, obstaclesLayerMask);
-        return hit.collider == null;
-    }
 
     /// <summary>
     /// 直線追擊目標（Target 不使用此方法，保留以維持兼容性）
@@ -342,7 +340,7 @@ public class TargetMovement : BaseMovement
         if (!usePathfinding || !HasPathfinding())
         {
             // 如果沒有路徑規劃，使用直接移動
-            MoveTowards(target, speedMultiplier);
+            base.MoveTowards(target);
             return;
         }
 
@@ -351,6 +349,7 @@ public class TargetMovement : BaseMovement
         
         if (shouldUpdatePath)
         {
+            // 使用基類的方法更新路徑
             UpdatePathToTargetSafe(target);
         }
 
@@ -358,151 +357,18 @@ public class TargetMovement : BaseMovement
         FollowChasePath(speedMultiplier);
     }
 
-    /// <summary>
-    /// 停止移動（覆寫基類方法）
-    /// </summary>
-    public override void StopMovement()
-    {
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector2.zero;
-        }
-    }
-
-    /// <summary>
-    /// 獲取返回目標位置（返回第一個patrol point，即spawn point）
-    /// </summary>
-    public Vector2 GetReturnTarget()
-    {
-        if (patrolPoints != null && patrolPoints.Length > 0)
-        {
-            return patrolPoints[0].position; // 總是返回第一個patrol point
-        }
-        return spawnPoint;
-    }
-
-    /// <summary>
-    /// 檢查是否到達目標位置（覆寫基類方法）
-    /// </summary>
-    public override bool HasArrivedAt(Vector2 target, float threshold = 0.2f)
-    {
-        return Vector2.Distance(transform.position, target) < threshold;
-    }
-
-    /// <summary>
-    /// 檢查是否到達目標位置（使用自訂閾值）
-    /// </summary>
-    public bool HasArrivedAtWithCustomThreshold(Vector2 target)
-    {
-        return HasArrivedAt(target, arriveThreshold);
-    }
-
-    /// <summary>
-    /// 前進到下一個巡邏點（超過最後一個則回到第一個）
-    /// </summary>
-    private void AdvancePatrolIndex()
-    {
-        if (patrolPoints == null || patrolPoints.Length == 0) return;
-        patrolIndex = (patrolIndex + 1) % patrolPoints.Length;
-    }
-
-    /// <summary>
-    /// 獲取當前巡邏點
-    /// </summary>
-    public Transform[] GetPatrolPoints()
-    {
-        return patrolPoints;
-    }
-
-    /// <summary>
-    /// 獲取當前移動方向（覆寫基類方法）
-    /// </summary>
-    public override Vector2 GetMovementDirection()
-    {
-        if (rb == null) return Vector2.right;
-        return rb.linearVelocity.normalized;
-    }
-
-    /// <summary>
-    /// 獲取朝向目標的方向（覆寫基類方法）
-    /// </summary>
-    public override Vector2 GetDirectionToTarget(Vector2 target)
-    {
-        return (target - (Vector2)transform.position).normalized;
-    }
-
-    /// <summary>
-    /// 獲取到下一個路徑點的方向
-    /// </summary>
-    public Vector2 GetDirectionToNextPathPoint()
-    {
-        if (currentPath != null && currentPathIndex < currentPath.Count)
-        {
-            Vector2 nextPoint = currentPath[currentPathIndex].worldPosition;
-            return (nextPoint - (Vector2)transform.position).normalized;
-        }
-        return Vector2.zero;
-    }
 
     /// <summary>
     /// 使用路徑規劃向目標移動
     /// </summary>
     public void MoveTowardsWithPathfinding(Vector2 target, float speedMultiplier)
     {
-        if (!usePathfinding || !HasPathfinding())
-        {
-            // 如果沒有路徑規劃，使用直接移動
-            MoveTowards(target, speedMultiplier);
-            return;
-        }
-
-        // 檢查是否需要更新路徑
-        bool shouldUpdatePath = ShouldUpdatePath(target);
-        
-        if (shouldUpdatePath)
-        {
-            UpdatePathToTargetSafe(target);
-        }
-
-        // 沿著路徑移動
-        FollowPath(speedMultiplier);
+        // 使用基類的智能移動邏輯（自動獲取速度倍數）
+        base.MoveTowards(target);
     }
 
     /// <summary>
-    /// 檢查是否需要更新路徑（基於移動距離）
-    /// </summary>
-    private bool ShouldUpdatePath(Vector2 target)
-    {
-        // 如果路徑為空，需要更新路徑
-        if (currentPath == null || currentPath.Count == 0)
-        {
-            return true;
-        }
-
-        // 如果已經到達路徑終點，需要更新路徑
-        if (currentPathIndex >= currentPath.Count)
-        {
-            return true;
-        }
-
-        // 如果目標位置改變太多，需要更新路徑
-        if (Vector2.Distance(target, lastTargetPosition) > targetPositionChangeThreshold)
-        {
-            return true;
-        }
-
-        // 如果敵人移動了足夠的距離，需要更新路徑
-        float movedDistance = Vector2.Distance(transform.position, lastPathUpdatePosition);
-        if (movedDistance > pathUpdateDistance)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// 檢查是否需要更新追擊路徑（基於移動距離）
+    /// 檢查是否需要更新追擊路徑（基於移動距離，使用追擊專用的更新間隔）
     /// </summary>
     private bool ShouldUpdateChasePath(Vector2 target)
     {
@@ -535,130 +401,6 @@ public class TargetMovement : BaseMovement
     }
 
 
-    /// <summary>
-    /// 更新路徑（自動處理不可行走的起點和終點）
-    /// </summary>
-    private void UpdatePathToTargetSafe(Vector2 target)
-    {
-        if (!HasPathfinding()) 
-        {
-            if (showPathfindingDebug)
-            {
-                Debug.LogWarning($"{gameObject.name}: 沒有可用的路徑規劃組件");
-            }
-            return;
-        }
-
-        PathfindingGrid grid = FindFirstObjectByType<PathfindingGrid>();
-        if (grid == null)
-        {
-            if (showPathfindingDebug)
-            {
-                Debug.LogError($"{gameObject.name}: 找不到 PathfindingGrid");
-            }
-            return;
-        }
-
-        // 調整起點和終點到可行走位置
-        Vector2 start = AdjustToWalkable(grid, transform.position, 2f);
-        Vector2 adjustedTarget = AdjustToWalkable(grid, target, 3f);
-
-        if (showPathfindingDebug)
-        {
-            Debug.Log($"{gameObject.name}: 更新路徑 {start} → {adjustedTarget}");
-        }
-
-        // 優先使用 A* 算法
-        if (useAStar && aStarPathfinding != null)
-        {
-            currentPath = aStarPathfinding.FindPath(start, adjustedTarget);
-        }
-        else if (greedyPathfinding != null)
-        {
-            currentPath = greedyPathfinding.FindPath(start, adjustedTarget);
-        }
-        
-        if (currentPath != null && showPathfindingDebug)
-        {
-            // 使用 LogWarning 讓路徑信息更顯眼，方便快速閱讀
-            string pathDetails = "";
-            for (int i = 0; i < Mathf.Min(currentPath.Count, 10); i++) // 只顯示前10個節點
-            {
-                pathDetails += $"\n  [{i}] ({currentPath[i].worldPosition.x:F1}, {currentPath[i].worldPosition.y:F1})";
-            }
-            if (currentPath.Count > 10)
-            {
-                pathDetails += $"\n  ... 還有 {currentPath.Count - 10} 個節點";
-            }
-            
-            string algorithm = (useAStar && aStarPathfinding != null) ? "A*" : "Greedy";
-            Debug.Log($"[{algorithm}路徑] {gameObject.name}: ✓ 路徑已更新！\n" +
-                           $"起點: ({start.x:F1}, {start.y:F1})\n" +
-                           $"終點: ({adjustedTarget.x:F1}, {adjustedTarget.y:F1})\n" +
-                           $"節點數: {currentPath.Count}{pathDetails}");
-        }
-        else if (currentPath == null && showPathfindingDebug)
-        {
-            Debug.LogWarning($"{gameObject.name}: ✗ 無法找到路徑！起點: ({start.x:F1}, {start.y:F1}) → 終點: ({adjustedTarget.x:F1}, {adjustedTarget.y:F1})");
-        }
-        
-        currentPathIndex = 0;
-        lastPathUpdatePosition = transform.position;
-        lastTargetPosition = target;
-    }
-
-    /// <summary>
-    /// 調整位置到最近的可行走點
-    /// </summary>
-    private Vector2 AdjustToWalkable(PathfindingGrid grid, Vector2 position, float searchRadius)
-    {
-        PathfindingNode node = grid.GetNode(position);
-        if (node != null && node.isWalkable) return position;
-        
-        PathfindingNode nearest = grid.GetNearestWalkableNode(position, searchRadius);
-        return nearest != null && nearest.isWalkable ? nearest.worldPosition : position;
-    }
-
-    /// <summary>
-    /// 沿著路徑移動
-    /// </summary>
-    private void FollowPath(float speedMultiplier)
-    {
-        if (currentPath == null)
-        {
-            StopMovement();
-            return;
-        }
-
-        // 如果路徑為空，表示已在目標位置附近，停止移動
-        if (currentPath.Count == 0)
-        {
-            StopMovement();
-            return;
-        }
-
-        if (currentPathIndex >= currentPath.Count)
-        {
-            StopMovement();
-            return;
-        }
-
-        Vector2 targetPosition = currentPath[currentPathIndex].worldPosition;
-        Vector2 direction = (targetPosition - (Vector2)transform.position).normalized;
-        
-        if (rb != null)
-        {
-            float baseSpeed = GetBaseSpeed();
-            float injuryMultiplier = GetInjurySpeedMultiplier(); // 受傷時速度乘以 0.7
-            rb.linearVelocity = direction * baseSpeed * speedMultiplier * injuryMultiplier;
-        }
-
-        // 檢查是否到達當前路徑點
-        if (Vector2.Distance(transform.position, targetPosition) < pathReachThreshold)
-        {
-            currentPathIndex++;
-        }
-    }
 
     /// <summary>
     /// 沿著路徑移動（追擊專用）
@@ -688,95 +430,6 @@ public class TargetMovement : BaseMovement
         }
     }
 
-    /// <summary>
-    /// 清除當前路徑
-    /// </summary>
-    public void ClearPath()
-    {
-        if (currentPath != null)
-        {
-            currentPath.Clear();
-        }
-        currentPathIndex = 0;
-    }
-
-    /// <summary>
-    /// 檢查是否有有效路徑
-    /// </summary>
-    public bool HasValidPath()
-    {
-        return currentPath != null && currentPath.Count > 0 && currentPathIndex < currentPath.Count;
-    }
-
-    /// <summary>
-    /// 獲取當前路徑
-    /// </summary>
-    public List<PathfindingNode> GetCurrentPath()
-    {
-        return currentPath;
-    }
-
-    /// <summary>
-    /// 獲取下一個路徑點
-    /// </summary>
-    public Vector2 GetNextPathPoint()
-    {
-        if (currentPath != null && currentPathIndex < currentPath.Count)
-        {
-            return currentPath[currentPathIndex].worldPosition;
-        }
-        return transform.position;
-    }
-
-    /// <summary>
-    /// 檢查敵人是否卡住
-    /// </summary>
-    public bool IsStuckOrHittingWall()
-    {
-        if (rb == null) return false;
-
-        float stuckThreshold = isUsingDirectChase ? 1.0f : 0.5f;
-        
-        if (rb.linearVelocity.magnitude < 0.1f)
-        {
-            if (Time.time - lastStuckTime > stuckThreshold) return true;
-        }
-        else
-        {
-            lastStuckTime = Time.time;
-        }
-
-        if (Vector2.Distance(transform.position, lastPosition) < 0.05f && Time.time - lastPositionUpdateTime > 0.5f)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private void Update()
-    {
-        // 更新位置追蹤
-        if (Time.time - lastPositionUpdateTime > 0.1f)
-        {
-            lastPosition = transform.position;
-            lastPositionUpdateTime = Time.time;
-        }
-    }
-
-    /// <summary>
-    /// 在 LateUpdate 中處理朝向移動方向，避免與物理更新衝突
-    /// </summary>
-    private void LateUpdate()
-    {
-        // 朝向移動方向
-        Vector2 movementDirection = GetMovementDirection();
-        if (movementDirection.magnitude > 0.1f)
-        {
-            float angle = Mathf.Atan2(movementDirection.y, movementDirection.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle);
-        }
-    }
 
     /// <summary>
     /// 設定移動速度（覆寫基類方法）

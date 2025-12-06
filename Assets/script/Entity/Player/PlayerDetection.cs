@@ -304,6 +304,9 @@ public class PlayerDetection : BaseDetection
     
     /// <summary>
     /// 檢查實體是否在玩家視野中（統一處理 Enemy 和 Target）
+    /// 檢查兩個視野範圍：
+    /// 1. 主要視野（有角度限制）
+    /// 2. 360度視野（全方向，近距離）
     /// </summary>
     private bool IsEntityInPlayerView(IEntity entity)
     {
@@ -314,8 +317,18 @@ public class PlayerDetection : BaseDetection
         Vector2 dirToEntity = entityPos - playerPos;
         float distanceToEntity = dirToEntity.magnitude;
         
-        // 距離檢查
-        if (distanceToEntity > GetViewRange())
+        // 首先檢查360度視野（近距離全方向）
+        float nearViewRange = GetNearViewRange();
+        if (distanceToEntity <= nearViewRange)
+        {
+            // 在360度視野範圍內，只需要檢查遮擋
+            if (!IsBlockedByObstacle(playerPos, entityPos))
+                return true;
+        }
+        
+        // 如果不在360度視野內，檢查主要視野（有角度限制）
+        float mainViewRange = GetViewRange();
+        if (distanceToEntity > mainViewRange)
             return false;
         
         // 角度檢查
@@ -346,8 +359,16 @@ public class PlayerDetection : BaseDetection
         return player != null ? player.ViewAngle : 90f;
     }
     
+    private float GetNearViewRange()
+    {
+        return player != null ? player.NearViewRange : 1.5f;
+    }
+    
     /// <summary>
     /// 檢查是否可以看到目標（覆寫基類抽象方法）
+    /// 檢查兩個視野範圍：
+    /// 1. 主要視野（有角度限制）
+    /// 2. 360度視野（全方向，近距離）
     /// </summary>
     public override bool CanSeeTarget(Vector2 targetPos)
     {
@@ -355,8 +376,18 @@ public class PlayerDetection : BaseDetection
         Vector2 dirToTarget = targetPos - playerPos;
         float distanceToTarget = dirToTarget.magnitude;
         
-        // 距離檢查
-        if (distanceToTarget > GetViewRange())
+        // 首先檢查360度視野（近距離全方向）
+        float nearViewRange = GetNearViewRange();
+        if (distanceToTarget <= nearViewRange)
+        {
+            // 在360度視野範圍內，只需要檢查遮擋
+            if (!IsBlockedByObstacle(playerPos, targetPos))
+                return true;
+        }
+        
+        // 如果不在360度視野內，檢查主要視野（有角度限制）
+        float mainViewRange = GetViewRange();
+        if (distanceToTarget > mainViewRange)
             return false;
         
         // 角度檢查（如果視野角度小於 360 度）

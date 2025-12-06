@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 /// <summary>
 /// 玩家移動組件（繼承基礎移動組件）
@@ -374,9 +375,9 @@ public class PlayerMovement : BaseMovement
     public Vector2 MoveInput => moveInput;
 
     /// <summary>
-    /// 獲取基礎速度（從 Player 組件）
+    /// 獲取基礎速度（從 Player 組件，實現基類抽象方法）
     /// </summary>
-    private float GetBaseSpeed()
+    protected override float GetBaseSpeed()
     {
         Player player = GetComponent<Player>();
         if (player != null)
@@ -385,6 +386,24 @@ public class PlayerMovement : BaseMovement
         }
         // 如果找不到 Player 組件，返回預設值（向後兼容）
         return 5f;
+    }
+
+    /// <summary>
+    /// 檢查是否有可用的路徑規劃組件（實現基類抽象方法）
+    /// 玩家不需要路徑規劃，始終返回 false
+    /// </summary>
+    protected override bool HasPathfinding()
+    {
+        return false; // 玩家不使用路徑規劃
+    }
+
+    /// <summary>
+    /// 獲取路徑規劃組件並計算路徑（實現基類抽象方法）
+    /// 玩家不需要路徑規劃，始終返回 null
+    /// </summary>
+    protected override List<PathfindingNode> FindPath(Vector2 start, Vector2 target)
+    {
+        return null; // 玩家不使用路徑規劃
     }
     
     /// <summary>

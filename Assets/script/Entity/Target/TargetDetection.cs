@@ -99,8 +99,21 @@ public class TargetDetection : BaseDetection
 
     private void Update()
     {
-        // Target 不需要向 DangerousManager 報告（只有 Enemy 需要）
-        // 這裡可以保留空實現或移除
+        // 每幀彙報是否看到玩家給 DangerousManager
+        if (dangerousManager == null) return;
+
+        // 檢查是否應該進行偵測
+        if (!ShouldPerformDetection())
+        {
+            // 如果不需要偵測，報告不可見狀態
+            dangerousManager.ReportTargetPerception(false);
+            return;
+        }
+
+        bool canSee = CanSeeCurrentTarget();
+        
+        // 報告是否看到玩家
+        dangerousManager.ReportTargetPerception(canSee);
     }
 
     // CanSeePlayer() 已由基類 BaseDetection 統一提供
