@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 
 public class PlayerAnimationController : MonoBehaviour
 {
@@ -8,64 +9,83 @@ public class PlayerAnimationController : MonoBehaviour
     [SerializeField] private ItemHolder itemHolder;
     [SerializeField] private GameObject gun;
     [SerializeField] private GameObject knife;
-    [SerializeField] private ParticleSystem muzzleFlash;
 
-    private int currentWeapon = -1;
     private float speed = 0f;
     private Vector2 direction = Vector2.zero;
-    private Vector2 relativeDirection = Vector2.zero;
     private Vector2 weaponDirection = Vector2.zero;
+    private Action<Item> OnEquipChangedHandler;
+    
+    private Action<int, int> OnHealthChangedHandler;
+    private Action OnPlayerDiedHandler;
+    
+    private Action<Weapon> OnWeaponAttackHandler;
+    private Action OnActionPerformedHandler;
 
-    void Start()
+    public void OnEnable()
     {
         animator = GetComponent<Animator>();
+        if (gun == null)
+            gun = GetComponentInChildren<RangedWeapon>(true).gameObject;
+        if (knife == null)
+            knife = GetComponentInChildren<MeleeWeapon>(true).gameObject;
+
+        OnEquipChangedHandler = (item) => {
+            int isMelee = itemHolder.CurrentWeapon is MeleeWeapon ? 0 : 1;
+            if (item is EmptyHands) isMelee = -1;
+            knife.SetActive(isMelee == 0);
+            gun.SetActive(isMelee == 1);
+            animator.SetInteger("weaponState", isMelee);
+        };
+
+        OnHealthChangedHandler = (current, max) => {animator.SetTrigger("Hurt");};
+        OnPlayerDiedHandler = () => {animator.SetTrigger("Die");};
+        
+        OnWeaponAttackHandler = (weapon) => {animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");};
+        OnActionPerformedHandler = () => {animator.SetTrigger("Interact");};
+
+        if (player != null)
+        {
+            player.OnEquipChanged += OnEquipChangedHandler;
+
+            player.OnHealthChanged += OnHealthChangedHandler;
+            player.OnPlayerDied += OnPlayerDiedHandler;        
+        }
+
+        if (itemHolder != null)
+        {
+            player.OnWeaponAttack += OnWeaponAttackHandler;
+            player.OnItemUse += OnActionPerformedHandler;
+        }
+
+        knife.SetActive(false);
+        gun.SetActive(false);
     }
 
-    public void TriggerAttackAnimation3D()
-    {   
-        if (currentWeapon == -1) return;
-        if(currentWeapon == 0)
-        {
-            animator.SetTrigger("Slash");
-        }
-        else
-        {
-            animator.SetTrigger("Shoot");
-        }
-    }
-
-    public void TriggerInteractAnimation()
+    public void OnDisable()
     {
-        animator.SetTrigger("Interact");
+        if (player != null)
+        {
+            player.OnEquipChanged -= OnEquipChangedHandler;
+
+            player.OnHealthChanged -= OnHealthChangedHandler;
+            player.OnPlayerDied -= OnPlayerDiedHandler;        
+        }
+
+        if (itemHolder != null)
+        {
+            player.OnWeaponAttack -= OnWeaponAttackHandler;
+            player.OnItemUse -= OnActionPerformedHandler;
+        }
     }
 
-    // Update is called once per frame
-    void Update()
-    {  
+    public void Update()
+    {   
         speed = playerMovement.GetSpeed();
         direction = playerMovement.MoveInput;
-        if (itemHolder.CurrentWeapon != null)
-        {
-            currentWeapon = itemHolder.CurrentWeapon is MeleeWeapon ? 0 : 1;
-        }
-        else
-        {
-            currentWeapon = -1;
-        }
-        weaponDirection = player.GetWeaponDirection();
+        weaponDirection = player.GetWeaponDirection().normalized;
 
-        relativeDirection = weaponDirection.normalized - direction.normalized;
-
-        animator.SetInteger("weaponState", currentWeapon);
-
-        gun.SetActive(currentWeapon == 1);
-        knife.SetActive(currentWeapon == 0);
-
-        relativeDirection.x =  Vector2.Dot(direction, new Vector2(weaponDirection.y, -weaponDirection.x));
-        relativeDirection.y =  Vector2.Dot(direction, weaponDirection);
-
-        animator.SetFloat("moveX", relativeDirection.x);
-        animator.SetFloat("moveY", relativeDirection.y);
+        animator.SetFloat("moveX", Vector2.Dot(direction, new Vector2(weaponDirection.y, -weaponDirection.x)));
+        animator.SetFloat("moveY", Vector2.Dot(direction, weaponDirection));
 
         if (playerMovement.IsCameraMode) {
             animator.SetFloat("moveX", 0f);

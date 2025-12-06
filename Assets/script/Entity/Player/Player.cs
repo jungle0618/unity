@@ -115,17 +115,18 @@ public class Player : BaseEntity<PlayerState>, IEntity
     public event System.Action<float> OnSpeedChanged;
 
     // Hand/Weapon state events
-    public event System.Action OnHandsEmpty;
-    public event System.Action OnWeaponEquipped;
-    public event System.Action OnItemEquipped;
+    public event System.Action<Item> OnEquipChanged;
+    public event System.Action<Weapon> OnWeaponAttack;
+    public event System.Action OnItemUse;
 
     // Internal tracking
     private bool wasMoving = false;
     private bool wasRunning = false;
     private Vector2 lastDirection = Vector2.zero;
     private float lastSpeed = 0f;
-    private bool hadWeaponEquipped = false;
     private Item lastEquippedItem = null;
+    private bool wasAttacking = false;
+    private bool wasUsingItem = false;
 
     #endregion
 
@@ -393,26 +394,26 @@ public class Player : BaseEntity<PlayerState>, IEntity
         if (itemHolder != null)
         {
             Item currentItem = itemHolder.CurrentItem;
-            bool hasWeapon = itemHolder.IsCurrentItemWeapon;
             
-            // Check if switched to empty hands
-            if (currentItem == null && lastEquippedItem != null)
+            // Check if switched item
+            if (currentItem != lastEquippedItem)
             {
-                OnHandsEmpty?.Invoke();
-            }
-            // Check if equipped weapon
-            else if (hasWeapon && !hadWeaponEquipped)
-            {
-                OnWeaponEquipped?.Invoke();
-            }
-            // Check if equipped non-weapon item
-            else if (currentItem != null && !hasWeapon && lastEquippedItem != currentItem)
-            {
-                OnItemEquipped?.Invoke();
+                OnEquipChanged?.Invoke(currentItem);
             }
 
-            hadWeaponEquipped = hasWeapon;
             lastEquippedItem = currentItem;
+        }
+
+        // Check attack/use actions
+        if (wasAttacking)
+        {
+            OnWeaponAttack?.Invoke(itemHolder?.CurrentItem as Weapon);
+            wasAttacking = false;
+        }
+        if (wasUsingItem)
+        {
+            OnItemUse?.Invoke();
+            wasUsingItem = false;
         }
     }
 
@@ -459,12 +460,14 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         UpdateWeaponDirection();
         Debug.Log("[Player] OnAttackPerformed");
-        ItemHolder.TryAttack(gameObject);
+        if(ItemHolder.TryAttack(gameObject))
+            wasAttacking = true;
     }
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
         // 只處理開門（撿取物品已改為自動）
+        wasUsingItem = true;
         TryOpenDoor();
     }
     
