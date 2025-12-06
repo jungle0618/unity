@@ -33,11 +33,15 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     
     [Header("狀態速度倍數")]
     [Tooltip("各狀態的速度倍數（相對於基礎速度）")]
-    [SerializeField] private float patrolSpeedMultiplier = 1.0f;
+    [SerializeField] private float patrolSpeedMultiplier = 0.35f;
     [SerializeField] private float alertSpeedMultiplier = 1.0f;
     [SerializeField] private float chaseSpeedMultiplier = 1.5f;
     [SerializeField] private float searchSpeedMultiplier = 1.5f;
     [SerializeField] private float returnSpeedMultiplier = 1.0f;
+    
+    [Header("巡邏暫停設定")]
+    [Tooltip("到達巡邏點後的停留時間（秒）")]
+    private const float patrolPauseDuration = 0.5f;
 
     // 效能優化變數
     private float aiUpdateInterval = 0.15f;
@@ -56,6 +60,7 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
 
     // 公共屬性
     public EnemyState CurrentState => enemyStateMachine?.CurrentState ?? EnemyState.Dead;
+    public float PatrolPauseDuration => patrolPauseDuration;
     
     /// <summary>
     /// 根據當前狀態獲取速度倍數

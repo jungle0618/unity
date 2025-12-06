@@ -295,10 +295,12 @@ public class EnemyAIHandler : MonoBehaviour
                     enemyDetection?.SetViewDirection(movementDirection);
                 }
                 
-                // 檢查是否到達當前location
-                if (enemyMovement.HasArrivedAtLocation(patrolLocations[currentPatrolIndex]))
+                // 檢查是否需要前進到下一個巡邏點（暫停結束時）
+                if (enemyMovement.ShouldAdvancePatrolIndex())
                 {
+                    int oldIndex = currentPatrolIndex;
                     currentPatrolIndex = (currentPatrolIndex + 1) % patrolLocations.Length;
+                    Debug.LogWarning($"[{enemy.gameObject.name}] PATROL INDEX ADVANCED: {oldIndex} -> {currentPatrolIndex}");
                 }
             }
             else

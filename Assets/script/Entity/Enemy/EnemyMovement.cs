@@ -20,6 +20,10 @@ public class EnemyMovement : BaseMovement
 
     [Header("巡邏路徑")]
     [SerializeField] private Transform[] patrolPoints;
+    [Tooltip("巡邏速度倍數（相對於基礎速度，建議 0.3-0.5）")]
+    [SerializeField] private float patrolSpeedMultiplier = 0.35f;
+    [Tooltip("到達巡邏點後的停留時間（秒）")]
+    [SerializeField] private float patrolPauseDuration = 0.5f;
 
     [Header("路徑規劃")]
     [SerializeField] private bool usePathfinding = true;
@@ -34,6 +38,12 @@ public class EnemyMovement : BaseMovement
     private Vector2 spawnPoint;
     private int patrolIndex = 0;
     private GreedyPathfinding pathfinding;
+    
+    // 巡邏暫停
+    private bool isPausedAtPatrolPoint = false;
+    private float patrolPauseEndTime = 0f; // Changed from timer to end time
+    private int lastPatrolIndex = -1; // Track which patrol point we're pausing at
+    private bool shouldAdvancePatrolIndex = false; // Flag to advance after pause
     
     // 路徑規劃
     private List<PathfindingNode> currentPath = new List<PathfindingNode>();
@@ -110,13 +120,27 @@ public class EnemyMovement : BaseMovement
             patrolIndex = 0;
         }
 
-        Vector2 targetPos = patrolPoints[patrolIndex].position;
-        float speedMultiplier = GetStateSpeedMultiplier();
-        MoveTowards(targetPos, speedMultiplier);
+        // 檢查是否正在巡邏點暫停
+        if (isPausedAtPatrolPoint)
+        {
+            StopMovement();
+            
+            if (Time.time >= patrolPauseEndTime)
+            {
+                isPausedAtPatrolPoint = false;
+                AdvancePatrolIndex();
+            }
+            return;
+        }
 
+        Vector2 targetPos = patrolPoints[patrolIndex].position;
+        MoveTowards(targetPos, patrolSpeedMultiplier); // Use configured patrol speed
+
+        // 到達巡邏點時開始暫停
         if (Vector2.Distance(transform.position, targetPos) < arriveThreshold)
         {
-            AdvancePatrolIndex();
+            isPausedAtPatrolPoint = true;
+            patrolPauseEndTime = Time.time + patrolPauseDuration;
         }
     }
 
@@ -131,9 +155,47 @@ public class EnemyMovement : BaseMovement
             return;
         }
 
+        // 檢查是否正在巡邏點暫停
+        if (isPausedAtPatrolPoint && currentIndex == lastPatrolIndex)
+        {
+            StopMovement();
+            float remainingTime = patrolPauseEndTime - Time.time;
+            
+            Debug.Log($"[{gameObject.name}] PAUSED at index {currentIndex}, remaining: {remainingTime:F2}s");
+            
+            if (Time.time >= patrolPauseEndTime)
+            {
+                // 暫停結束，清除暫停狀態
+                isPausedAtPatrolPoint = false;
+                lastPatrolIndex = -1;
+                // 通知需要前進到下一個巡邏點（通過設置標記）
+                shouldAdvancePatrolIndex = true;
+                Debug.LogWarning($"[{gameObject.name}] PAUSE ENDED! Setting advance flag. Current index: {currentIndex}");
+            }
+            return;
+        }
+
         Vector2 targetPos = locations[currentIndex];
         float speedMultiplier = GetStateSpeedMultiplier();
+        float distance = Vector2.Distance(transform.position, targetPos);
+        
         MoveTowards(targetPos, speedMultiplier);
+        
+        // 檢查是否到達巡邏點
+        if (distance < arriveThreshold && !isPausedAtPatrolPoint)
+        {
+            // 獲取暫停時長
+            Enemy enemy = GetComponent<Enemy>();
+            float pauseDuration = enemy != null ? enemy.PatrolPauseDuration : 0f;
+            Debug.Log("pauseDuration: " + pauseDuration);
+            
+            // 開始暫停
+            isPausedAtPatrolPoint = true;
+            patrolPauseEndTime = Time.time + pauseDuration; // Set end time instead of countdown timer
+            lastPatrolIndex = currentIndex;
+            
+            Debug.LogWarning($"[{gameObject.name}] ARRIVED at patrol point {currentIndex} (dist: {distance:F2}), STARTING PAUSE for {pauseDuration}s (until {patrolPauseEndTime:F2})");
+        }
     }
 
     /// <summary>
@@ -142,6 +204,28 @@ public class EnemyMovement : BaseMovement
     public bool HasArrivedAtLocation(Vector3 location)
     {
         return Vector2.Distance(transform.position, location) < arriveThreshold;
+    }
+    
+    /// <summary>
+    /// 檢查是否正在巡邏點暫停
+    /// </summary>
+    public bool IsPausedAtPatrolPoint()
+    {
+        return isPausedAtPatrolPoint;
+    }
+    
+    /// <summary>
+    /// 檢查並清除巡邏索引前進標記
+    /// </summary>
+    public bool ShouldAdvancePatrolIndex()
+    {
+        if (shouldAdvancePatrolIndex)
+        {
+            shouldAdvancePatrolIndex = false;
+            Debug.LogWarning($"[{gameObject.name}] ShouldAdvancePatrolIndex() returning TRUE - index will advance!");
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
