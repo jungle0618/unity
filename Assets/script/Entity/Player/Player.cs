@@ -59,6 +59,10 @@ public class Player : BaseEntity<PlayerState>, IEntity
     [Header("視野設定")]
     [Tooltip("近距離360度視野範圍（全方向，半徑1-2）")]
     [SerializeField] private float nearViewRange = 1.5f; // 360度視野範圍
+
+    [Header("動畫控制器")]
+    [SerializeField] private PlayerAnimationController animationController;
+
     
     // 注意：viewRange 和 viewAngle 現在從基類 BaseEntity 獲取（baseViewRange, baseViewAngle）
     
@@ -459,11 +463,13 @@ public class Player : BaseEntity<PlayerState>, IEntity
 
         UpdateWeaponDirection();
         Debug.Log("[Player] OnAttackPerformed");
+        animationController.TriggerAttackAnimation3D();
         ItemHolder.TryAttack(gameObject);
     }
 
     private void OnActionPerformed(InputAction.CallbackContext ctx)
     {
+        animationController.TriggerInteractAnimation();
         // 只處理開門（撿取物品已改為自動）
         TryOpenDoor();
     }
@@ -549,7 +555,6 @@ public class Player : BaseEntity<PlayerState>, IEntity
             return;
         }
     }
-
 
     private void TrySwitchToWeaponType(string typeKey)
     {
