@@ -20,10 +20,9 @@ public class EnemyAnimationController : MonoBehaviour
 
     void Update()
     {
-        speed = enemy.GetSpeed();
         
         animator.SetFloat("Speed", speed);
-        
-        animator.SetInt("weaponState", 1);
+
+        animator.SetInteger("weaponState", 1);
     }
 }

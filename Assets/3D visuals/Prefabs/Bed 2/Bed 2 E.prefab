@@ -100,10 +100,30 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -4335762324661265829, guid: 12ce75cb8c50f9441bfdf9abf8b13f07,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
+      objectReference: {fileID: 0}
+    - target: {fileID: -3869610054579387764, guid: 12ce75cb8c50f9441bfdf9abf8b13f07,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
+      objectReference: {fileID: 0}
+    - target: {fileID: -593806973074502732, guid: 12ce75cb8c50f9441bfdf9abf8b13f07,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 12ce75cb8c50f9441bfdf9abf8b13f07,
         type: 3}
       propertyPath: m_Name
       value: BedTwin
+      objectReference: {fileID: 0}
+    - target: {fileID: 7587821206314611076, guid: 12ce75cb8c50f9441bfdf9abf8b13f07,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

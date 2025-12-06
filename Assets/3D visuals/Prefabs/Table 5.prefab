@@ -105,10 +105,20 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 8b3d36da0d752a64b98fe12f3159831d,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 659a9559a4c8a9c48a28bfe64a9a8373, type: 2}
     - target: {fileID: 919132149155446097, guid: 8b3d36da0d752a64b98fe12f3159831d,
         type: 3}
       propertyPath: m_Name
       value: Table 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8b3d36da0d752a64b98fe12f3159831d,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
