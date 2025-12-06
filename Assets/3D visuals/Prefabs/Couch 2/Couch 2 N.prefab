@@ -43,17 +43,17 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: a7072f55abd01804fb776be764d0eadf,
         type: 3}
       propertyPath: m_LocalScale.x
-      value: 3.2
+      value: 320
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7072f55abd01804fb776be764d0eadf,
         type: 3}
       propertyPath: m_LocalScale.y
-      value: 3.2
+      value: 320
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7072f55abd01804fb776be764d0eadf,
         type: 3}
       propertyPath: m_LocalScale.z
-      value: 3.2
+      value: 320
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: a7072f55abd01804fb776be764d0eadf,
         type: 3}
@@ -105,10 +105,20 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: a7072f55abd01804fb776be764d0eadf,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 954679578391d6e4abde2d08a3e26919, type: 2}
     - target: {fileID: 919132149155446097, guid: a7072f55abd01804fb776be764d0eadf,
         type: 3}
       propertyPath: m_Name
       value: Couch
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: a7072f55abd01804fb776be764d0eadf,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

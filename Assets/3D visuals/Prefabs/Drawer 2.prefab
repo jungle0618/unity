@@ -95,6 +95,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Drawer_1
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 19239fe3dfe1fd144bf1ac30e4394038,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
