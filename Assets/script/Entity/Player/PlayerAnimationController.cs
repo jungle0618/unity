@@ -13,9 +13,18 @@ public class PlayerAnimationController : MonoBehaviour
     [SerializeField] private GameObject knife;
 
     [Header("Bones")]
-    [SerializeField] private Transform torso;
     [SerializeField] private Transform chest;
-    [SerializeField, Range(0f, 1f)] private float upperBodyWeight = 0.5f;
+
+    [Header("Crouch Visual")]
+    [SerializeField] private Transform hips;
+    [SerializeField] private Transform torso;
+
+    [SerializeField] private float crouchDrop = 0.5f;
+    [SerializeField] private float crouchTorsoLean = 6f;
+    [SerializeField] private float crouchSpeed = 10f;
+
+    private Vector3 hipsLocalStartPos;
+    private Quaternion torsoLocalStartRot;
 
     private Vector2 speed = Vector2.zero;
     private Vector2 direction = Vector2.zero;
@@ -60,6 +69,9 @@ public class PlayerAnimationController : MonoBehaviour
 
         knife.SetActive(false);
         gun.SetActive(false);
+
+        hipsLocalStartPos = hips.localPosition;
+        torsoLocalStartRot = torso.localRotation;
     }
 
     public void OnDisable()
@@ -99,13 +111,49 @@ public class PlayerAnimationController : MonoBehaviour
 
     void LateUpdate()
     {
-        // Vector3 aimDir = new Vector3(weaponDirection.x, weaponDirection.y, 0f);
+    //     if (playerMovement.IsCameraMode)
+    //         return;
+        
+    //     float x = Vector2.Dot(weaponDirection, new Vector2(direction.y, -direction.x));
+    //     float y = Vector2.Dot(weaponDirection, direction);
 
-        // if (aimDir.sqrMagnitude > 0.001f)
-        // {
-        //     Quaternion targetRot = Quaternion.LookRotation(aimDir, Vector3.up);
-        //     chest.localRotation = Quaternion.Euler(0f, targetRot.eulerAngles.y - torso.rotation.eulerAngles.y, 0f);
-        // }
+    //     Debug.Log($"Weapon Dir: {weaponDirection}, Move Dir: {direction}, x: {x}, y: {y}");
+
+    //     Vector3 flatDir = new Vector3(x, 0f, y);
+
+    //     if (flatDir.sqrMagnitude > 0.001f)
+    //     {
+    //         float targetYaw = Mathf.Atan2(flatDir.x, flatDir.z) * Mathf.Rad2Deg;
+
+    //         chest.rotation = Quaternion.Euler(0f, 0f, targetYaw);
+    //     }
+        ApplyFakeCrouch(playerMovement.IsSquatting);
     }
 
+    void ApplyFakeCrouch(bool crouching)
+    {
+        // TARGET HIP HEIGHT (WORLD-DOWN)
+        Vector3 targetHips =
+            crouching
+            ? hipsLocalStartPos + Vector3.down * crouchDrop
+            : hipsLocalStartPos;
+
+        hips.localPosition = Vector3.Lerp(
+            hips.localPosition,
+            targetHips,
+            Time.deltaTime * crouchSpeed
+        );
+
+        // TARGET TORSO LEAN (SLIGHT FORWARD)
+        Quaternion targetTorso =
+            crouching
+            ? torsoLocalStartRot * Quaternion.Euler(crouchTorsoLean, 0f, 0f)
+            : torsoLocalStartRot;
+
+        torso.localRotation = Quaternion.Slerp(
+            torso.localRotation,
+            targetTorso,
+            Time.deltaTime * crouchSpeed
+        );
+    }
 }
