@@ -490,8 +490,9 @@ public class Enemy : BaseEntity<EnemyState>, IEntity
     protected override void OnDeath()
     {
         enemyStateMachine?.ChangeState(EnemyState.Dead);
-        gameObject.SetActive(false);
         OnEnemyDied?.Invoke(this);
+        Debug.Log($"{gameObject.name}: Fire OnEnemyDied event.");
+        gameObject.SetActive(false);
     }
 
     /// <summary>

@@ -3,10 +3,12 @@ using System;
 
 public class PlayerAnimationController : MonoBehaviour
 {
+    [Header("Settings")]
+    public float Hurt2AnimationThreshold = 0.5f;
+    [Header("References")]
     [SerializeField] private Player player;
     [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private Animator animator;
-    [SerializeField] private ItemHolder itemHolder;
     [SerializeField] private GameObject gun;
     [SerializeField] private GameObject knife;
 
@@ -16,7 +18,6 @@ public class PlayerAnimationController : MonoBehaviour
     private Action<Item> OnEquipChangedHandler;
     
     private Action<int, int> OnHealthChangedHandler;
-    private Action OnPlayerDiedHandler;
     
     private Action<Weapon> OnWeaponAttackHandler;
     private Action OnActionPerformedHandler;
@@ -30,15 +31,14 @@ public class PlayerAnimationController : MonoBehaviour
             knife = GetComponentInChildren<MeleeWeapon>(true).gameObject;
 
         OnEquipChangedHandler = (item) => {
-            int isMelee = itemHolder.CurrentWeapon is MeleeWeapon ? 0 : 1;
+            int isMelee = item is MeleeWeapon ? 0 : 1;
             if (item is EmptyHands) isMelee = -1;
             knife.SetActive(isMelee == 0);
             gun.SetActive(isMelee == 1);
             animator.SetInteger("weaponState", isMelee);
         };
 
-        OnHealthChangedHandler = (current, max) => {animator.SetTrigger("Hurt");};
-        OnPlayerDiedHandler = () => {animator.SetTrigger("Die");};
+        OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
         
         OnWeaponAttackHandler = (weapon) => {animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");};
         OnActionPerformedHandler = () => {animator.SetTrigger("Interact");};
@@ -48,11 +48,7 @@ public class PlayerAnimationController : MonoBehaviour
             player.OnEquipChanged += OnEquipChangedHandler;
 
             player.OnHealthChanged += OnHealthChangedHandler;
-            player.OnPlayerDied += OnPlayerDiedHandler;        
-        }
-
-        if (itemHolder != null)
-        {
+            player.OnPlayerDied += VFXManager.Instance.PlayerPlayDeathVFXHandler;
             player.OnWeaponAttack += OnWeaponAttackHandler;
             player.OnItemUse += OnActionPerformedHandler;
         }
@@ -68,11 +64,7 @@ public class PlayerAnimationController : MonoBehaviour
             player.OnEquipChanged -= OnEquipChangedHandler;
 
             player.OnHealthChanged -= OnHealthChangedHandler;
-            player.OnPlayerDied -= OnPlayerDiedHandler;        
-        }
-
-        if (itemHolder != null)
-        {
+            player.OnPlayerDied -= VFXManager.Instance.PlayerPlayDeathVFXHandler;
             player.OnWeaponAttack -= OnWeaponAttackHandler;
             player.OnItemUse -= OnActionPerformedHandler;
         }
