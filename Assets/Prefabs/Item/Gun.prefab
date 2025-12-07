@@ -5017,10 +5017,13 @@ MonoBehaviour:
   startingAmmo: 3
   bulletPrefab: {fileID: 3795827902366607150, guid: 1e30be19f9284df4cbe350826c5bbac4,
     type: 3}
-  bulletSpeed: 30
+  bulletSpeed: 100
   firePoint: {fileID: 2495505718286392461}
   alertRange: 15
   muzzleFlash: {fileID: 0}
+  enableMovementJitter: 1
+  maxJitterAngle: 5
+  jitterSpeedThreshold: 0.1
 --- !u!114 &3143689069840469098
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5039,5 +5042,7 @@ MonoBehaviour:
   segmentCount: 10
   dashLength: 0.5
   gapLength: 0.5
+  jitterAreaColor: {r: 1, g: 0.5, b: 0, a: 0.2}
+  jitterBoundaryLines: 2
   onlyShowForPlayer: 1
   sortingOrder: 10
