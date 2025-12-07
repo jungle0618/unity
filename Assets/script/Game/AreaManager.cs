@@ -222,7 +222,6 @@ public class AreaManager : MonoBehaviour
         
         // Convert world position to map position
         Vector2 mapPos = ConvertWorldToMapPosition(area.center, mapUI);
-        Debug.LogWarning($"[AreaManager] Mapping Guard Area '{area.areaName}' at world {area.center} to map {mapPos}");
         // Vector2 mapSize = area.size * 2f; // Same scale as position conversion
         // Get the corners of the area in world space
         Vector2 worldMin = area.center - area.size / 2f;
@@ -289,7 +288,6 @@ public class AreaManager : MonoBehaviour
         {
             try
             {
-                Debug.LogWarning("[AreaManager] Invoking WorldToMapPosition via reflection");
                 return (Vector2)method.Invoke(mapUI, new object[] { new Vector3(worldPos.x, worldPos.y, 0f) });
             }
             catch (System.Exception)
@@ -297,7 +295,6 @@ public class AreaManager : MonoBehaviour
                 // Fall through to fallback
             }
         }
-        Debug.LogWarning("[AreaManager] Could not invoke WorldToMapPosition via reflection - using fallback conversion");
         // Fallback: simple conversion (adjust multiplier based on your map scale)
         return worldPos * 2f;
     }
