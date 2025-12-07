@@ -475,21 +475,41 @@ public class WinConditionManager : MonoBehaviour
         EntityManager em = GetEntityManager();
         if (em != null)
         {
-            allTargetsKilled = em.AreAllTargetsDead();
+            // 先檢查是否有活躍的目標（使用公開方法）
+            int activeTargetCount = em.GetActiveTargetCount();
+            if (activeTargetCount > 0)
+            {
+                // 有目標存在，檢查是否全部死亡
+                allTargetsKilled = em.AreAllTargetsDead();
+            }
+            else
+            {
+                // 如果沒有目標，且 requireTargetKilled = true，則不應該滿足勝利條件
+                // 所以 allTargetsKilled 保持為 false
+                allTargetsKilled = false;
+            }
         }
         else
         {
             // 如果 EntityManager 不可用，回退到本地檢查
-            bool allDead = true;
-            foreach (var target in targets)
+            if (targets.Count == 0)
             {
-                if (target != null && !target.IsDead)
-                {
-                    allDead = false;
-                    break;
-                }
+                // 沒有目標，不應該認為所有目標都死了
+                allTargetsKilled = false;
             }
-            allTargetsKilled = allDead;
+            else
+            {
+                bool allDead = true;
+                foreach (var target in targets)
+                {
+                    if (target != null && !target.IsDead)
+                    {
+                        allDead = false;
+                        break;
+                    }
+                }
+                allTargetsKilled = allDead;
+            }
         }
     }
     

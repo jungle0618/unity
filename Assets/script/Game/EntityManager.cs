@@ -601,7 +601,8 @@ public class EntityManager : MonoBehaviour
     public bool AreAllTargetsDead()
     {
         var targets = eventManager?.ActiveTargets;
-        if (targets == null || targets.Count == 0) return true;
+        // 如果沒有目標，返回 false（因為沒有目標 = 沒有目標被殺死，不應該認為"所有目標都死了"）
+        if (targets == null || targets.Count == 0) return false;
         return !targets.Any(target => target != null && !target.IsDead);
     }
 

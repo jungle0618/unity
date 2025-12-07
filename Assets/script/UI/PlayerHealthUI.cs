@@ -33,8 +33,23 @@ public class PlayerHealthUI : MonoBehaviour
     [Header("Target Player")]
     [SerializeField] private Player player;
     
+    [Header("Auto Find Settings")]
+    [SerializeField] private bool autoFindPlayer = true; // 是否自動查找 Player
+    [SerializeField] private bool useEntityManager = true; // 是否使用 EntityManager 獲取 Player
+    
     private float barWidth; // 血條寬度（用於計算前景條寬度）
     private float barHeight; // 血條高度
+    private bool isInitialized = false;
+    private EntityManager entityManager;
+    
+    private void Awake()
+    {
+        // 嘗試獲取 EntityManager 引用
+        if (useEntityManager)
+        {
+            entityManager = FindFirstObjectByType<EntityManager>();
+        }
+    }
     
     private void Start()
     {
@@ -43,18 +58,71 @@ public class PlayerHealthUI : MonoBehaviour
         {
             InitializePlayer();
         }
-        // 否則，等待 HealthUIManager 通過 SetPlayer() 設定
-        else
+        // 否則，嘗試獲取 Player
+        else if (autoFindPlayer)
         {
-            // 備用方案：嘗試查找 Player（如果 HealthUIManager 沒有使用）
+            TryFindPlayer();
+        }
+    }
+    
+    private void Update()
+    {
+        // 如果還沒初始化，持續嘗試獲取 Player
+        if (!isInitialized && autoFindPlayer && player == null)
+        {
+            TryFindPlayer();
+        }
+    }
+    
+    /// <summary>
+    /// 嘗試查找 Player
+    /// </summary>
+    private void TryFindPlayer()
+    {
+        if (isInitialized || player != null) return;
+        
+        // 優先從 EntityManager 獲取 Player（如果可用）
+        if (useEntityManager && entityManager != null)
+        {
+            player = entityManager.Player;
+            
+            // 如果 Player 還沒準備好，訂閱事件
+            if (player == null && entityManager != null)
+            {
+                entityManager.OnPlayerReady += HandlePlayerReady;
+                return; // 等待事件觸發
+            }
+        }
+        
+        // 如果 EntityManager 不可用或 Player 為 null，直接查找
+        if (player == null)
+        {
             player = FindFirstObjectByType<Player>();
+        }
+        
+        // 如果找到 Player，初始化
+        if (player != null)
+        {
+            InitializePlayer();
+        }
+    }
+    
+    /// <summary>
+    /// 處理 Player 準備就緒事件
+    /// </summary>
+    private void HandlePlayerReady()
+    {
+        if (isInitialized || player != null) return;
+        
+        if (entityManager != null)
+        {
+            player = entityManager.Player;
             if (player != null)
             {
                 InitializePlayer();
-            }
-            else
-            {
-                Debug.LogWarning("PlayerHealthUI: 找不到Player，等待 SetPlayer() 被調用...");
+                
+                // 取消訂閱（只需要一次）
+                entityManager.OnPlayerReady -= HandlePlayerReady;
             }
         }
     }
@@ -79,6 +147,9 @@ public class PlayerHealthUI : MonoBehaviour
         
         // 初始化顯示
         UpdateHealthDisplay();
+        
+        isInitialized = true;
+        Debug.Log($"PlayerHealthUI: 已成功找到並初始化 Player: {player.name}");
     }
     
     /// <summary>
@@ -255,6 +326,12 @@ public class PlayerHealthUI : MonoBehaviour
             player.OnHealthChanged -= OnHealthChanged;
             player.OnPlayerDied -= OnPlayerDied;
         }
+        
+        // 取消訂閱 EntityManager 事件
+        if (entityManager != null)
+        {
+            entityManager.OnPlayerReady -= HandlePlayerReady;
+        }
     }
     
     /// <summary>
@@ -330,7 +407,8 @@ public class PlayerHealthUI : MonoBehaviour
     /// </summary>
     public void SetPlayer(Player targetPlayer)
     {
-        Debug.Log("PlayerHealthUI: 設定目標玩家: " + targetPlayer.name);
+        Debug.Log("PlayerHealthUI: 設定目標玩家: " + (targetPlayer != null ? targetPlayer.name : "null"));
+        
         // 取消訂閱舊的玩家
         if (player != null)
         {
@@ -339,11 +417,20 @@ public class PlayerHealthUI : MonoBehaviour
         }
         
         player = targetPlayer;
+        isInitialized = false; // 重置初始化狀態
         
         // 訂閱新的玩家並初始化
         if (player != null)
         {
             InitializePlayer();
         }
+    }
+    
+    /// <summary>
+    /// 檢查是否已初始化
+    /// </summary>
+    public bool IsInitialized()
+    {
+        return isInitialized && player != null;
     }
 }

@@ -10,26 +10,53 @@ public class DangerUIManager : MonoBehaviour
     [SerializeField] private DangerousUI dangerousUI;
     
     private DangerousManager dangerousManager;
+    private bool isInitialized = false;
     
     /// <summary>
     /// 初始化危險等級UI
     /// </summary>
     public void Initialize()
     {
+        if (isInitialized) return;
+        
+        // 嘗試獲取 DangerousManager（可能還沒初始化，需要重試）
+        TryInitialize();
+    }
+    
+    private void Update()
+    {
+        // 如果還沒初始化，持續嘗試獲取 DangerousManager
+        if (!isInitialized)
+        {
+            TryInitialize();
+        }
+    }
+    
+    /// <summary>
+    /// 嘗試初始化（獲取 DangerousManager）
+    /// </summary>
+    private void TryInitialize()
+    {
+        if (isInitialized) return;
+        
         // 獲取 DangerousManager
         dangerousManager = DangerousManager.Instance;
         
-        // 訂閱事件
-        if (dangerousManager != null)
+        if (dangerousManager == null)
         {
-            dangerousManager.OnDangerLevelTypeChanged += OnDangerLevelChanged;
+            // DangerousManager 可能還沒初始化，稍後再試
+            return;
         }
+        
+        // 訂閱事件
+        dangerousManager.OnDangerLevelTypeChanged += OnDangerLevelChanged;
         
         // 設定危險等級UI
         if (dangerousUI != null)
         {
             // DangerousUI會自動獲取DangerousManager.Instance，不需要額外設定
-            Debug.Log("DangerUIManager: 危險等級UI已初始化");
+            isInitialized = true;
+            Debug.Log("DangerUIManager: 危險等級UI已初始化，已找到 DangerousManager");
         }
         else
         {

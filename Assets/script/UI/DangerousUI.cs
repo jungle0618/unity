@@ -43,15 +43,36 @@ public class DangerousUI : MonoBehaviour
     private DangerousManager dangerousManager;
     private float barWidth; // 危險指數條寬度（用於計算前景條寬度）
     private float barHeight; // 危險指數條高度
+    private bool isInitialized = false;
     
     private void Start()
     {
+        // 嘗試獲取 DangerousManager（可能還沒初始化，需要重試）
+        TryInitialize();
+    }
+    
+    private void Update()
+    {
+        // 如果還沒初始化，持續嘗試獲取 DangerousManager
+        if (!isInitialized)
+        {
+            TryInitialize();
+        }
+    }
+    
+    /// <summary>
+    /// 嘗試初始化（獲取 DangerousManager）
+    /// </summary>
+    private void TryInitialize()
+    {
+        if (isInitialized) return;
+        
         // 獲取DangerousManager實例
         dangerousManager = DangerousManager.Instance;
         
         if (dangerousManager == null)
         {
-            Debug.LogError("DangerousUI: 找不到DangerousManager實例！");
+            // DangerousManager 可能還沒初始化，稍後再試
             return;
         }
         
@@ -64,6 +85,9 @@ public class DangerousUI : MonoBehaviour
         
         // 初始化顯示
         UpdateDangerDisplay();
+        
+        isInitialized = true;
+        Debug.Log("DangerousUI: 已成功找到並初始化 DangerousManager");
     }
     
     /// <summary>
@@ -240,6 +264,14 @@ public class DangerousUI : MonoBehaviour
             dangerousManager.OnDangerLevelChanged -= OnDangerLevelChanged;
             dangerousManager.OnDangerLevelTypeChanged -= OnDangerLevelTypeChanged;
         }
+    }
+    
+    /// <summary>
+    /// 檢查是否已初始化
+    /// </summary>
+    public bool IsInitialized()
+    {
+        return isInitialized && dangerousManager != null;
     }
     
     /// <summary>
