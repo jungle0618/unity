@@ -624,8 +624,8 @@ MonoBehaviour:
   chest: {fileID: 1055267127124430960}
   hips: {fileID: 2344385314398178958}
   torso: {fileID: 3148335654680866957}
-  crouchDrop: 0.01
-  crouchTorsoLean: 6.36
+  crouchDrop: 0.03
+  crouchTorsoLean: 179
   crouchSpeed: 10
 --- !u!4 &3012656581836601420 stripped
 Transform:
