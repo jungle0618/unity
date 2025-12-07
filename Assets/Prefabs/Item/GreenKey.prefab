@@ -103,7 +103,7 @@ GameObject:
   m_Layer: 0
   m_Name: GreenKey
   m_TagString: Untagged
-  m_Icon: {fileID: 0}
+  m_Icon: {fileID: 2800000, guid: 9224289d41044aa4b83cc12512e2bd02, type: 3}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -138,4 +138,4 @@ MonoBehaviour:
   itemName: GreenKey
   itemIcon: {fileID: -859464744, guid: 9224289d41044aa4b83cc12512e2bd02, type: 3}
   keyType: 3
-  consumeOnUse: 1
+  consumeOnUse: 0
