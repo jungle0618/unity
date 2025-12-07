@@ -18,6 +18,8 @@ public class DialogueUIManager : MonoBehaviour
     [SerializeField] private Button skipButton;                 // 跳過按鈕（可選）
     [SerializeField] private GameObject buttonContainer;        // 按鈕容器（可選）
     
+    private Button dialoguePanelButton;                         // 對話面板點擊區域（自動生成或手動指定）
+    
     [Header("Display Settings")]
     [SerializeField] private bool enableTypewriterEffect = true; // 是否啟用打字機效果
     [SerializeField] private float typewriterSpeed = 0.05f;      // 打字機速度（每個字元間隔）
@@ -42,6 +44,10 @@ public class DialogueUIManager : MonoBehaviour
     private bool isInitialized = false;
     private string currentMessage = ""; // 保存當前正在顯示的完整訊息
     private GameUIManager gameUIManager; // GameUIManager 引用
+    
+    // Skip functionality
+    private HashSet<string> shownDialogues = new HashSet<string>(); // 已顯示過的對話
+    private const string SHOWN_DIALOGUES_KEY = "ShownDialogues"; // PlayerPrefs 鍵
     
     /// <summary>
     /// 對話條目結構
@@ -84,12 +90,17 @@ public class DialogueUIManager : MonoBehaviour
         {
             continueButton.onClick.AddListener(OnContinueButtonClicked);
             UpdateContinueButtonText(continueButtonText);
+            // 隱藏繼續按鈕（改用點擊面板繼續）
+            continueButton.gameObject.SetActive(false);
         }
         
         if (skipButton != null)
         {
             skipButton.onClick.AddListener(OnSkipButtonClicked);
         }
+        
+        // 設定對話面板點擊區域
+        SetupDialoguePanelClickArea();
         
         // 初始隱藏
         dialoguePanel.SetActive(false);
@@ -103,6 +114,9 @@ public class DialogueUIManager : MonoBehaviour
                 Debug.LogWarning("DialogueUIManager: 未找到 GameUIManager，無法隱藏其他 UI");
             }
         }
+        
+        // 載入已顯示過的對話記錄
+        LoadShownDialogues();
         
         isInitialized = true;
         Debug.Log("DialogueUIManager: 對話UI已初始化");
@@ -141,6 +155,19 @@ public class DialogueUIManager : MonoBehaviour
     /// <param name="onComplete">所有對話完成回調（可選）</param>
     public void ShowDialogues(string[] messages, string speakerName = "", Action onComplete = null)
     {
+        // 調用帶 dialogueId 的版本，但不傳遞 ID（不啟用跳過功能）
+        ShowDialogues(messages, speakerName, "", onComplete);
+    }
+    
+    /// <summary>
+    /// 顯示多條對話（支援跳過功能）
+    /// </summary>
+    /// <param name="messages">對話內容陣列</param>
+    /// <param name="speakerName">說話者名稱（可選，所有對話使用同一名稱）</param>
+    /// <param name="dialogueId">對話唯一ID（用於記錄是否已顯示，可選）</param>
+    /// <param name="onComplete">所有對話完成回調（可選）</param>
+    public void ShowDialogues(string[] messages, string speakerName, string dialogueId, Action onComplete)
+    {
         if (!isInitialized)
         {
             Debug.LogWarning("DialogueUIManager: 尚未初始化！");
@@ -153,13 +180,32 @@ public class DialogueUIManager : MonoBehaviour
             return;
         }
         
+        // 檢查是否應該跳過（只顯示最後一條）
+        bool skipToLast = !string.IsNullOrEmpty(dialogueId) && HasShownDialogue(dialogueId);
+        
         // 清空現有對話隊列
         ClearDialogueQueue();
         
-        // 添加所有對話
-        foreach (string message in messages)
+        // 根據跳過狀態添加對話
+        if (skipToLast)
         {
-            dialogueQueue.Enqueue(new DialogueEntry(message, speakerName));
+            // 只添加最後一條對話
+            Debug.Log($"DialogueUIManager: 對話 '{dialogueId}' 已顯示過，只顯示最後一條");
+            dialogueQueue.Enqueue(new DialogueEntry(messages[messages.Length - 1], speakerName));
+        }
+        else
+        {
+            // 添加所有對話
+            foreach (string message in messages)
+            {
+                dialogueQueue.Enqueue(new DialogueEntry(message, speakerName));
+            }
+            
+            // 標記為已顯示（如果有 ID）
+            if (!string.IsNullOrEmpty(dialogueId))
+            {
+                MarkDialogueAsShown(dialogueId);
+            }
         }
         
         onDialogueComplete = onComplete;
@@ -477,6 +523,134 @@ public class DialogueUIManager : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// 自動設定對話面板點擊區域
+    /// </summary>
+    private void SetupDialoguePanelClickArea()
+    {
+        if (dialoguePanel == null)
+        {
+            Debug.LogWarning("DialogueUIManager: 對話面板為空，無法設定點擊區域");
+            return;
+        }
+        
+        // 檢查是否已有 Button 組件
+        dialoguePanelButton = dialoguePanel.GetComponent<Button>();
+        
+        if (dialoguePanelButton == null)
+        {
+            // 添加 Button 組件
+            dialoguePanelButton = dialoguePanel.AddComponent<Button>();
+            Debug.Log("DialogueUIManager: 已添加對話面板點擊區域 Button 組件");
+        }
+        
+        // 設定為透明（不影響視覺）
+        dialoguePanelButton.transition = UnityEngine.UI.Selectable.Transition.None;
+        
+        // 添加點擊監聽
+        dialoguePanelButton.onClick.AddListener(OnContinueButtonClicked);
+        
+        // 確保對話面板有 Image 組件（Button 需要 Graphic 組件才能接收點擊）
+        UnityEngine.UI.Image panelImage = dialoguePanel.GetComponent<UnityEngine.UI.Image>();
+        if (panelImage == null)
+        {
+            panelImage = dialoguePanel.AddComponent<UnityEngine.UI.Image>();
+            // 設定為幾乎透明但仍可接收點擊
+            Color transparent = Color.white;
+            transparent.a = 0.01f;
+            panelImage.color = transparent;
+            Debug.Log("DialogueUIManager: 已添加 Image 組件用於點擊檢測");
+        }
+        
+        // 確保 Raycast Target 啟用
+        panelImage.raycastTarget = true;
+        
+        Debug.Log("DialogueUIManager: 對話面板點擊區域已設定完成");
+    }
+    
+    // ========== Skip Functionality Helper Methods ==========
+    
+    /// <summary>
+    /// 載入已顯示過的對話記錄
+    /// </summary>
+    private void LoadShownDialogues()
+    {
+        if (!PlayerPrefs.HasKey(SHOWN_DIALOGUES_KEY))
+        {
+            shownDialogues = new HashSet<string>();
+            return;
+        }
+        
+        string savedData = PlayerPrefs.GetString(SHOWN_DIALOGUES_KEY);
+        if (string.IsNullOrEmpty(savedData))
+        {
+            shownDialogues = new HashSet<string>();
+            return;
+        }
+        
+        // 分割儲存的對話 ID（使用逗號分隔）
+        string[] dialogueIds = savedData.Split(',');
+        shownDialogues = new HashSet<string>(dialogueIds);
+        
+        Debug.Log($"DialogueUIManager: 載入了 {shownDialogues.Count} 個已顯示的對話記錄");
+    }
+    
+    /// <summary>
+    /// 儲存已顯示過的對話記錄
+    /// </summary>
+    private void SaveShownDialogues()
+    {
+        if (shownDialogues.Count == 0)
+        {
+            PlayerPrefs.SetString(SHOWN_DIALOGUES_KEY, "");
+        }
+        else
+        {
+            // 將 HashSet 轉換為逗號分隔的字串
+            string savedData = string.Join(",", shownDialogues);
+            PlayerPrefs.SetString(SHOWN_DIALOGUES_KEY, savedData);
+        }
+        
+        PlayerPrefs.Save();
+    }
+    
+    /// <summary>
+    /// 檢查對話是否已顯示過
+    /// </summary>
+    /// <param name="dialogueId">對話唯一ID</param>
+    /// <returns>是否已顯示過</returns>
+    private bool HasShownDialogue(string dialogueId)
+    {
+        return !string.IsNullOrEmpty(dialogueId) && shownDialogues.Contains(dialogueId);
+    }
+    
+    /// <summary>
+    /// 標記對話為已顯示
+    /// </summary>
+    /// <param name="dialogueId">對話唯一ID</param>
+    private void MarkDialogueAsShown(string dialogueId)
+    {
+        if (string.IsNullOrEmpty(dialogueId)) return;
+        
+        if (!shownDialogues.Contains(dialogueId))
+        {
+            shownDialogues.Add(dialogueId);
+            SaveShownDialogues();
+            Debug.Log($"DialogueUIManager: 對話 '{dialogueId}' 已標記為已顯示");
+        }
+    }
+    
+    /// <summary>
+    /// 重置所有已顯示的對話記錄（用於新遊戲或重置進度）
+    /// </summary>
+    public void ResetShownDialogues()
+    {
+        shownDialogues.Clear();
+        PlayerPrefs.DeleteKey(SHOWN_DIALOGUES_KEY);
+        PlayerPrefs.Save();
+        Debug.Log("DialogueUIManager: 已重置所有對話記錄");
+    }
+    
     private void OnDestroy()
     {
         // 清理按鈕監聽器
@@ -488,6 +662,11 @@ public class DialogueUIManager : MonoBehaviour
         if (skipButton != null)
         {
             skipButton.onClick.RemoveListener(OnSkipButtonClicked);
+        }
+        
+        if (dialoguePanelButton != null)
+        {
+            dialoguePanelButton.onClick.RemoveListener(OnContinueButtonClicked);
         }
         
         // 恢復時間縮放
