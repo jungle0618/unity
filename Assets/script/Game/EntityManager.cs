@@ -153,7 +153,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Item mappings 已確定：{itemManager.ItemMappingDict.Count} 個物品映射");
+            //Debug.Log($"[EntityManager] Item mappings 已確定：{itemManager.ItemMappingDict.Count} 個物品映射");
         }
 
         // 3. 初始化攻擊系統
@@ -214,7 +214,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] WinConditionManager 已初始化，出口點: {exitPoint}");
+            //Debug.Log($"[EntityManager] WinConditionManager 已初始化，出口點: {exitPoint}");
         }
     }
     
@@ -263,7 +263,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log("[EntityManager] 開始生成實體（item mappings 已確定）");
+            //Debug.Log("[EntityManager] 開始生成實體（item mappings 已確定）");
         }
         
         // 生成所有實體
@@ -371,7 +371,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Subscribed to {allEnemies.Count} enemies' death events");
+            //Debug.Log($"[EntityManager] Subscribed to {allEnemies.Count} enemies' death events");
         }
     }
     
@@ -410,7 +410,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Target died: {deadTarget.gameObject.name}");
+            //Debug.Log($"[EntityManager] Target died: {deadTarget.gameObject.name}");
         }
         
         // 注意：Target 死亡事件已由 WinConditionManager 直接監聽，不需要通過 GameManager
@@ -425,7 +425,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Target reached escape point: {target.gameObject.name}");
+            //Debug.Log($"[EntityManager] Target reached escape point: {target.gameObject.name}");
         }
         
         // 注意：Target 到達逃亡點事件已由 WinConditionManager 直接監聽，不需要通過 GameManager
@@ -464,7 +464,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Updated all enemies for danger level {currentLevel}");
+            //Debug.Log($"[EntityManager] Updated all enemies for danger level {currentLevel}");
         }
     }
 
@@ -533,7 +533,7 @@ public class EntityManager : MonoBehaviour
         
         var enemyDataList = dataLoader?.GetEntitiesByType(EntityDataLoader.EntityType.Enemy) ?? new List<EntityDataLoader.EntityData>();
         
-        Debug.Log("=== 所有敵人生成點資訊 ===");
+        //Debug.Log("=== 所有敵人生成點資訊 ===");
         for (int i = 0; i < enemyDataList.Count; i++)
         {
             var data = enemyDataList[i];
@@ -541,14 +541,14 @@ public class EntityManager : MonoBehaviour
             {
                 string patrolInfo = string.Join(" -> ", data.patrolPoints.Select(p => $"({p.x:F1},{p.y:F1})"));
                 string itemsInfo = data.itemNames.Count > 0 ? string.Join(", ", data.itemNames) : "None";
-                Debug.Log($"敵人 {data.entityIndex} ({data.type}): 生成點 {data.patrolPoints[0]} | 物品: [{itemsInfo}] | 巡邏路線: {patrolInfo}");
+                //Debug.Log($"敵人 {data.entityIndex} ({data.type}): 生成點 {data.patrolPoints[0]} | 物品: [{itemsInfo}] | 巡邏路線: {patrolInfo}");
             }
             else
             {
                 Debug.LogWarning($"敵人 {i}: 沒有有效的資料");
             }
         }
-        Debug.Log($"總共 {enemyDataList.Count} 個敵人");
+        //Debug.Log($"總共 {enemyDataList.Count} 個敵人");
     }
 
     /// <summary>
@@ -683,7 +683,7 @@ public class EntityManager : MonoBehaviour
     {
         yield return null;
         spawner?.SpawnInitialEntities();
-        Debug.Log($"EntityManager: Respawned {ActiveEnemyCount} enemies");
+        //Debug.Log($"EntityManager: Respawned {ActiveEnemyCount} enemies");
     }
 
     #endregion
@@ -705,7 +705,7 @@ public class EntityManager : MonoBehaviour
 
         if (showDebugInfo)
         {
-            Debug.Log($"EntityManager: Alerted {alertedCount} enemies within {alertRange} units");
+            //Debug.Log($"EntityManager: Alerted {alertedCount} enemies within {alertRange} units");
         }
     }
 
@@ -789,7 +789,7 @@ public class EntityManager : MonoBehaviour
             InitializePlayerDetection();
         }
         
-        Debug.Log($"[EntityManager] 玩家偵測系統設定 - 啟用: {enabled}, 自動註冊: {autoRegister}");
+        //Debug.Log($"[EntityManager] 玩家偵測系統設定 - 啟用: {enabled}, 自動註冊: {autoRegister}");
     }
 
     /// <summary>

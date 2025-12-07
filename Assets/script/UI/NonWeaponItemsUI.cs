@@ -27,7 +27,7 @@ public class NonWeaponItemsUI : MonoBehaviour
     /// </summary>
     public void Initialize()
     {
-        Debug.Log("[NonWeaponItemsUI] Initialize called");
+        //Debug.Log("[NonWeaponItemsUI] Initialize called");
         
         // 檢查必要組件
         if (itemIconPrefab == null)
@@ -47,7 +47,7 @@ public class NonWeaponItemsUI : MonoBehaviour
             if (player != null)
             {
                 itemHolder = player.GetComponent<ItemHolder>();
-                Debug.Log($"[NonWeaponItemsUI] Found player ItemHolder: {itemHolder != null}");
+                //Debug.Log($"[NonWeaponItemsUI] Found player ItemHolder: {itemHolder != null}");
             }
             else
             {
@@ -59,7 +59,7 @@ public class NonWeaponItemsUI : MonoBehaviour
         if (itemHolder != null)
         {
             itemHolder.OnItemChanged += OnItemChanged;
-            Debug.Log("[NonWeaponItemsUI] Subscribed to ItemHolder events");
+            //Debug.Log("[NonWeaponItemsUI] Subscribed to ItemHolder events");
         }
         else
         {
@@ -122,7 +122,7 @@ public class NonWeaponItemsUI : MonoBehaviour
         var allItems = itemHolder.GetAllItems();
         var nonWeaponItems = allItems.Where(item => !(item is Weapon)).ToList();
         
-        Debug.Log($"[NonWeaponItemsUI] RefreshItemsDisplay: {nonWeaponItems.Count} non-weapon items, {itemIcons.Count} icons");
+        //Debug.Log($"[NonWeaponItemsUI] RefreshItemsDisplay: {nonWeaponItems.Count} non-weapon items, {itemIcons.Count} icons");
         
         // 先移除多餘的圖示（從後往前）
         while (itemIcons.Count > nonWeaponItems.Count)
@@ -222,7 +222,7 @@ public class NonWeaponItemsUI : MonoBehaviour
         if (lastIcon != null && lastIcon.gameObject != null)
         {
             Destroy(lastIcon.gameObject);
-            Debug.Log($"[NonWeaponItemsUI] Removed item icon at index {lastIndex}");
+            //Debug.Log($"[NonWeaponItemsUI] Removed item icon at index {lastIndex}");
         }
     }
     

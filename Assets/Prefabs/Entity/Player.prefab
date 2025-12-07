@@ -223,6 +223,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c60ecc239295d0428d0c0ae55084260, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  patrolPoints: []
   normalSpeedMultiplier: 1
   runSpeedMultiplier: 1.5
   arrivalThreshold: 0.1
@@ -253,6 +254,7 @@ MonoBehaviour:
   pickupRange: 1
   enableAutoPickup: 1
   autoPickupCheckInterval: 0.2
+  nearViewRange: 1.5
 --- !u!114 &952130877989713656
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -281,7 +283,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b93ddbb9c87cfa4a8703f000f8345d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityHealth
-  maxHealth: 4000
+  maxHealth: 50
   currentHealth: 0
   damageReduction: 0
   invulnerabilityTime: 0

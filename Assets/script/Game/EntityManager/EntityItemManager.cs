@@ -81,7 +81,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"EntityItemManager: Initialized {itemNameToPrefab.Count} item mappings");
+                //Debug.Log($"EntityItemManager: Initialized {itemNameToPrefab.Count} item mappings");
             }
         }
 
@@ -136,7 +136,7 @@ namespace Game.EntityManager
                     equippedCount++;
                     if (showDebugInfo)
                     {
-                        Debug.Log($"EntityItemManager: Added '{itemName}' to {entity.name}");
+                        //Debug.Log($"EntityItemManager: Added '{itemName}' to {entity.name}");
                     }
                 }
                 else
@@ -161,7 +161,7 @@ namespace Game.EntityManager
                             itemHolder.SwitchToItem(i);
                             if (showDebugInfo)
                             {
-                                Debug.Log($"EntityItemManager: Equipped first weapon '{weapons[0].ItemName}' to {entity.name}");
+                                //Debug.Log($"EntityItemManager: Equipped first weapon '{weapons[0].ItemName}' to {entity.name}");
                             }
                             break;
                         }
@@ -173,14 +173,14 @@ namespace Game.EntityManager
                     itemHolder.SwitchToItem(0);
                     if (showDebugInfo)
                     {
-                        Debug.Log($"EntityItemManager: Equipped first item to {entity.name}");
+                        //Debug.Log($"EntityItemManager: Equipped first item to {entity.name}");
                     }
                 }
             }
 
             if (showDebugInfo && equippedCount > 0)
             {
-                Debug.Log($"EntityItemManager: Added {equippedCount} items to {entity.name}");
+                //Debug.Log($"EntityItemManager: Added {equippedCount} items to {entity.name}");
             }
         }
 

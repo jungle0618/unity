@@ -55,13 +55,26 @@ public class EntityHealth : MonoBehaviour
     /// <param name="damage">傷害值</param>
     /// <param name="source">傷害來源</param>
     /// <param name="entityName">實體名稱（用於日誌）</param>
+    /// <param name="attackerPosition">攻擊者位置（用於視野檢測，可選）</param>
     /// <returns>是否造成傷害（如果無敵則返回 false）</returns>
-    public bool TakeDamage(int damage, string source = "", string entityName = "")
+    public bool TakeDamage(int damage, string source = "", string entityName = "", Vector2? attackerPosition = null)
     {
         if (IsDead || IsInvulnerable) return false;
         
-        // 應用傷害減少
-        float actualDamage = damage * (1f - damageReduction);
+        // 計算視野倍率：被攻擊者能看到攻擊者 ? 1 : 2
+        float visionMultiplier = 1f;
+        if (attackerPosition.HasValue)
+        {
+            var detection = GetComponent<BaseDetection>();
+            if (detection != null)
+            {
+                bool canSeeAttacker = detection.CanSeeTarget(attackerPosition.Value);
+                visionMultiplier = canSeeAttacker ? 0.2f : 1f;
+            }
+        }
+        
+        // 應用傷害減少和視野倍率
+        float actualDamage = damage * (1f - damageReduction) * visionMultiplier;
         int finalDamage = Mathf.Max(1, Mathf.RoundToInt(actualDamage)); // 至少造成1點傷害
         
         // 扣除生命值
@@ -75,13 +88,14 @@ public class EntityHealth : MonoBehaviour
         if (!string.IsNullOrEmpty(source))
         {
             string name = string.IsNullOrEmpty(entityName) ? gameObject.name : entityName;
+            string visionInfo = visionMultiplier != 1f ? $" (視野倍率: {visionMultiplier}x)" : "";
             if (damageReduction > 0f)
             {
-                Debug.Log($"{name} 受到 {damage} 點傷害 (減少 {damageReduction:P0}，實際 {finalDamage} 點) (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
+                Debug.Log($"{name} 受到 {damage} 點傷害 (減少 {damageReduction:P0}，視野倍率 {visionMultiplier}x，實際 {finalDamage} 點) (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
             }
             else
             {
-                Debug.Log($"{name} 受到 {damage} 點傷害 (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
+                Debug.Log($"{name} 受到 {damage} 點傷害{visionInfo} (視野倍率 {visionMultiplier}x，實際 {finalDamage} 點) (來源: {source})，剩餘生命值: {currentHealth}/{maxHealth}");
             }
         }
         

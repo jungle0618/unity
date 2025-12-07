@@ -10,9 +10,9 @@ using TMPro;
 public class WeaponSlotUI : MonoBehaviour
 {
     [Header("UI Elements")]
+    [SerializeField] private RectTransform borderRect;   // 邊框矩形
+    [SerializeField] private RectTransform backgroundRect; // 背景矩形
     [SerializeField] private Image weaponIcon;          // 武器圖示
-    [SerializeField] private TextMeshProUGUI weaponName; // 武器名稱
-    [SerializeField] private Image background;          // 背景
     [SerializeField] private Image durabilityBar;       // 耐久度條
     [SerializeField] private GameObject durabilityPanel; // 耐久度面板
     [SerializeField] private CanvasGroup canvasGroup;   // 用於控制亮暗
@@ -26,6 +26,10 @@ public class WeaponSlotUI : MonoBehaviour
     [SerializeField] private Color unselectedColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
     [SerializeField] private float selectedAlpha = 1.0f;
     [SerializeField] private float unselectedAlpha = 0.5f;
+    
+    [Header("Border Settings")]
+    [SerializeField] private float borderWidth = 2f; // 邊框寬度
+    [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
     
     [Header("Durability Colors")]
     [SerializeField] private Color durabilityHighColor = Color.green;
@@ -44,6 +48,15 @@ public class WeaponSlotUI : MonoBehaviour
     private bool isEmpty = true;
     private Weapon currentWeapon;
     private float targetAlpha;
+    
+    private void Start()
+    {
+        // 在 Start 中再次設置邊框，確保父物件尺寸已正確
+        if (borderRect != null)
+        {
+            SetupBorder();
+        }
+    }
     
     private void Update()
     {
@@ -133,7 +146,146 @@ public class WeaponSlotUI : MonoBehaviour
             if (tf != null) countBadge = tf.GetComponent<TextMeshProUGUI>();
         }
         
+        // 設置背景
+        SetupBackground();
+        
+        // 設置邊框
+        SetupBorder();
+        
+        // 設置圖標層級（確保在背景前面）
+        SetupIconLayer();
+        
         SetCount(0); // 預設隱藏
+    }
+    
+    /// <summary>
+    /// 設置圖標層級（確保在背景前面）
+    /// </summary>
+    private void SetupIconLayer()
+    {
+        if (weaponIcon == null) return;
+        
+        RectTransform iconRect = weaponIcon.GetComponent<RectTransform>();
+        if (iconRect == null) return;
+        
+        // 確保圖標在背景之上
+        if (backgroundRect != null)
+        {
+            int backgroundIndex = backgroundRect.GetSiblingIndex();
+            iconRect.SetSiblingIndex(backgroundIndex + 1);
+        }
+        else
+        {
+            // 如果沒有背景，確保圖標在邊框之上
+            if (borderRect != null)
+            {
+                int borderIndex = borderRect.GetSiblingIndex();
+                iconRect.SetSiblingIndex(borderIndex + 1);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 設置背景矩形
+    /// </summary>
+    private void SetupBackground()
+    {
+        if (backgroundRect == null) return;
+        
+        RectTransform parentRect = transform as RectTransform;
+        if (parentRect == null) return;
+        
+        // 設置錨點：完全填充父物件
+        backgroundRect.anchorMin = new Vector2(0f, 0f);
+        backgroundRect.anchorMax = new Vector2(1f, 1f);
+        backgroundRect.pivot = new Vector2(0.5f, 0.5f);
+        
+        // 設置偏移為 0，讓背景完全填充父物件
+        backgroundRect.offsetMin = Vector2.zero;
+        backgroundRect.offsetMax = Vector2.zero;
+        
+        // 確保背景在邊框之上，但在其他元素之下
+        if (borderRect != null)
+        {
+            int borderIndex = borderRect.GetSiblingIndex();
+            backgroundRect.SetSiblingIndex(borderIndex + 1);
+        }
+        else
+        {
+            backgroundRect.SetAsFirstSibling();
+        }
+        
+        // 自動獲取或添加 Image 組件
+        Image backgroundImage = backgroundRect.GetComponent<Image>();
+        if (backgroundImage == null)
+        {
+            backgroundImage = backgroundRect.gameObject.AddComponent<Image>();
+        }
+        
+        if (backgroundImage != null)
+        {
+            // 初始顏色會在 SetSelected 中設置
+            backgroundImage.color = unselectedColor;
+        }
+    }
+    
+    /// <summary>
+    /// 設置邊框
+    /// </summary>
+    private void SetupBorder()
+    {
+        if (borderRect == null) return;
+        
+        RectTransform parentRect = transform as RectTransform;
+        if (parentRect == null) return;
+        
+        // 強制重建布局以確保尺寸正確
+        UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(parentRect);
+        
+        float width = parentRect.rect.width;
+        float height = parentRect.rect.height;
+        
+        // 如果尺寸無效，使用 LayoutGroup 計算的尺寸
+        if (width <= 0 || height <= 0)
+        {
+            // 嘗試從 LayoutElement 獲取
+            var layoutElement = GetComponent<UnityEngine.UI.LayoutElement>();
+            if (layoutElement != null)
+            {
+                if (width <= 0) width = layoutElement.preferredWidth > 0 ? layoutElement.preferredWidth : 100f;
+                if (height <= 0) height = layoutElement.preferredHeight > 0 ? layoutElement.preferredHeight : 100f;
+            }
+            else
+            {
+                // 使用預設尺寸
+                width = width <= 0 ? 100f : width;
+                height = height <= 0 ? 100f : height;
+            }
+        }
+        
+        // 設置錨點：完全填充父物件
+        borderRect.anchorMin = new Vector2(0f, 0f);
+        borderRect.anchorMax = new Vector2(1f, 1f);
+        borderRect.pivot = new Vector2(0.5f, 0.5f);
+        
+        // 設置偏移，讓邊框比背景大 borderWidth
+        borderRect.offsetMin = new Vector2(-borderWidth, -borderWidth);
+        borderRect.offsetMax = new Vector2(borderWidth, borderWidth);
+        
+        // 確保邊框在最底層
+        borderRect.SetAsFirstSibling();
+        
+        // 自動獲取或添加 Image 組件
+        Image borderImage = borderRect.GetComponent<Image>();
+        if (borderImage == null)
+        {
+            borderImage = borderRect.gameObject.AddComponent<Image>();
+        }
+        
+        if (borderImage != null)
+        {
+            borderImage.color = borderColor;
+        }
     }
     
     /// <summary>
@@ -159,12 +311,12 @@ public class WeaponSlotUI : MonoBehaviour
             {
                 weaponIcon.sprite = weaponSprite;
                 weaponIcon.enabled = true;
-                Debug.Log($"[WeaponSlotUI] ✓ Set weapon sprite for {weapon.ItemName}: {weaponSprite.name} → UI Image component");
+                //Debug.Log($"[WeaponSlotUI] ✓ Set weapon sprite for {weapon.ItemName}: {weaponSprite.name} → UI Image component");
                 
                 // 驗證設置成功
                 if (weaponIcon.sprite == weaponSprite)
                 {
-                    Debug.Log($"[WeaponSlotUI] ✓ Verified: UI Image.sprite is correctly set to {weaponSprite.name}");
+                    //Debug.Log($"[WeaponSlotUI] ✓ Verified: UI Image.sprite is correctly set to {weaponSprite.name}");
                 }
                 else
                 {
@@ -183,16 +335,6 @@ public class WeaponSlotUI : MonoBehaviour
             Debug.LogError("[WeaponSlotUI] weaponIcon (UI Image) is NOT assigned! Please assign it in the Inspector.");
         }
         
-        // 顯示武器名稱
-        if (weaponName != null)
-        {
-            weaponName.text = weapon.ItemName;
-        }
-        else
-        {
-            Debug.LogWarning("[WeaponSlotUI] weaponName (TextMeshPro) is not assigned");
-        }
-        
         // 更新耐久度
         UpdateDurability(weapon.CurrentDurability, weapon.MaxDurability);
     }
@@ -209,16 +351,16 @@ public class WeaponSlotUI : MonoBehaviour
             return null;
         }
         
-        Debug.Log($"[WeaponSlotUI] Getting sprite for weapon: {weapon.ItemName}");
+        //Debug.Log($"[WeaponSlotUI] Getting sprite for weapon: {weapon.ItemName}");
         
         // 1. 嘗試從 SpriteRenderer 取得（武器 prefab 通常有 SpriteRenderer）
         var spriteRenderer = weapon.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
-            Debug.Log($"[WeaponSlotUI] Found SpriteRenderer on {weapon.ItemName}");
+            //Debug.Log($"[WeaponSlotUI] Found SpriteRenderer on {weapon.ItemName}");
             if (spriteRenderer.sprite != null)
             {
-                Debug.Log($"[WeaponSlotUI] ✓ Using sprite from SpriteRenderer: {spriteRenderer.sprite.name}");
+                //Debug.Log($"[WeaponSlotUI] ✓ Using sprite from SpriteRenderer: {spriteRenderer.sprite.name}");
                 return spriteRenderer.sprite;
             }
             else
@@ -228,17 +370,17 @@ public class WeaponSlotUI : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[WeaponSlotUI] No SpriteRenderer found on {weapon.ItemName} root");
+            //Debug.Log($"[WeaponSlotUI] No SpriteRenderer found on {weapon.ItemName} root");
         }
         
         // 2. 嘗試從子物件的 SpriteRenderer 取得
         spriteRenderer = weapon.GetComponentInChildren<SpriteRenderer>();
         if (spriteRenderer != null)
         {
-            Debug.Log($"[WeaponSlotUI] Found SpriteRenderer in children of {weapon.ItemName}");
+            //Debug.Log($"[WeaponSlotUI] Found SpriteRenderer in children of {weapon.ItemName}");
             if (spriteRenderer.sprite != null)
             {
-                Debug.Log($"[WeaponSlotUI] ✓ Using sprite from child SpriteRenderer: {spriteRenderer.sprite.name}");
+                //Debug.Log($"[WeaponSlotUI] ✓ Using sprite from child SpriteRenderer: {spriteRenderer.sprite.name}");
                 return spriteRenderer.sprite;
             }
             else
@@ -248,18 +390,18 @@ public class WeaponSlotUI : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[WeaponSlotUI] No SpriteRenderer found in children of {weapon.ItemName}");
+            //Debug.Log($"[WeaponSlotUI] No SpriteRenderer found in children of {weapon.ItemName}");
         }
         
         // 3. 退而求其次：使用 ItemIcon（如果有設定）
         if (weapon.ItemIcon != null)
         {
-            Debug.Log($"[WeaponSlotUI] ✓ Using ItemIcon as fallback: {weapon.ItemIcon.name}");
+            //Debug.Log($"[WeaponSlotUI] ✓ Using ItemIcon as fallback: {weapon.ItemIcon.name}");
             return weapon.ItemIcon;
         }
         else
         {
-            Debug.Log($"[WeaponSlotUI] ItemIcon is also null on {weapon.ItemName}");
+            //Debug.Log($"[WeaponSlotUI] ItemIcon is also null on {weapon.ItemName}");
         }
         
         Debug.LogError($"[WeaponSlotUI] ❌ No sprite found for {weapon.ItemName} - check weapon prefab has SpriteRenderer with sprite assigned!");
@@ -278,11 +420,6 @@ public class WeaponSlotUI : MonoBehaviour
         {
             weaponIcon.sprite = null;
             weaponIcon.enabled = false;
-        }
-        
-        if (weaponName != null)
-        {
-            weaponName.text = "---";
         }
         
         if (durabilityPanel != null)
@@ -304,18 +441,15 @@ public class WeaponSlotUI : MonoBehaviour
         targetAlpha = selected ? selectedAlpha : unselectedAlpha;
         
         // 更新背景顏色
-        if (background != null)
+        if (backgroundRect != null)
         {
-            background.color = selected ? selectedColor : unselectedColor;
+            Image backgroundImage = backgroundRect.GetComponent<Image>();
+            if (backgroundImage != null)
+            {
+                backgroundImage.color = selected ? selectedColor : unselectedColor;
+            }
         }
         
-        // 更新武器名稱顏色
-        if (weaponName != null)
-        {
-            Color nameColor = weaponName.color;
-            nameColor.a = selected ? 1.0f : 0.7f;
-            weaponName.color = nameColor;
-        }
     }
     
     /// <summary>

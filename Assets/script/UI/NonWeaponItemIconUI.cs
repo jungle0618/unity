@@ -9,8 +9,9 @@ using TMPro;
 public class NonWeaponItemIconUI : MonoBehaviour
 {
     [Header("UI Elements")]
+    [SerializeField] private RectTransform borderRect;     // 邊框矩形
+    [SerializeField] private RectTransform backgroundRect; // 背景矩形
     [SerializeField] private Image itemIcon;              // 物品圖示
-    [SerializeField] private Image background;            // 背景
     [SerializeField] private TextMeshProUGUI itemNameText; // 物品名稱（可選）
     [SerializeField] private TextMeshProUGUI countText;   // 數量文字（可選）
     [SerializeField] private GameObject tooltipPanel;     // 提示面板（可選）
@@ -21,6 +22,10 @@ public class NonWeaponItemIconUI : MonoBehaviour
     [SerializeField] private bool showItemName = false;   // 是否顯示物品名稱
     [SerializeField] private bool showCount = false;      // 是否顯示數量
     
+    [Header("Border Settings")]
+    [SerializeField] private float borderWidth = 2f; // 邊框寬度
+    [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
+    
     private Item currentItem;
     private Vector2 targetSize = new Vector2(50, 50);
 
@@ -29,11 +34,6 @@ public class NonWeaponItemIconUI : MonoBehaviour
     /// </summary>
     public void Initialize()
     {
-        // 嘗試自動尋找子節點（容錯：Unity 可能因 UI 建立流程插入 Canvas）
-        if (background == null)
-        {
-            background = GetComponentInChildren<Image>();
-        }
         if (itemIcon == null)
         {
             // 優先尋找名為 Icon 的 Image
@@ -41,18 +41,13 @@ public class NonWeaponItemIconUI : MonoBehaviour
             if (iconTF != null) itemIcon = iconTF.GetComponent<Image>();
             if (itemIcon == null)
             {
-                // 退而求其次：找第一個子孫 Image，但避免 background 本體
+                // 退而求其次：找第一個子孫 Image
                 var images = GetComponentsInChildren<Image>(true);
                 if (images != null && images.Length > 0)
                 {
                     itemIcon = images[images.Length - 1]; // 最後一個通常是子 Image
                 }
             }
-        }
-
-        if (background != null)
-        {
-            background.color = backgroundColor;
         }
 
         if (itemNameText != null)
@@ -68,7 +63,126 @@ public class NonWeaponItemIconUI : MonoBehaviour
         // 強制調整尺寸
         ApplySize(targetSize);
         
+        // 設置背景
+        SetupBackground();
+        
+        // 設置邊框
+        SetupBorder();
+        
+        // 設置圖標層級（確保在背景前面）
+        SetupIconLayer();
+        
         SetEmpty();
+    }
+    
+    /// <summary>
+    /// 設置圖標層級（確保在背景前面）
+    /// </summary>
+    private void SetupIconLayer()
+    {
+        if (itemIcon == null) return;
+        
+        RectTransform iconRect = itemIcon.GetComponent<RectTransform>();
+        if (iconRect == null) return;
+        
+        // 確保圖標在背景之上
+        if (backgroundRect != null)
+        {
+            int backgroundIndex = backgroundRect.GetSiblingIndex();
+            iconRect.SetSiblingIndex(backgroundIndex + 1);
+        }
+        else
+        {
+            // 如果沒有背景，確保圖標在邊框之上
+            if (borderRect != null)
+            {
+                int borderIndex = borderRect.GetSiblingIndex();
+                iconRect.SetSiblingIndex(borderIndex + 1);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 設置背景矩形
+    /// </summary>
+    private void SetupBackground()
+    {
+        if (backgroundRect == null) return;
+        
+        RectTransform parentRect = transform as RectTransform;
+        if (parentRect == null) return;
+        
+        // 設置錨點：完全填充父物件
+        backgroundRect.anchorMin = new Vector2(0f, 0f);
+        backgroundRect.anchorMax = new Vector2(1f, 1f);
+        backgroundRect.pivot = new Vector2(0.5f, 0.5f);
+        
+        // 設置偏移為 0，讓背景完全填充父物件
+        backgroundRect.offsetMin = Vector2.zero;
+        backgroundRect.offsetMax = Vector2.zero;
+        
+        // 確保背景在邊框之上，但在其他元素之下
+        if (borderRect != null)
+        {
+            int borderIndex = borderRect.GetSiblingIndex();
+            backgroundRect.SetSiblingIndex(borderIndex + 1);
+        }
+        else
+        {
+            backgroundRect.SetAsFirstSibling();
+        }
+        
+        // 自動獲取或添加 Image 組件
+        Image backgroundImage = backgroundRect.GetComponent<Image>();
+        if (backgroundImage == null)
+        {
+            backgroundImage = backgroundRect.gameObject.AddComponent<Image>();
+        }
+        
+        if (backgroundImage != null)
+        {
+            backgroundImage.color = backgroundColor;
+        }
+    }
+    
+    /// <summary>
+    /// 設置邊框
+    /// </summary>
+    private void SetupBorder()
+    {
+        if (borderRect == null) return;
+        
+        RectTransform parentRect = transform as RectTransform;
+        if (parentRect == null) return;
+        
+        float width = parentRect.rect.width;
+        float height = parentRect.rect.height;
+        
+        if (width <= 0 || height <= 0) return;
+        
+        // 設置錨點：完全填充父物件
+        borderRect.anchorMin = new Vector2(0f, 0f);
+        borderRect.anchorMax = new Vector2(1f, 1f);
+        borderRect.pivot = new Vector2(0.5f, 0.5f);
+        
+        // 設置偏移，讓邊框比背景大 borderWidth
+        borderRect.offsetMin = new Vector2(-borderWidth, -borderWidth);
+        borderRect.offsetMax = new Vector2(borderWidth, borderWidth);
+        
+        // 確保邊框在最底層
+        borderRect.SetAsFirstSibling();
+        
+        // 自動獲取或添加 Image 組件
+        Image borderImage = borderRect.GetComponent<Image>();
+        if (borderImage == null)
+        {
+            borderImage = borderRect.gameObject.AddComponent<Image>();
+        }
+        
+        if (borderImage != null)
+        {
+            borderImage.color = borderColor;
+        }
     }
 
     /// <summary>

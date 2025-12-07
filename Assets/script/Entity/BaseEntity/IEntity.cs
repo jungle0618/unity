@@ -26,7 +26,8 @@ public interface IEntity
     /// </summary>
     /// <param name="damage">傷害值</param>
     /// <param name="source">傷害來源</param>
-    void TakeDamage(int damage, string source = "");
+    /// <param name="attackerPosition">攻擊者位置（用於視野檢測，可選）</param>
+    void TakeDamage(int damage, string source = "", Vector2? attackerPosition = null);
     
     /// <summary>
     /// 獲取實體類型

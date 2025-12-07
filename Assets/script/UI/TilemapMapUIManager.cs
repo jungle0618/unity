@@ -2,28 +2,39 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// Tilemap 地圖UI管理器
-/// 使用 Camera + RenderTexture 來顯示動態變化的 Tilemap
+/// 使用手動繪製方式生成地圖圖片並顯示在 UI 上
 /// </summary>
 public class TilemapMapUIManager : MonoBehaviour
 {
     [Header("Tilemap References")]
-    [SerializeField] private Tilemap tilemap;                   // 要顯示的 Tilemap
+    [SerializeField] private Tilemap tilemap;                   // 要顯示的 Tilemap（主地圖）
     [SerializeField] private bool autoFindTilemap = true;       // 自動尋找 Tilemap
+    [SerializeField] private MapExplorationManager explorationManager; // 地圖探索管理器
+    
+    [Header("Additional Tilemaps for Map Display")]
+    [SerializeField] private Tilemap wallsTilemap;               // 牆壁 Tilemap
+    [SerializeField] private Tilemap objectsTilemap;             // 物件 Tilemap
+    [SerializeField] private Tilemap doorTilemap;                // 門 Tilemap
+    [SerializeField] private Tilemap fogTilemap;                  // 霧層 Tilemap
+    
+    [Header("Map Tile Colors")]
+    [SerializeField] private Color wallsColor = Color.gray;        // 牆壁顏色
+    [SerializeField] private Color objectsColor = Color.yellow;   // 物件顏色
+    [SerializeField] private Color doorColor = Color.blue;        // 門顏色
+    [SerializeField] private Color fogColor = new Color(0.3f, 0.3f, 0.3f, 0.8f); // 霧層顏色（灰色）
+    [SerializeField] private Color backgroundColor = Color.black; // 背景顏色
     
     [Header("Map Display")]
     [SerializeField] private RawImage mapDisplay;               // 顯示地圖的 RawImage
     [SerializeField] private RectTransform mapContainer;        // 地圖容器
+    [SerializeField] private RectTransform mapBorderRect;       // 地圖邊框矩形
     
-    [Header("Map Camera")]
-    [SerializeField] private Camera mapCamera;                  // 渲染地圖的相機
-    [SerializeField] private bool autoCreateCamera = true;      // 自動創建相機
+    [Header("Map Render Settings")]
     [SerializeField] private int renderTextureSize = 512;       // RenderTexture 大小
-    [SerializeField] private float cameraHeight = 10f;          // 相機高度
-    [SerializeField] private LayerMask mapLayerMask = -1;       // 地圖要渲染的圖層（可多選）
-    [SerializeField] private bool autoDetectTilemapLayer = true; // 自動偵測 Tilemap 的 Layer
     
     [Header("Player Icon")]
     [SerializeField] private RectTransform playerIcon;          // 玩家圖標
@@ -48,6 +59,10 @@ public class TilemapMapUIManager : MonoBehaviour
     [SerializeField] private float transitionDuration = 0.2f; // 過渡動畫時間
     [SerializeField] private bool useSmoothTransition = true; // 是否使用平滑過渡
     
+    [Header("Border Settings")]
+    [SerializeField] private float borderWidth = 2f; // 邊框寬度
+    [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
+    
     private Player player;
     private EntityManager entityManager;
     private bool isInitialized = false;
@@ -55,6 +70,7 @@ public class TilemapMapUIManager : MonoBehaviour
     private List<MapMarker> mapMarkers = new List<MapMarker>();
     private bool isVisible = false;
     private float lastUpdateTime = 0f;
+    private float lastPlayerUpdateTime = 0f; // 玩家位置更新的獨立計時器
     
     // Tilemap 邊界
     private Bounds tilemapBounds;
@@ -77,7 +93,6 @@ public class TilemapMapUIManager : MonoBehaviour
     private void Awake()
     {
         // 強制使用程式碼預設值（覆蓋場景中保存的值）
-        updateInterval = 0.1f;
         zoomScale = 4.5f;
         playerIconZoomScale = 1.5f;
         
@@ -128,8 +143,11 @@ public class TilemapMapUIManager : MonoBehaviour
         // 獲取 Tilemap 邊界
         UpdateTilemapBounds();
         
-        // 創建或設定相機
-        SetupMapCamera();
+        // 設置探索管理器
+        SetupExplorationManager();
+        
+        // 自動尋找未指定的 Tilemap
+        AutoFindTilemaps();
         
         // 創建 RenderTexture
         SetupRenderTexture();
@@ -147,6 +165,44 @@ public class TilemapMapUIManager : MonoBehaviour
         if (playerIcon == null)
         {
             Debug.LogWarning("TilemapMapUIManager: 玩家圖標未設定");
+        }
+        
+        // 設置邊框
+        SetupMapBorder();
+    }
+    
+    /// <summary>
+    /// 設置地圖邊框
+    /// </summary>
+    private void SetupMapBorder()
+    {
+        if (mapBorderRect == null || mapContainer == null) return;
+        
+        RectTransform containerRect = mapContainer;
+        if (containerRect == null) return;
+        
+        // 設置錨點：完全填充地圖容器
+        mapBorderRect.anchorMin = new Vector2(0f, 0f);
+        mapBorderRect.anchorMax = new Vector2(1f, 1f);
+        mapBorderRect.pivot = new Vector2(0.5f, 0.5f);
+        
+        // 設置偏移，讓邊框比容器大 borderWidth
+        mapBorderRect.offsetMin = new Vector2(-borderWidth, -borderWidth);
+        mapBorderRect.offsetMax = new Vector2(borderWidth, borderWidth);
+        
+        // 確保邊框在最底層
+        mapBorderRect.SetAsFirstSibling();
+        
+        // 自動獲取或添加 Image 組件
+        Image borderImage = mapBorderRect.GetComponent<Image>();
+        if (borderImage == null)
+        {
+            borderImage = mapBorderRect.gameObject.AddComponent<Image>();
+        }
+        
+        if (borderImage != null)
+        {
+            borderImage.color = borderColor;
         }
     }
     
@@ -184,6 +240,19 @@ public class TilemapMapUIManager : MonoBehaviour
     
     private void Update()
     {
+        // 確保所有 Tilemap 的渲染器設置正確（每幀檢查，確保 fog 和 mainTilemap 沒有渲染器）
+        EnsureTilemapRenderers();
+        
+        // 定期重新生成地圖圖片（如果地圖可見且需要即時更新）
+        if (isVisible && updateInRealtime)
+        {
+            if (Time.time - lastUpdateTime >= updateInterval)
+            {
+                GenerateMapImage();
+                lastUpdateTime = Time.time;
+            }
+        }
+        
         // 處理地圖縮放輸入
         HandleMapZoomInput();
         
@@ -193,14 +262,14 @@ public class TilemapMapUIManager : MonoBehaviour
             UpdateMapTransition();
         }
         
-        // 只有在地圖可見且需要即時更新時才更新
+        // 只有在地圖可見且需要即時更新時才更新玩家位置
         if (isVisible && updateInRealtime && player != null)
         {
-            // 使用更新間隔來降低性能消耗
-            if (Time.time - lastUpdateTime >= updateInterval)
+            // 使用獨立的更新間隔來降低性能消耗
+            if (Time.time - lastPlayerUpdateTime >= updateInterval)
             {
                 UpdatePlayerPosition();
-                lastUpdateTime = Time.time;
+                lastPlayerUpdateTime = Time.time;
             }
         }
     }
@@ -214,11 +283,6 @@ public class TilemapMapUIManager : MonoBehaviour
             Destroy(mapRenderTexture);
         }
         
-        // 如果是自動創建的相機，銷毀它
-        if (autoCreateCamera && mapCamera != null)
-        {
-            Destroy(mapCamera.gameObject);
-        }
     }
     
     /// <summary>
@@ -229,17 +293,12 @@ public class TilemapMapUIManager : MonoBehaviour
         isVisible = visible;
         gameObject.SetActive(visible);
         
-        // 啟用或禁用地圖相機
-        if (mapCamera != null)
-        {
-            mapCamera.enabled = visible;
-        }
-        
         // 當地圖顯示時，立即更新
         if (visible && player != null)
         {
             UpdatePlayerPosition();
             lastUpdateTime = Time.time;
+            lastPlayerUpdateTime = Time.time;
             
             // 當地圖顯示時，儲存原始值（如果還沒儲存）
             if (!hasStoredOriginalValues && mapContainer != null)
@@ -271,6 +330,272 @@ public class TilemapMapUIManager : MonoBehaviour
     #region Tilemap 相關
     
     /// <summary>
+    /// 自動尋找未指定的 Tilemap
+    /// </summary>
+    private void AutoFindTilemaps()
+    {
+        // 如果沒有指定 fogTilemap，嘗試從探索管理器獲取
+        if (fogTilemap == null && explorationManager != null)
+        {
+            fogTilemap = explorationManager.GetComponentInChildren<Tilemap>();
+            if (fogTilemap != null && fogTilemap.gameObject.name != "FogTilemap")
+            {
+                fogTilemap = null; // 如果不是 FogTilemap，清除引用
+            }
+        }
+        
+        // 如果仍然沒有找到，嘗試通過名稱查找
+        if (fogTilemap == null)
+        {
+            GameObject fogObj = GameObject.Find("FogTilemap");
+            if (fogObj != null)
+            {
+                fogTilemap = fogObj.GetComponent<Tilemap>();
+            }
+        }
+        
+        // 嘗試通過名稱查找其他 Tilemap（如果未指定）
+        if (wallsTilemap == null)
+        {
+            GameObject wallsObj = GameObject.Find("walls");
+            if (wallsObj == null) wallsObj = GameObject.Find("Walls");
+            if (wallsObj != null)
+            {
+                wallsTilemap = wallsObj.GetComponent<Tilemap>();
+            }
+        }
+        
+        if (objectsTilemap == null)
+        {
+            GameObject objectsObj = GameObject.Find("objects");
+            if (objectsObj == null) objectsObj = GameObject.Find("Objects");
+            if (objectsObj != null)
+            {
+                objectsTilemap = objectsObj.GetComponent<Tilemap>();
+            }
+        }
+        
+        if (doorTilemap == null)
+        {
+            GameObject doorObj = GameObject.Find("door");
+            if (doorObj == null) doorObj = GameObject.Find("Door");
+            if (doorObj != null)
+            {
+                doorTilemap = doorObj.GetComponent<Tilemap>();
+            }
+        }
+        
+        Debug.Log($"TilemapMapUIManager: 已自動尋找 Tilemap - Walls: {wallsTilemap != null}, Objects: {objectsTilemap != null}, Door: {doorTilemap != null}, Fog: {fogTilemap != null}");
+    }
+    
+    /// <summary>
+    /// 設置探索管理器
+    /// </summary>
+    private void SetupExplorationManager()
+    {
+        // 如果沒有指定探索管理器，嘗試自動尋找
+        if (explorationManager == null)
+        {
+            explorationManager = FindFirstObjectByType<MapExplorationManager>();
+        }
+        
+        if (explorationManager != null)
+        {
+            Debug.Log("TilemapMapUIManager: 已找到探索管理器");
+        }
+    }
+    
+    /// <summary>
+    /// 確保所有 Tilemap 的渲染器設置正確（fogTilemap 和 mainTilemap 不添加永久渲染器）
+    /// </summary>
+    private void EnsureTilemapRenderers()
+    {
+        // 確保其他 Tilemap 的渲染器啟用（walls, objects, door）
+        // 注意：fogTilemap 和 mainTilemap (tilemap) 不添加永久渲染器
+        // 它們只在 GenerateMapImage() 時臨時添加渲染器
+        EnsureTilemapRenderer(wallsTilemap, 0);
+        EnsureTilemapRenderer(objectsTilemap, 1);
+        EnsureTilemapRenderer(doorTilemap, 2);
+        
+        // 確保 fogTilemap 和 mainTilemap 沒有渲染器（如果有的話，移除它）
+        if (fogTilemap != null)
+        {
+            TilemapRenderer fogRenderer = fogTilemap.GetComponent<TilemapRenderer>();
+            if (fogRenderer != null)
+            {
+                DestroyImmediate(fogRenderer);
+            }
+        }
+        
+        if (tilemap != null)
+        {
+            TilemapRenderer mainRenderer = tilemap.GetComponent<TilemapRenderer>();
+            if (mainRenderer != null)
+            {
+                DestroyImmediate(mainRenderer);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 確保指定 Tilemap 的渲染器設置正確
+    /// </summary>
+    private void EnsureTilemapRenderer(Tilemap tilemap, int sortingOrder)
+    {
+        if (tilemap == null) return;
+        
+        TilemapRenderer renderer = tilemap.GetComponent<TilemapRenderer>();
+        if (renderer == null)
+        {
+            // 如果沒有渲染器，添加一個
+            renderer = tilemap.gameObject.AddComponent<TilemapRenderer>();
+            Debug.Log($"TilemapMapUIManager: 已為 {tilemap.gameObject.name} 添加 TilemapRenderer");
+        }
+        
+        if (renderer != null)
+        {
+            if (sortingOrder >= 0)
+            {
+                renderer.sortingOrder = sortingOrder;
+            }
+            renderer.enabled = true;
+        }
+    }
+    
+    /// <summary>
+    /// 生成地圖圖片（完全手動繪製，使用指定的顏色，不讀取 tilemap 的圖片）
+    /// </summary>
+    private void GenerateMapImage()
+    {
+        if (mapRenderTexture == null || tilemap == null) return;
+        
+        // 獲取 Tilemap 的邊界和單元格大小
+        BoundsInt bounds = tilemap.cellBounds;
+        Vector3 cellSize = tilemap.cellSize;
+        Vector3 cellGap = tilemap.cellGap;
+        
+        // 計算實際的單元格大小（包括間隙）
+        float cellWidth = cellSize.x + cellGap.x;
+        float cellHeight = cellSize.y + cellGap.y;
+        
+        // 計算地圖在世界空間中的範圍
+        Vector3 mapMin = tilemap.CellToWorld(new Vector3Int(bounds.xMin, bounds.yMin, 0));
+        Vector3 mapMax = tilemap.CellToWorld(new Vector3Int(bounds.xMax, bounds.yMax, 0));
+        float mapWidth = mapMax.x - mapMin.x;
+        float mapHeight = mapMax.y - mapMin.y;
+        
+        // 創建臨時 Texture2D 用於繪製
+        Texture2D tempTexture = new Texture2D(renderTextureSize, renderTextureSize, TextureFormat.RGBA32, false);
+        
+        // 填充背景顏色
+        Color[] pixels = new Color[renderTextureSize * renderTextureSize];
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            pixels[i] = backgroundColor;
+        }
+        tempTexture.SetPixels(pixels);
+        
+        // 繪製各個 Tilemap 層（從底層到頂層）
+        // 1. 主地圖（背景層，實際上不需要繪製，因為已經填充了背景色）
+        
+        // 2. 牆壁層
+        DrawTilemapLayer(tempTexture, wallsTilemap, wallsColor, mapMin, mapWidth, mapHeight, bounds);
+        
+        // 3. 物件層
+        DrawTilemapLayer(tempTexture, objectsTilemap, objectsColor, mapMin, mapWidth, mapHeight, bounds);
+        
+        // 4. 門層
+        DrawTilemapLayer(tempTexture, doorTilemap, doorColor, mapMin, mapWidth, mapHeight, bounds);
+        
+        // 5. 霧層（最上層）
+        DrawTilemapLayer(tempTexture, fogTilemap, fogColor, mapMin, mapWidth, mapHeight, bounds);
+        
+        // 應用所有像素更改
+        tempTexture.Apply();
+        
+        // 將 Texture2D 複製到 RenderTexture
+        RenderTexture previousRT = RenderTexture.active;
+        RenderTexture.active = mapRenderTexture;
+        Graphics.Blit(tempTexture, mapRenderTexture);
+        RenderTexture.active = previousRT;
+        
+        // 清理臨時 Texture2D
+        DestroyImmediate(tempTexture);
+    }
+    
+    /// <summary>
+    /// 在 Texture2D 上繪製 Tilemap 層（只繪製有 tile 的位置，使用指定顏色）
+    /// </summary>
+    private void DrawTilemapLayer(Texture2D texture, Tilemap tilemap, Color color, Vector3 mapMin, float mapWidth, float mapHeight, BoundsInt bounds)
+    {
+        if (tilemap == null) return;
+        
+        // 獲取該 Tilemap 的邊界
+        BoundsInt tilemapBounds = tilemap.cellBounds;
+        Vector3 cellSize = tilemap.cellSize;
+        Vector3 cellGap = tilemap.cellGap;
+        
+        // 計算實際的單元格大小（包括間隙）
+        float actualCellWidth = cellSize.x + cellGap.x;
+        float actualCellHeight = cellSize.y + cellGap.y;
+        
+        // 遍歷所有有 tile 的位置
+        foreach (Vector3Int pos in tilemapBounds.allPositionsWithin)
+        {
+            if (tilemap.GetTile(pos) != null)
+            {
+                // 將單元格位置轉換為世界座標（左下角）
+                Vector3 cellWorldMin = tilemap.CellToWorld(pos);
+                
+                // 計算單元格的右上角世界座標
+                Vector3 cellWorldMax = cellWorldMin + new Vector3(actualCellWidth, actualCellHeight, 0);
+                
+                // 計算在 Texture2D 中的像素位置（相對於地圖範圍）
+                float normalizedXMin = (cellWorldMin.x - mapMin.x) / mapWidth;
+                float normalizedYMin = (cellWorldMin.y - mapMin.y) / mapHeight;
+                float normalizedXMax = (cellWorldMax.x - mapMin.x) / mapWidth;
+                float normalizedYMax = (cellWorldMax.y - mapMin.y) / mapHeight;
+                
+                // 轉換為像素座標（使用 Ceil 和 Floor 確保覆蓋完整範圍）
+                int pixelXMin = Mathf.FloorToInt(normalizedXMin * renderTextureSize);
+                int pixelYMin = Mathf.FloorToInt(normalizedYMin * renderTextureSize);
+                int pixelXMax = Mathf.CeilToInt(normalizedXMax * renderTextureSize);
+                int pixelYMax = Mathf.CeilToInt(normalizedYMax * renderTextureSize);
+                
+                // 計算單元格在像素中的大小（確保至少為 1）
+                int cellPixelWidth = Mathf.Max(1, pixelXMax - pixelXMin);
+                int cellPixelHeight = Mathf.Max(1, pixelYMax - pixelYMin);
+                
+                // 繪製單元格（填充矩形區域，確保覆蓋邊界）
+                for (int y = 0; y < cellPixelHeight; y++)
+                {
+                    for (int x = 0; x < cellPixelWidth; x++)
+                    {
+                        int px = pixelXMin + x;
+                        int py = pixelYMin + y;
+                        
+                        // 確保在範圍內
+                        if (px >= 0 && px < renderTextureSize && py >= 0 && py < renderTextureSize)
+                        {
+                            // 對於霧層，直接覆蓋（非透明），確保蓋過其他層
+                            if (tilemap == fogTilemap)
+                            {
+                                // 確保 fog 顏色是非透明的（alpha = 1）
+                                Color opaqueFogColor = new Color(color.r, color.g, color.b, 1f);
+                                texture.SetPixel(px, py, opaqueFogColor);
+                            }
+                            else
+                            {
+                                texture.SetPixel(px, py, color);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// <summary>
     /// 更新 Tilemap 邊界
     /// </summary>
     private void UpdateTilemapBounds()
@@ -290,87 +615,10 @@ public class TilemapMapUIManager : MonoBehaviour
     public void RefreshTilemapBounds()
     {
         UpdateTilemapBounds();
-        
-        // 重新設定相機位置和大小
-        if (mapCamera != null)
-        {
-            UpdateCameraPosition();
-        }
     }
     
     #endregion
     
-    #region 相機設定
-    
-    /// <summary>
-    /// 設定地圖相機
-    /// </summary>
-    private void SetupMapCamera()
-    {
-        if (mapCamera == null && autoCreateCamera)
-        {
-            // 自動創建相機
-            GameObject cameraObj = new GameObject("MapCamera");
-            mapCamera = cameraObj.AddComponent<Camera>();
-            
-            // 設定相機屬性
-            mapCamera.orthographic = true;
-            mapCamera.clearFlags = CameraClearFlags.SolidColor;
-            mapCamera.backgroundColor = Color.black;
-            mapCamera.enabled = false; // 預設禁用
-            
-            Debug.Log("已自動創建地圖相機");
-        }
-        
-        if (mapCamera != null)
-        {
-            // 自動偵測或使用手動設定的 LayerMask
-            if (tilemap != null && autoDetectTilemapLayer)
-            {
-                // 使用 Tilemap 的 Layer
-                int tilemapLayer = tilemap.gameObject.layer;
-                mapCamera.cullingMask = 1 << tilemapLayer;
-                Debug.Log($"地圖相機自動設定為 Tilemap 的 Layer: {LayerMask.LayerToName(tilemapLayer)} (Layer {tilemapLayer})");
-            }
-            else if (mapLayerMask.value != 0 && mapLayerMask.value != -1)
-            {
-                // 使用手動設定的 LayerMask（如果有明確設定）
-                mapCamera.cullingMask = mapLayerMask;
-                Debug.Log($"地圖相機使用手動設定的 LayerMask: {mapLayerMask.value}");
-            }
-            else if (tilemap != null)
-            {
-                // 如果沒有手動設定，退回自動偵測
-                int tilemapLayer = tilemap.gameObject.layer;
-                mapCamera.cullingMask = 1 << tilemapLayer;
-                Debug.LogWarning($"未設定 LayerMask，自動使用 Tilemap Layer: {LayerMask.LayerToName(tilemapLayer)} (Layer {tilemapLayer})");
-            }
-            
-            UpdateCameraPosition();
-        }
-    }
-    
-    /// <summary>
-    /// 更新相機位置和大小
-    /// </summary>
-    private void UpdateCameraPosition()
-    {
-        if (mapCamera == null || tilemap == null) return;
-        
-        // 設定相機位置（正面看向 Tilemap - 2D 遊戲）
-        // 相機在 Z 軸負方向，看向 XY 平面
-        Vector3 center = tilemapBounds.center;
-        mapCamera.transform.position = new Vector3(center.x, center.y, -cameraHeight);
-        mapCamera.transform.rotation = Quaternion.identity; // 直接面向前方（看向 Z+）
-        
-        // 設定正交大小（讓整個 Tilemap 都可見）
-        float maxSize = Mathf.Max(tilemapBounds.size.x, tilemapBounds.size.y); // 使用 X 和 Y
-        mapCamera.orthographicSize = maxSize / 2f;
-        
-        Debug.Log($"相機設定: 位置={mapCamera.transform.position}, 大小={mapCamera.orthographicSize}");
-    }
-    
-    #endregion
     
     #region RenderTexture 設定
     
@@ -379,19 +627,28 @@ public class TilemapMapUIManager : MonoBehaviour
     /// </summary>
     private void SetupRenderTexture()
     {
-        if (mapCamera == null || mapDisplay == null) return;
+        if (mapDisplay == null) return;
         
-        // 創建 RenderTexture
+        // 創建 RenderTexture（不再需要相機）
         mapRenderTexture = new RenderTexture(renderTextureSize, renderTextureSize, 16);
         mapRenderTexture.Create();
         
-        // 設定相機輸出
-        mapCamera.targetTexture = mapRenderTexture;
+        // 確保所有 Tilemap 的渲染器設置正確（walls, objects, door 需要渲染器用於實際遊戲顯示）
+        EnsureTilemapRenderers();
+        
+        // 手動生成地圖圖片（使用指定的顏色，不讀取 tilemap 的圖片）
+        GenerateMapImage();
         
         // 設定 RawImage 顯示
         mapDisplay.texture = mapRenderTexture;
         
-        Debug.Log($"RenderTexture 已創建: {renderTextureSize}x{renderTextureSize}");
+        // 確保 RawImage 啟用
+        if (mapDisplay != null)
+        {
+            mapDisplay.enabled = true;
+        }
+        
+        Debug.Log($"RenderTexture 已創建: {renderTextureSize}x{renderTextureSize}, 使用手動繪製方式生成地圖");
     }
     
     #endregion
@@ -404,7 +661,12 @@ public class TilemapMapUIManager : MonoBehaviour
     private void UpdatePlayerPosition()
     {
         if (playerIcon == null || player == null || mapDisplay == null)
+        {
+            if (playerIcon == null) Debug.LogWarning("TilemapMapUIManager: playerIcon 為 null");
+            if (player == null) Debug.LogWarning("TilemapMapUIManager: player 為 null");
+            if (mapDisplay == null) Debug.LogWarning("TilemapMapUIManager: mapDisplay 為 null");
             return;
+        }
         
         // 將世界座標轉換為地圖UI座標
         Vector3 worldPos = player.transform.position;
@@ -412,6 +674,9 @@ public class TilemapMapUIManager : MonoBehaviour
         
         // 更新玩家圖標位置
         playerIcon.anchoredPosition = mapPos;
+        
+        // 調試信息（只在必要時啟用）
+        // Debug.Log($"UpdatePlayerPosition: worldPos={worldPos}, mapPos={mapPos}, playerIcon.anchoredPosition={playerIcon.anchoredPosition}");
         
         // 更新玩家圖標旋轉（如果需要）
         if (rotateWithPlayer)
@@ -426,30 +691,33 @@ public class TilemapMapUIManager : MonoBehaviour
     /// </summary>
     public Vector2 WorldToMapUIPosition(Vector3 worldPosition)
     {
-        if (tilemap == null || mapDisplay == null || mapCamera == null) return Vector2.zero;
+        if (tilemap == null || mapDisplay == null) return Vector2.zero;
         
-        // 使用相機的視角範圍來計算座標轉換
-        // 相機的 orthographicSize 是垂直方向的一半大小
-        float orthoSize = mapCamera.orthographicSize;
+        // 使用與 GenerateMapImage 相同的計算方式
+        BoundsInt bounds = tilemap.cellBounds;
         
-        // 計算相機視角的寬高比（RenderTexture 是正方形，所以寬高比為 1）
-        float aspectRatio = 1f; // RenderTexture 是正方形
+        // 計算地圖在世界空間中的範圍（與 GenerateMapImage 保持一致）
+        Vector3 mapMin = tilemap.CellToWorld(new Vector3Int(bounds.xMin, bounds.yMin, 0));
+        Vector3 mapMax = tilemap.CellToWorld(new Vector3Int(bounds.xMax, bounds.yMax, 0));
+        float mapWidth = mapMax.x - mapMin.x;
+        float mapHeight = mapMax.y - mapMin.y;
         
-        // 相機視角的實際寬度和高度
-        float cameraWidth = orthoSize * 2f * aspectRatio;
-        float cameraHeight = orthoSize * 2f;
+        // 如果地圖寬高為 0，返回零向量
+        if (mapWidth <= 0 || mapHeight <= 0) return Vector2.zero;
         
-        // 計算相對於相機中心的位置（相機在 tilemapBounds.center 上方）
-        Vector3 relativePos = worldPosition - tilemapBounds.center;
+        // 計算相對於地圖最小點的位置
+        Vector3 relativePos = worldPosition - mapMin;
         
-        // 轉換為相機視角空間的座標（-0.5 到 0.5）
-        float normalizedX = relativePos.x / cameraWidth;
-        float normalizedY = relativePos.y / cameraHeight;
+        // 轉換為標準化座標（0 到 1）
+        float normalizedX = relativePos.x / mapWidth;
+        float normalizedY = relativePos.y / mapHeight;
         
-        // 轉換為地圖UI座標（0 到 1，然後轉換為 UI 座標）
+        // 轉換為地圖UI座標（相對於 mapDisplay 的 rect）
         Rect rect = mapDisplay.rectTransform.rect;
-        float uiX = normalizedX * rect.width;
-        float uiY = normalizedY * rect.height;
+        
+        // 將標準化座標（0-1）轉換為 UI 座標（從 rect 的左下角開始）
+        float uiX = normalizedX * rect.width - rect.width * 0.5f;
+        float uiY = normalizedY * rect.height - rect.height * 0.5f;
         
         return new Vector2(uiX, uiY);
     }
@@ -890,72 +1158,7 @@ public class TilemapMapUIManager : MonoBehaviour
         if (tilemap != null)
         {
             RefreshTilemapBounds();
-            
-            // 如果啟用自動偵測，更新相機 LayerMask
-            if (autoDetectTilemapLayer && mapCamera != null)
-            {
-                int tilemapLayer = tilemap.gameObject.layer;
-                mapCamera.cullingMask = 1 << tilemapLayer;
-                Debug.Log($"Tilemap 變更，相機 Layer 已更新為: {LayerMask.LayerToName(tilemapLayer)}");
-            }
         }
-    }
-    
-    /// <summary>
-    /// 設定地圖相機的 LayerMask（手動模式）
-    /// </summary>
-    public void SetMapLayerMask(LayerMask layerMask)
-    {
-        mapLayerMask = layerMask;
-        autoDetectTilemapLayer = false; // 停用自動偵測
-        
-        if (mapCamera != null)
-        {
-            mapCamera.cullingMask = mapLayerMask;
-            Debug.Log($"地圖相機 LayerMask 已手動設定為: {mapLayerMask.value}");
-        }
-    }
-    
-    /// <summary>
-    /// 設定地圖相機的單一 Layer
-    /// </summary>
-    public void SetMapLayer(int layer)
-    {
-        mapLayerMask = 1 << layer;
-        autoDetectTilemapLayer = false; // 停用自動偵測
-        
-        if (mapCamera != null)
-        {
-            mapCamera.cullingMask = mapLayerMask;
-            Debug.Log($"地圖相機 Layer 已手動設定為: {LayerMask.LayerToName(layer)} (Layer {layer})");
-        }
-    }
-    
-    /// <summary>
-    /// 設定是否自動偵測 Tilemap Layer
-    /// </summary>
-    public void SetAutoDetectTilemapLayer(bool autoDetect)
-    {
-        autoDetectTilemapLayer = autoDetect;
-        
-        if (autoDetect && tilemap != null && mapCamera != null)
-        {
-            int tilemapLayer = tilemap.gameObject.layer;
-            mapCamera.cullingMask = 1 << tilemapLayer;
-            Debug.Log($"已啟用自動偵測，相機 Layer 設定為: {LayerMask.LayerToName(tilemapLayer)}");
-        }
-    }
-    
-    /// <summary>
-    /// 獲取當前使用的 LayerMask
-    /// </summary>
-    public LayerMask GetCurrentLayerMask()
-    {
-        if (mapCamera != null)
-        {
-            return mapCamera.cullingMask;
-        }
-        return mapLayerMask;
     }
     
     #endregion

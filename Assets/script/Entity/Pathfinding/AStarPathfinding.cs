@@ -33,7 +33,7 @@ public class AStarPathfinding : MonoBehaviour
     {
         if (showDebugPath)
         {
-            Debug.Log($"[A*] 開始尋路: {startPos} → {targetPos}");
+            //Debug.Log($"[A*] 開始尋路: {startPos} → {targetPos}");
         }
         
         if (pathfindingGrid == null)
@@ -84,7 +84,7 @@ public class AStarPathfinding : MonoBehaviour
         // 檢查起點和終點是否相同
         if (startNode == targetNode)
         {
-            if (showDebugPath) Debug.Log("[A*] 起點和終點相同，返回空路徑");
+            if (showDebugPath) //Debug.Log("[A*] 起點和終點相同，返回空路徑");
             return new List<PathfindingNode>();
         }
 
@@ -134,7 +134,7 @@ public class AStarPathfinding : MonoBehaviour
                         pathStr += $"[{i}]({path[i].worldPosition.x:F1}, {path[i].worldPosition.y:F1})";
                         if (i < path.Count - 1) pathStr += " → ";
                     }
-                    Debug.Log($"[A*] ✓ 找到路徑! 節點數: {path.Count}, 迭代: {iterations}\n{pathStr}");
+                    //Debug.Log($"[A*] ✓ 找到路徑! 節點數: {path.Count}, 迭代: {iterations}\n{pathStr}");
                 }
                 return path;
             }

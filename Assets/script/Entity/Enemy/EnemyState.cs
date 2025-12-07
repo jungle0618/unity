@@ -40,7 +40,7 @@ public class EnemyStateMachine : BaseStateMachine<EnemyState>
     /// </summary>
     public override void ChangeState(EnemyState newState)
     {
-        Debug.Log($"ChangeState: {CurrentState} -> {newState}");
+        //Debug.Log($"ChangeState: {CurrentState} -> {newState}");
         if (CurrentState.Equals(newState)) return;
 
         EnemyState oldState = CurrentState;

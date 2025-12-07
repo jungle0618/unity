@@ -49,7 +49,7 @@ MonoBehaviour:
   itemIcon: {fileID: 6764707825347140516, guid: 3b0d11dcea895e744b365e4acb7a8cfb,
     type: 3}
   attackCooldown: 1
-  attackDamage: 130
+  attackDamage: 70
   equipDelay: 1
   maxDurability: 3
   attackRange: 1.5

@@ -39,7 +39,7 @@ public class Gun : RangedWeapon
             // 玩家需要檢查彈藥
             if (!HasAmmo)
             {
-                Debug.Log("[Gun] Out of ammo!");
+                //Debug.Log("[Gun] Out of ammo!");
                 return;
             }
 
@@ -68,7 +68,7 @@ public class Gun : RangedWeapon
         // Alert nearby enemies when player shoots
         AlertNearbyEnemies(origin, attacker);
 
-        Debug.Log($"[Gun] Fired! Ammo: {_currentAmmo}");
+        //Debug.Log($"[Gun] Fired! Ammo: {_currentAmmo}");
     }
 
     private void SpawnBullet(Vector2 origin, Vector2 direction, GameObject owner)
@@ -116,7 +116,7 @@ public class Gun : RangedWeapon
         if (entityManager != null)
         {
             entityManager.AlertNearbyEnemies(shootPosition, alertRange);
-            Debug.Log($"[Gun] Alerted enemies within {alertRange} units");
+            //Debug.Log($"[Gun] Alerted enemies within {alertRange} units");
         }
         else
         {
