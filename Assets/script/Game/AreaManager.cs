@@ -156,26 +156,8 @@ public class AreaManager : MonoBehaviour
         {
             enabled = true,
             areaName = "Central Guard Zone",
-            center = new Vector2(67f, 24f),
-            size = new Vector2(20f, 16f)
-        });
-        
-        // Guard Area 2: North Checkpoint
-        guardAreas.Add(new GuardAreaDefinition
-        {
-            enabled = true,
-            areaName = "North Checkpoint",
-            center = new Vector2(80f, 50f),
-            size = new Vector2(12f, 12f)
-        });
-        
-        // Guard Area 3: Target Escape Route (near escape point)
-        guardAreas.Add(new GuardAreaDefinition
-        {
-            enabled = true,
-            areaName = "Meeting Room",
-            center = new Vector2(44f, 11f),
-            size = new Vector2(6f, 10f)
+            center = new Vector2(74f, 28f),
+            size = new Vector2(46f, 54f)
         });
         
         //Debug.Log($"[AreaManager] Initialized {guardAreas.Count} predefined guard areas");
@@ -240,8 +222,21 @@ public class AreaManager : MonoBehaviour
         
         // Convert world position to map position
         Vector2 mapPos = ConvertWorldToMapPosition(area.center, mapUI);
-        Vector2 mapSize = area.size * 2f; // Same scale as position conversion
-        
+        Debug.LogWarning($"[AreaManager] Mapping Guard Area '{area.areaName}' at world {area.center} to map {mapPos}");
+        // Vector2 mapSize = area.size * 2f; // Same scale as position conversion
+        // Get the corners of the area in world space
+        Vector2 worldMin = area.center - area.size / 2f;
+        Vector2 worldMax = area.center + area.size / 2f;
+
+        // Convert both corners to map space
+        Vector2 mapMin = ConvertWorldToMapPosition(worldMin, mapUI);
+        Vector2 mapMax = ConvertWorldToMapPosition(worldMax, mapUI);
+
+        // Calculate the size in map space
+        Vector2 mapSize = new Vector2(
+            Mathf.Abs(mapMax.x - mapMin.x),
+            Mathf.Abs(mapMax.y - mapMin.y)
+        );
         // Set anchors and pivot
         rectTransform.anchorMin = Vector2.zero;
         rectTransform.anchorMax = Vector2.zero;
@@ -294,6 +289,7 @@ public class AreaManager : MonoBehaviour
         {
             try
             {
+                Debug.LogWarning("[AreaManager] Invoking WorldToMapPosition via reflection");
                 return (Vector2)method.Invoke(mapUI, new object[] { new Vector3(worldPos.x, worldPos.y, 0f) });
             }
             catch (System.Exception)
@@ -301,7 +297,7 @@ public class AreaManager : MonoBehaviour
                 // Fall through to fallback
             }
         }
-        
+        Debug.LogWarning("[AreaManager] Could not invoke WorldToMapPosition via reflection - using fallback conversion");
         // Fallback: simple conversion (adjust multiplier based on your map scale)
         return worldPos * 2f;
     }
