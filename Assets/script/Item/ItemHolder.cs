@@ -932,6 +932,21 @@ public class ItemHolder : MonoBehaviour
             return null;
         }
         
+        // 檢查是否為鑰匙，且已持有相同類型的鑰匙
+        if (item is Key newKey)
+        {
+            KeyType keyType = newKey.KeyType;
+            Key existingKey = GetKeyByType(keyType);
+            
+            if (existingKey != null)
+            {
+                // 已持有相同類型的鑰匙，不加入背包，銷毀實例化的物品
+                Debug.Log($"[ItemHolder] 已持有 {keyType} 鑰匙，不重複加入背包");
+                Destroy(item.gameObject);
+                return null; // 返回 null 表示未加入，但地上的物品應該被銷毀
+            }
+        }
+        
         bool isWeapon = item is Weapon;
         bool currentIsWeapon = IsCurrentItemWeapon;
         bool currentIsEmptyHands = IsEmptyHands();

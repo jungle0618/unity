@@ -418,13 +418,36 @@ public class ItemManager : MonoBehaviour
         // 將物品 Prefab 加入 ItemHolder（不裝備，只加到列表尾端）
         Item addedItem = targetHolder.AddItemFromPrefab(worldItem.ItemPrefab);
         
-        if (addedItem == null)
+        // 檢查是否為鑰匙且已持有相同類型（AddItemFromPrefab 會返回 null 但不加入背包）
+        bool isKeyAndAlreadyHas = false;
+        if (addedItem == null && worldItem.ItemPrefab != null)
+        {
+            // 檢查 prefab 是否為 Key
+            Item prefabItem = worldItem.ItemPrefab.GetComponent<Item>();
+            if (prefabItem is Key keyPrefab)
+            {
+                KeyType keyType = keyPrefab.KeyType;
+                // 檢查是否已持有相同類型的鑰匙
+                if (targetHolder.GetKeyByType(keyType) != null)
+                {
+                    isKeyAndAlreadyHas = true;
+                    if (showDebugInfo)
+                    {
+                        Debug.Log($"[ItemManager] 已持有 {keyType} 鑰匙，地上的鑰匙會被移除但不加入背包");
+                    }
+                }
+            }
+        }
+        
+        // 如果添加失敗且不是因為重複鑰匙，則返回失敗
+        if (addedItem == null && !isKeyAndAlreadyHas)
         {
             Debug.LogWarning($"ItemManager: Failed to add item {worldItem.ItemType}");
             return false;
         }
         
         // 從場景中移除物品（先從列表移除，再銷毀）
+        // 無論是否加入背包，地上的物品都要消失
         spawnedItems.Remove(worldItem);
         
         // 銷毀 GameObject
