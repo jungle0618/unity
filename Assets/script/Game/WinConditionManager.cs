@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using System.Collections.Generic;
 
 /// <summary>
 /// 勝利條件管理器
@@ -11,7 +10,7 @@ using System.Collections.Generic;
 public class WinConditionManager : MonoBehaviour
 {
     [Header("Settings")]
-    [SerializeField] private float exitReachDistance = 1.5f; // 到達出口的距離閾值
+    [SerializeField] private float exitReachDistance = 3f; // 到達出口的距離閾值
     [SerializeField] private bool showDebugLogs = true;
     
     [Header("Visual")]
@@ -22,7 +21,7 @@ public class WinConditionManager : MonoBehaviour
     private Vector3 exitPoint = Vector3.zero;
     
     // 狀態追蹤
-    private bool allTargetsKilled = false;
+    private bool targetKilled = false;
     private bool playerReachedExit = false;
     private bool playerDied = false;
     private bool targetReachedExit = false;
@@ -32,10 +31,9 @@ public class WinConditionManager : MonoBehaviour
     // 系統引用
     private GameManager gameManager;
     private Player player;
-    private EntityManager entityManager;
     
-    // 目標引用
-    private List<Target> targets = new List<Target>();
+    // 目標引用（只有一個 target）
+    private Target target;
     
     /// <summary>
     /// 初始化（出口點位置從 patroldata.json 讀取，由 EntityManager 調用）
@@ -47,10 +45,9 @@ public class WinConditionManager : MonoBehaviour
         
         // 獲取系統引用
         GetPlayer();
-        GetEntityManager();
         
         // 訂閱事件
-        TrySubscribeToTargets();
+        TrySubscribeToTarget();
         TrySubscribeToPlayerEvents();
         
         if (showDebugLogs)
@@ -84,18 +81,6 @@ public class WinConditionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 獲取 EntityManager
-    /// </summary>
-    private EntityManager GetEntityManager()
-    {
-        if (entityManager == null)
-        {
-            entityManager = FindFirstObjectByType<EntityManager>();
-        }
-        return entityManager;
-    }
-    
-    /// <summary>
     /// 嘗試訂閱玩家事件
     /// </summary>
     private void TrySubscribeToPlayerEvents()
@@ -118,11 +103,10 @@ public class WinConditionManager : MonoBehaviour
     private void Start()
     {
         GetPlayer();
-        GetEntityManager();
         
-        if (targets.Count == 0)
+        if (target == null)
         {
-            TrySubscribeToTargets();
+            TrySubscribeToTarget();
         }
         
         TrySubscribeToPlayerEvents();
@@ -131,13 +115,10 @@ public class WinConditionManager : MonoBehaviour
     private void OnDestroy()
     {
         // 取消訂閱 Target 事件
-        foreach (var target in targets)
+        if (target != null)
         {
-            if (target != null)
-            {
-                target.OnTargetDied -= OnTargetKilled;
-                target.OnTargetReachedEscapePoint -= OnTargetReachedExit;
-            }
+            target.OnTargetDied -= OnTargetKilled;
+            target.OnTargetReachedEscapePoint -= OnTargetReachedExit;
         }
         
         // 取消訂閱 Player 事件
@@ -158,9 +139,9 @@ public class WinConditionManager : MonoBehaviour
         }
         
         // 持續嘗試訂閱目標和玩家事件
-        if (targets.Count == 0)
+        if (target == null)
         {
-            TrySubscribeToTargets();
+            TrySubscribeToTarget();
         }
         
         if (player == null)
@@ -179,29 +160,23 @@ public class WinConditionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 嘗試訂閱目標事件
+    /// 嘗試訂閱目標事件（只有一個 target）
     /// </summary>
-    private void TrySubscribeToTargets()
+    private void TrySubscribeToTarget()
     {
-        Target[] allTargets = FindObjectsByType<Target>(FindObjectsSortMode.None);
+        if (target != null) return;
         
-        if (allTargets.Length == 0) return;
-        
-        int subscribedCount = 0;
-        foreach (var target in allTargets)
+        Target foundTarget = FindFirstObjectByType<Target>();
+        if (foundTarget != null)
         {
-            if (target != null && !targets.Contains(target))
+            target = foundTarget;
+            target.OnTargetDied += OnTargetKilled;
+            target.OnTargetReachedEscapePoint += OnTargetReachedExit;
+            
+            if (showDebugLogs)
             {
-                targets.Add(target);
-                target.OnTargetDied += OnTargetKilled;
-                target.OnTargetReachedEscapePoint += OnTargetReachedExit;
-                subscribedCount++;
+                Debug.Log($"[WinCondition] 已訂閱目標事件: {target.name}");
             }
-        }
-        
-        if (showDebugLogs && subscribedCount > 0)
-        {
-            Debug.Log($"[WinCondition] 已訂閱 {subscribedCount} 個目標事件（總共 {targets.Count} 個）");
         }
     }
     
@@ -231,31 +206,40 @@ public class WinConditionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 檢查目標是否到達出口
+    /// 檢查目標是否到達出口（檢查目標的 escapePoint，不是玩家的 exitPoint）
     /// </summary>
     private void CheckTargetReachedExit()
     {
-        if (targetReachedExit || exitPoint == Vector3.zero) return;
+        if (targetReachedExit || target == null || target.IsDead) return;
         
-        foreach (var target in targets)
+        // 獲取目標的 escapePoint（不是玩家的 exitPoint）
+        TargetAIHandler aiHandler = target.GetComponent<TargetAIHandler>();
+        if (aiHandler == null) return;
+        
+        Vector3 targetEscapePoint = aiHandler.GetEscapePoint();
+        if (targetEscapePoint == Vector3.zero) return;
+        
+        float distance = Vector3.Distance(target.transform.position, targetEscapePoint);
+        
+        if (showDebugLogs)
         {
-            if (target != null && !target.IsDead)
+            Debug.Log($"[WinCondition] CheckTargetReachedExit: {target.name}");
+            Debug.Log($"[WinCondition] Target Escape Point: {targetEscapePoint}");
+            Debug.Log($"[WinCondition] Target Position: {target.transform.position}");
+            Debug.Log($"[WinCondition] Distance to escape point: {distance}");
+        }
+        
+        if (distance <= exitReachDistance)
+        {
+            targetReachedExit = true;
+            
+            if (showDebugLogs)
             {
-                float distance = Vector3.Distance(target.transform.position, exitPoint);
-                if (distance <= exitReachDistance)
-                {
-                    targetReachedExit = true;
-                    
-                    if (showDebugLogs)
-                    {
-                        Debug.LogWarning($"[WinCondition] ✗ 目標已到達出口: {target.name}");
-                    }
-                    
-                    // 觸發失敗
-                    TriggerFailure("Target reached exit point");
-                    return;
-                }
+                Debug.LogWarning($"[WinCondition] ✗ 目標已到達逃亡點: {target.name}");
             }
+            
+            // 觸發失敗
+            TriggerFailure("Target reached escape point");
         }
     }
     
@@ -277,28 +261,23 @@ public class WinConditionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 目標到達出口事件處理（使用 escape point 事件，但檢查是否為出口點）
+    /// 目標到達逃亡點事件處理（當目標到達其 escapePoint 時觸發）
     /// </summary>
     private void OnTargetReachedExit(Target target)
     {
         if (targetReachedExit) return;
         
-        // 檢查目標是否真的到達出口點
-        if (exitPoint != Vector3.zero)
+        // 目標已經到達其 escapePoint（不是玩家的 exitPoint），直接觸發失敗
+        targetReachedExit = true;
+        
+        if (showDebugLogs)
         {
-            float distance = Vector3.Distance(target.transform.position, exitPoint);
-            if (distance <= exitReachDistance)
-            {
-                targetReachedExit = true;
-                
-                if (showDebugLogs)
-                {
-                    Debug.LogWarning($"[WinCondition] ✗ 目標已到達出口: {target.name}");
-                }
-                
-                TriggerFailure("Target reached exit point");
-            }
+            TargetAIHandler aiHandler = target.GetComponent<TargetAIHandler>();
+            Vector3 escapePoint = aiHandler != null ? aiHandler.GetEscapePoint() : Vector3.zero;
+            Debug.LogWarning($"[WinCondition] ✗ 目標已到達逃亡點: {target.name} (escapePoint: {escapePoint})");
         }
+        
+        TriggerFailure("Target reached escape point");
     }
     
     /// <summary>
@@ -311,45 +290,18 @@ public class WinConditionManager : MonoBehaviour
             Debug.LogWarning($"[WinCondition] ✓ 目標已被殺死: {target.name}");
         }
         
-        // 檢查是否所有目標都已死亡
-        CheckAllTargetsKilled();
+        // 目標已死亡
+        targetKilled = true;
+        
+        // 當目標死亡且還沒發送過通知時，顯示通知
+        if (!exitNotificationSent)
+        {
+            ShowExitPointNotification();
+            exitNotificationSent = true;
+        }
         
         // 檢查勝利條件
         CheckWinCondition();
-    }
-    
-    /// <summary>
-    /// 檢查目標是否已死亡（預設只有一個 target）
-    /// </summary>
-    private void CheckAllTargetsKilled()
-    {
-        if (allTargetsKilled) return;
-        
-        // 預設只有一個 target，直接檢查第一個目標
-        if (targets.Count == 0)
-        {
-            allTargetsKilled = false;
-            return;
-        }
-        
-        // 檢查第一個目標是否死亡
-        Target target = targets[0];
-        if (target != null && target.IsDead)
-        {
-            allTargetsKilled = true;
-            
-            if (showDebugLogs)
-            {
-                Debug.LogWarning($"[WinCondition] 目標已死亡: {target.name}");
-            }
-            
-            // 當所有目標死亡且還沒發送過通知時，顯示通知
-            if (!exitNotificationSent)
-            {
-                ShowExitPointNotification();
-                exitNotificationSent = true;
-            }
-        }
     }
     
     /// <summary>
@@ -384,17 +336,25 @@ public class WinConditionManager : MonoBehaviour
         if (winConditionChecked) return;
         
         // 檢查失敗條件（優先級最高）
-        if (playerDied || targetReachedExit)
+        if (playerDied)
         {
-            Debug.Log("[WinCondition] Failure condition met");
+            // 玩家死亡已在 OnPlayerDied 中處理，這裡不需要再次觸發
             return;
         }
         
-        CheckAllTargetsKilled();
-        Debug.Log("[WinCondition] All targets killed: " + allTargetsKilled);
+        if (targetReachedExit)
+        {
+            // 目標到達逃亡點，確保觸發失敗（如果之前沒有成功觸發）
+            TriggerFailure("Target reached escape point");
+            return;
+        }
+        
+        Debug.Log("[WinCondition] Target killed: " + targetKilled);
         Debug.Log("[WinCondition] Player reached exit: " + playerReachedExit);
-        // 勝利條件：所有目標死亡且玩家到達出口
-        if (allTargetsKilled && playerReachedExit)
+        Debug.Log("[WinCondition] Target reached exit: " + targetReachedExit);
+        
+        // 勝利條件：目標死亡且玩家到達出口
+        if (targetKilled && playerReachedExit)
         {
             TriggerWin();
         }
@@ -432,6 +392,7 @@ public class WinConditionManager : MonoBehaviour
     /// </summary>
     private void TriggerFailure(string reason)
     {
+        Debug.LogError("[WinCondition] TriggerFailure: " + reason);
         if (winConditionChecked) return;
         
         winConditionChecked = true;
@@ -464,11 +425,11 @@ public class WinConditionManager : MonoBehaviour
         
         if (targetReachedExit)
         {
-            return "任務失敗：目標已到達出口";
+            return "任務失敗：目標已到達逃亡點";
         }
         
         string status = "勝利條件：\n";
-        status += allTargetsKilled ? "✓ 殺死所有目標\n" : "○ 殺死所有目標\n";
+        status += targetKilled ? "✓ 殺死目標\n" : "○ 殺死目標\n";
         status += playerReachedExit ? "✓ 到達出口\n" : "○ 到達出口\n";
         
         return status;
