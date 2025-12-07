@@ -282,25 +282,42 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
         var itemsWithPrefabs = itemHolder.GetAllItemsWithPrefabs();
         if (itemsWithPrefabs.Count == 0) return;
         
-        // 25% 概率掉落物品
-        var randomValue = Random.Range(0f, 1f);
-        if (randomValue > 0.25f)
+        // 掉落機率設定
+        const float weaponDropChance = 0.25f;  // 武器掉落機率：25%
+        const float nonWeaponDropChance = 1.0f; // 非武器掉落機率：100%
+        
+        // 對每個物品分別檢查掉落機率
+        List<GameObject> prefabsToDrop = new List<GameObject>();
+        
+        foreach (var pair in itemsWithPrefabs)
         {
-            itemHolder.ClearAllItems();
-            return;
+            Item item = pair.Key;
+            GameObject prefab = pair.Value;
+            
+            if (prefab == null) continue;
+            
+            // 判斷是否為武器
+            bool isWeapon = item is Weapon;
+            
+            // 根據物品類型決定掉落機率
+            float dropChance = isWeapon ? weaponDropChance : nonWeaponDropChance;
+            
+            // 進行掉落機率檢查
+            float randomValue = Random.Range(0f, 1f);
+            if (randomValue <= dropChance)
+            {
+                prefabsToDrop.Add(prefab);
+            }
         }
         
-        // 提取 Prefab 列表
-        List<GameObject> prefabs = itemsWithPrefabs
-            .Where(pair => pair.Value != null)
-            .Select(pair => pair.Value)
-            .ToList();
-        
-        if (prefabs.Count > 0)
+        // 掉落通過機率檢查的物品
+        if (prefabsToDrop.Count > 0)
         {
-            itemManager.DropItemsAtPosition(prefabs, transform.position, 1.5f);
-            itemHolder.ClearAllItems();
+            itemManager.DropItemsAtPosition(prefabsToDrop, transform.position, 1.5f);
         }
+        
+        // 清除所有物品（無論是否掉落）
+        itemHolder.ClearAllItems();
     }
 
     /// <summary>
@@ -386,4 +403,3 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
 
     #endregion
 }
-
