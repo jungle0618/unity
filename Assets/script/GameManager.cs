@@ -55,6 +55,7 @@ public class GameManager : MonoBehaviour
 
     // Properties
     public bool IsPaused => Time.timeScale == 0f;
+    public GameState CurrentState => currentState;
 
     // Events
     public delegate void GameStateChangeHandler(GameState oldState, GameState newState);
@@ -197,7 +198,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void Initialize()
     {
-        Debug.Log("[GameManager] Initializing...");
+        //Debug.Log("[GameManager] Initializing...");
         
         // DON'T find references in Awake/Initialize - they don't exist yet in MainMenuScene
         // They will be found when the game scene loads via OnSceneLoaded
@@ -214,7 +215,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        Debug.Log($"[GameManager] Scene loaded: {scene.name}");
+        //Debug.Log($"[GameManager] Scene loaded: {scene.name}");
         
         // Set game state based on scene
         if (scene.name == "MainMenuScene")

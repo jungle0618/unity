@@ -27,12 +27,21 @@ public class DialogueUIManager : MonoBehaviour
     [SerializeField] private string continueButtonText = "Continue...";
     [SerializeField] private string finishButtonText = "Close.";
     
+    [Header("Input Settings")]
+    [SerializeField] private bool enableSpaceKeyToContinue = true; // 是否啟用空格鍵繼續
+    [SerializeField] private KeyCode continueKey = KeyCode.Space;   // 繼續按鍵
+    
+    [Header("UI Visibility Settings")]
+    [SerializeField] private bool hideOtherUIDuringDialogue = true; // 對話時是否隱藏其他 UI
+    
     private Queue<DialogueEntry> dialogueQueue = new Queue<DialogueEntry>();
     private bool isShowingDialogue = false;
     private bool isTyping = false;
     private Coroutine typewriterCoroutine;
     private Action onDialogueComplete;
     private bool isInitialized = false;
+    private string currentMessage = ""; // 保存當前正在顯示的完整訊息
+    private GameUIManager gameUIManager; // GameUIManager 引用
     
     /// <summary>
     /// 對話條目結構
@@ -84,6 +93,16 @@ public class DialogueUIManager : MonoBehaviour
         
         // 初始隱藏
         dialoguePanel.SetActive(false);
+        
+        // 嘗試獲取 GameUIManager 引用（用於隱藏/顯示其他 UI）
+        if (hideOtherUIDuringDialogue)
+        {
+            gameUIManager = FindFirstObjectByType<GameUIManager>();
+            if (gameUIManager == null)
+            {
+                Debug.LogWarning("DialogueUIManager: 未找到 GameUIManager，無法隱藏其他 UI");
+            }
+        }
         
         isInitialized = true;
         Debug.Log("DialogueUIManager: 對話UI已初始化");
@@ -202,6 +221,18 @@ public class DialogueUIManager : MonoBehaviour
             Time.timeScale = 0f;
         }
         
+        // 隱藏其他 UI（如果啟用）
+        if (hideOtherUIDuringDialogue && gameUIManager != null)
+        {
+            gameUIManager.HideAllGameplayUI();
+        }
+        
+        // 確保對話面板顯示在最前面（移動到 Hierarchy 最後面）
+        if (dialoguePanel != null)
+        {
+            dialoguePanel.transform.SetAsLastSibling();
+        }
+        
         // 顯示面板
         dialoguePanel.SetActive(true);
         
@@ -271,6 +302,7 @@ public class DialogueUIManager : MonoBehaviour
             StopCoroutine(typewriterCoroutine);
         }
         
+        currentMessage = message; // 保存完整訊息
         typewriterCoroutine = StartCoroutine(TypewriterEffect(message));
     }
     
@@ -330,8 +362,12 @@ public class DialogueUIManager : MonoBehaviour
             typewriterCoroutine = null;
         }
         
-        // 這裡需要完整的文字，但我們在協程中沒有保存
-        // 簡單的解決方案：立即結束並顯示完整文字
+        // 立即顯示完整文字
+        if (!string.IsNullOrEmpty(currentMessage) && dialogueText != null)
+        {
+            dialogueText.text = currentMessage;
+        }
+        
         isTyping = false;
     }
     
@@ -350,10 +386,30 @@ public class DialogueUIManager : MonoBehaviour
         // 隱藏面板
         dialoguePanel.SetActive(false);
         
+        // 恢復其他 UI（如果之前隱藏了）
+        // 注意：只有在遊戲還在進行中時才恢復 UI，遊戲結束時不恢復（由 MissionDialogueManager 控制）
+        if (hideOtherUIDuringDialogue && gameUIManager != null)
+        {
+            // 檢查遊戲狀態，只有在遊戲進行中時才恢復 UI
+            if (GameManager.Instance != null && 
+                GameManager.Instance.CurrentState == GameManager.GameState.Playing)
+            {
+                gameUIManager.ShowAllGameplayUI();
+            }
+            // 如果遊戲已結束（GameOver 或 GameWin），不恢復 UI
+            // MissionDialogueManager 會在對話完成後顯示對應的結算 UI
+        }
+        
         // 恢復遊戲（如果之前暫停了）
+        // 注意：遊戲結束時不恢復時間（保持暫停狀態）
         if (pauseGameDuringDialogue)
         {
-            Time.timeScale = 1f;
+            // 只有在遊戲還在進行中時才恢復時間
+            if (GameManager.Instance != null && 
+                GameManager.Instance.CurrentState == GameManager.GameState.Playing)
+            {
+                Time.timeScale = 1f;
+            }
         }
         
         isShowingDialogue = false;
@@ -402,6 +458,23 @@ public class DialogueUIManager : MonoBehaviour
     {
         ClearDialogueQueue();
         CloseDialogue();
+        // CloseDialogue() 已經會恢復其他 UI，所以這裡不需要額外處理
+    }
+    
+    /// <summary>
+    /// 檢測輸入（空格鍵繼續）
+    /// </summary>
+    private void Update()
+    {
+        // 如果啟用了空格鍵繼續，且正在顯示對話
+        if (enableSpaceKeyToContinue && isShowingDialogue)
+        {
+            // 檢測空格鍵按下（使用 GetKeyDown 避免重複觸發）
+            if (Input.GetKeyDown(continueKey))
+            {
+                OnContinueButtonClicked();
+            }
+        }
     }
     
     private void OnDestroy()

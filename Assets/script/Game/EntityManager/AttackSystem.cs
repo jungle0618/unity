@@ -128,7 +128,9 @@ namespace Game.EntityManager
                     EntityDataLoader.EntityType targetType = GetEntityTypeFromIEntity(entity);
                     if (ShouldAttackTarget(attackerType, targetType))
                     {
-                        entity.TakeDamage(damage, damageSource);
+                        // 傳入攻擊者位置用於視野檢測
+                        Vector2 attackerPos = attacker != null ? (Vector2)attacker.transform.position : attackCenter;
+                        entity.TakeDamage(damage, damageSource, attackerPos);
                         hitCount++;
 
                         if (showDebugInfo)

@@ -256,7 +256,7 @@ public class PathfindingGrid : MonoBehaviour
             if (hasWall) obstacles += "牆壁 ";
             if (hasObject) obstacles += "物件 ";
             if (hasCollider) obstacles += "碰撞體 ";
-            Debug.Log($"位置 {worldPosition} 不可行走，障礙物: {obstacles}");
+            //Debug.Log($"位置 {worldPosition} 不可行走，障礙物: {obstacles}");
         }
 
         return isWalkable;
@@ -283,14 +283,14 @@ public class PathfindingGrid : MonoBehaviour
     [ContextMenu("檢查網格設定")]
     public void CheckGridSettings()
     {
-        Debug.Log("=== 路徑規劃網格設定檢查 ===");
-        Debug.Log($"網格大小: {gridWidth} x {gridHeight}");
-        Debug.Log($"單元大小: {cellSize}");
-        Debug.Log($"網格偏移: {gridOffset}");
+        //Debug.Log("=== 路徑規劃網格設定檢查 ===");
+        //Debug.Log($"網格大小: {gridWidth} x {gridHeight}");
+        //Debug.Log($"單元大小: {cellSize}");
+        //Debug.Log($"網格偏移: {gridOffset}");
         
         if (wallTilemap != null)
         {
-            Debug.Log($"牆壁Tilemap: {wallTilemap.name}");
+            //Debug.Log($"牆壁Tilemap: {wallTilemap.name}");
         }
         else
         {
@@ -299,14 +299,14 @@ public class PathfindingGrid : MonoBehaviour
         
         if (objectTilemap != null)
         {
-            Debug.Log($"物件Tilemap: {objectTilemap.name}");
+            //Debug.Log($"物件Tilemap: {objectTilemap.name}");
         }
         else
         {
             Debug.LogWarning("物件Tilemap未設定！");
         }
         
-        Debug.Log($"障礙物層遮罩: {obstacleLayerMask.value}");
+        //Debug.Log($"障礙物層遮罩: {obstacleLayerMask.value}");
         
         // 檢查一些樣本位置
         Vector3[] testPositions = {
@@ -321,7 +321,7 @@ public class PathfindingGrid : MonoBehaviour
             PathfindingNode node = GetNode(pos);
             if (node != null)
             {
-                Debug.Log($"位置 {pos}: 可行走 = {node.isWalkable}");
+                //Debug.Log($"位置 {pos}: 可行走 = {node.isWalkable}");
             }
         }
     }
@@ -332,9 +332,9 @@ public class PathfindingGrid : MonoBehaviour
     [ContextMenu("重新創建網格")]
     public void RecreateGrid()
     {
-        Debug.Log("重新創建路徑規劃網格...");
+        //Debug.Log("重新創建路徑規劃網格...");
         CreateGrid();
-        Debug.Log("網格重新創建完成！");
+        //Debug.Log("網格重新創建完成！");
     }
 
     /// <summary>

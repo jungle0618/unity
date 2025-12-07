@@ -32,7 +32,7 @@ public class WeaponSwitchUI : MonoBehaviour
     /// </summary>
     public void Initialize()
     {
-        Debug.Log("[WeaponSwitchUI] Initialize called");
+        //Debug.Log("[WeaponSwitchUI] Initialize called");
         
         // 檢查槽位是否已設置
         if (weaponSlot1 == null)
@@ -41,7 +41,7 @@ public class WeaponSwitchUI : MonoBehaviour
         }
         else
         {
-            Debug.Log("[WeaponSwitchUI] weaponSlot1 is assigned ✓");
+            //Debug.Log("[WeaponSwitchUI] weaponSlot1 is assigned ✓");
         }
         
         if (weaponSlot2 == null)
@@ -50,7 +50,7 @@ public class WeaponSwitchUI : MonoBehaviour
         }
         else
         {
-            Debug.Log("[WeaponSwitchUI] weaponSlot2 is assigned ✓");
+            //Debug.Log("[WeaponSwitchUI] weaponSlot2 is assigned ✓");
         }
         
         // 尋找玩家的 ItemHolder
@@ -60,7 +60,7 @@ public class WeaponSwitchUI : MonoBehaviour
             if (player != null)
             {
                 itemHolder = player.GetComponent<ItemHolder>();
-                Debug.Log($"[WeaponSwitchUI] Found player ItemHolder: {itemHolder != null}");
+                //Debug.Log($"[WeaponSwitchUI] Found player ItemHolder: {itemHolder != null}");
             }
             else
             {
@@ -73,7 +73,7 @@ public class WeaponSwitchUI : MonoBehaviour
         {
             itemHolder.OnItemChanged += OnItemChanged;
             itemHolder.OnWeaponDurabilityChanged += OnWeaponDurabilityChanged;
-            Debug.Log("[WeaponSwitchUI] Subscribed to ItemHolder events");
+            //Debug.Log("[WeaponSwitchUI] Subscribed to ItemHolder events");
         }
         else
         {
@@ -126,7 +126,7 @@ public class WeaponSwitchUI : MonoBehaviour
     /// </summary>
     private void RefreshWeaponDisplay()
     {
-        Debug.Log("[WeaponSwitchUI] RefreshWeaponDisplay called");
+        //Debug.Log("[WeaponSwitchUI] RefreshWeaponDisplay called");
         
         if (itemHolder == null)
         {
@@ -137,7 +137,7 @@ public class WeaponSwitchUI : MonoBehaviour
         
         // 獲取所有武器
         List<Weapon> weapons = itemHolder.GetItemsOfType<Weapon>();
-        Debug.Log($"[WeaponSwitchUI] Found {weapons.Count} weapons in ItemHolder");
+        //Debug.Log($"[WeaponSwitchUI] Found {weapons.Count} weapons in ItemHolder");
         
         // 更新武器引用
         Weapon knifeTop = null;
@@ -202,7 +202,7 @@ public class WeaponSwitchUI : MonoBehaviour
         weaponSlot1.SetSelected(currentTypeIndex == 0);
         weaponSlot2.SetSelected(currentTypeIndex == 1);
         
-        Debug.Log($"[WeaponSwitchUI] currentTypeIndex={currentTypeIndex}, Knife selected={currentTypeIndex == 0}, Gun selected={currentTypeIndex == 1}");
+        //Debug.Log($"[WeaponSwitchUI] currentTypeIndex={currentTypeIndex}, Knife selected={currentTypeIndex == 0}, Gun selected={currentTypeIndex == 1}");
     }
     
     // 判斷武器類型鍵（可擴展：未來可改為 ScriptableObject tag 或 enum）
@@ -299,7 +299,7 @@ public class WeaponSwitchUI : MonoBehaviour
             if (currentTypeIndex == -1)
             {
                 itemHolder.TryEquipEmptyHands();
-                Debug.Log("[WeaponSwitchUI] Switched to Empty Hands");
+                //Debug.Log("[WeaponSwitchUI] Switched to Empty Hands");
                 RefreshWeaponDisplay();
                 return;
             }

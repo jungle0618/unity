@@ -14,7 +14,6 @@ public class GameUIManager : MonoBehaviour
     [Header("Game UI Managers - 遊戲進行中的 UI")]
     [SerializeField] private HealthUIManager healthUIManager;          // 血條UI
     [SerializeField] private DangerUIManager dangerUIManager;          // 危險等級UI
-    [SerializeField] private HotbarUIManager hotbarUIManager;           // 物品欄UI
     [SerializeField] private TilemapMapUIManager tilemapMapUIManager;  // 地圖UI
     [SerializeField] private WeaponSwitchUI weaponSwitchUI;          // 武器切換UI
     [SerializeField] private NonWeaponItemsUI nonWeaponItemsUI;      // 非武器物品UI
@@ -35,7 +34,6 @@ public class GameUIManager : MonoBehaviour
     [Header("Initial Visibility Settings")]
     [SerializeField] private bool showHealthUI = true;
     [SerializeField] private bool showDangerUI = true;
-    [SerializeField] private bool showHotbarUI = true;
     [SerializeField] private bool showMapUI = false;
     // 注意：暫停選單由 GameManager 自動控制，不需要手動設定
     
@@ -57,6 +55,12 @@ public class GameUIManager : MonoBehaviour
     
     private void Start()
     {
+        // 訂閱遊戲狀態變化事件（用於在遊戲結束時隱藏 UI）
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+        }
+        
         // 如果需要等待 Player，訂閱 EntityManager 事件
         if (waitForPlayer && useEntityManager && entityManager != null)
         {
@@ -76,6 +80,18 @@ public class GameUIManager : MonoBehaviour
         {
             // 不需要等待或找不到 EntityManager，直接初始化
             InitializeAllUI();
+        }
+    }
+    
+    /// <summary>
+    /// 處理遊戲狀態變化事件
+    /// </summary>
+    private void OnGameStateChanged(GameManager.GameState oldState, GameManager.GameState newState)
+    {
+        // 當遊戲結束或勝利時，隱藏除了 Dialogue 以外的所有 UI
+        if (newState == GameManager.GameState.GameOver || newState == GameManager.GameState.GameWin)
+        {
+            HideAllUIExceptDialogue();
         }
     }
     
@@ -101,6 +117,12 @@ public class GameUIManager : MonoBehaviour
         if (entityManager != null)
         {
             entityManager.OnPlayerReady -= HandlePlayerReady;
+        }
+        
+        // 取消訂閱遊戲狀態變化事件
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
         }
     }
     
@@ -134,15 +156,6 @@ public class GameUIManager : MonoBehaviour
         else
         {
             Debug.LogWarning("GameUIManager: DangerUIManager 未設定");
-        }
-        
-        if (hotbarUIManager != null)
-        {
-            hotbarUIManager.Initialize();
-        }
-        else
-        {
-            Debug.LogWarning("GameUIManager: HotbarUIManager 未設定");
         }
         
         if (tilemapMapUIManager != null)
@@ -230,9 +243,6 @@ public class GameUIManager : MonoBehaviour
         // 設定初始可見性
         SetHealthUIVisible(showHealthUI);
         SetDangerUIVisible(showDangerUI);
-        
-        // Hotbar is deprecated and merged into NonWeaponItemsUI
-        // SetHotbarUIVisible(showHotbarUI);
         SetMapUIVisible(showMapUI);
         
         // 暫停選單由 GameManager 自動控制，不需要手動設定
@@ -268,18 +278,6 @@ public class GameUIManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 設定物品欄UI可見性
-    /// </summary>
-    public void SetHotbarUIVisible(bool visible)
-    {
-        showHotbarUI = visible;
-        if (hotbarUIManager != null)
-        {
-            hotbarUIManager.SetVisible(visible);
-        }
-    }
-    
-    /// <summary>
     /// 設定地圖UI可見性
     /// </summary>
     public void SetMapUIVisible(bool visible)
@@ -305,14 +303,6 @@ public class GameUIManager : MonoBehaviour
     public void ToggleDangerUI()
     {
         SetDangerUIVisible(!showDangerUI);
-    }
-    
-    /// <summary>
-    /// 切換物品欄UI顯示
-    /// </summary>
-    public void ToggleHotbarUI()
-    {
-        SetHotbarUIVisible(!showHotbarUI);
     }
     
     /// <summary>
@@ -345,18 +335,6 @@ public class GameUIManager : MonoBehaviour
     public void SetDangerUIManager(DangerUIManager manager)
             {
         dangerUIManager = manager;
-        if (manager != null)
-            {
-            manager.Initialize();
-        }
-    }
-    
-    /// <summary>
-    /// 設定物品欄UI管理器
-    /// </summary>
-    public void SetHotbarUIManager(HotbarUIManager manager)
-        {
-        hotbarUIManager = manager;
         if (manager != null)
             {
             manager.Initialize();
@@ -438,11 +416,6 @@ public class GameUIManager : MonoBehaviour
     public DangerUIManager GetDangerUIManager() => dangerUIManager;
     
     /// <summary>
-    /// 獲取物品欄UI管理器
-    /// </summary>
-    public HotbarUIManager GetHotbarUIManager() => hotbarUIManager;
-    
-    /// <summary>
     /// 獲取地圖UI管理器
     /// </summary>
     public TilemapMapUIManager GetTilemapMapUIManager() => tilemapMapUIManager;
@@ -492,8 +465,35 @@ public class GameUIManager : MonoBehaviour
         if (dangerUIManager != null)
             dangerUIManager.gameObject.SetActive(false);
         
-        if (hotbarUIManager != null)
-            hotbarUIManager.gameObject.SetActive(false);
+        if (tilemapMapUIManager != null)
+            tilemapMapUIManager.gameObject.SetActive(false);
+        
+        if (weaponSwitchUI != null)
+            weaponSwitchUI.gameObject.SetActive(false);
+        
+        if (nonWeaponItemsUI != null)
+            nonWeaponItemsUI.gameObject.SetActive(false);
+
+        if (gameOverUIManager != null)
+            gameOverUIManager.gameObject.SetActive(false);
+        
+        if (gameWinUIManager != null)
+            gameWinUIManager.gameObject.SetActive(false);
+        
+        Debug.Log("[GameUIManager] All gameplay UI hidden");
+    }
+    
+    /// <summary>
+    /// 隱藏除了 Dialogue 以外的所有 UI（用於遊戲結束時，在對話顯示前）
+    /// </summary>
+    public void HideAllUIExceptDialogue()
+    {
+        // 隱藏遊戲進行中的 UI
+        if (healthUIManager != null)
+            healthUIManager.gameObject.SetActive(false);
+        
+        if (dangerUIManager != null)
+            dangerUIManager.gameObject.SetActive(false);
         
         if (tilemapMapUIManager != null)
             tilemapMapUIManager.gameObject.SetActive(false);
@@ -504,7 +504,48 @@ public class GameUIManager : MonoBehaviour
         if (nonWeaponItemsUI != null)
             nonWeaponItemsUI.gameObject.SetActive(false);
         
-        Debug.Log("[GameUIManager] All gameplay UI hidden");
+        // 隱藏暫停選單
+        if (pauseUIManager != null)
+            pauseUIManager.gameObject.SetActive(false);
+        
+        // 隱藏通知 UI
+        if (notificationUIManager != null)
+            notificationUIManager.gameObject.SetActive(false);
+        
+        // 隱藏 GameOver 和 GameWin UI（對話完成後會再顯示）
+        if (gameOverUIManager != null)
+            gameOverUIManager.gameObject.SetActive(false);
+        
+        if (gameWinUIManager != null)
+            gameWinUIManager.gameObject.SetActive(false);
+        
+        // 注意：不隱藏 DialogueUIManager（保留，因為可能正在顯示對話）
+        
+        Debug.Log("[GameUIManager] All UI hidden except Dialogue");
+    }
+    
+    /// <summary>
+    /// 顯示 GameOver UI（用於對話完成後）
+    /// </summary>
+    public void ShowGameOverUI()
+    {
+        if (gameOverUIManager != null)
+        {
+            gameOverUIManager.gameObject.SetActive(true);
+            gameOverUIManager.SetVisible(true);
+        }
+    }
+    
+    /// <summary>
+    /// 顯示 GameWin UI（用於對話完成後）
+    /// </summary>
+    public void ShowGameWinUI()
+    {
+        if (gameWinUIManager != null)
+        {
+            gameWinUIManager.gameObject.SetActive(true);
+            gameWinUIManager.SetVisible(true);
+        }
     }
     
     /// <summary>
@@ -518,9 +559,6 @@ public class GameUIManager : MonoBehaviour
         if (dangerUIManager != null)
             dangerUIManager.gameObject.SetActive(showDangerUI);
         
-        if (hotbarUIManager != null)
-            hotbarUIManager.gameObject.SetActive(showHotbarUI);
-        
         if (tilemapMapUIManager != null)
             tilemapMapUIManager.gameObject.SetActive(showMapUI);
         
@@ -530,6 +568,11 @@ public class GameUIManager : MonoBehaviour
         if (nonWeaponItemsUI != null)
             nonWeaponItemsUI.gameObject.SetActive(true);
         
+        if (gameOverUIManager != null)
+            gameOverUIManager.gameObject.SetActive(true);
+        
+        if (gameWinUIManager != null)
+            gameWinUIManager.gameObject.SetActive(true);
         Debug.Log("[GameUIManager] All gameplay UI shown");
     }
     

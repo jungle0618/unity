@@ -196,7 +196,8 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     /// </summary>
     /// <param name="damage">傷害值</param>
     /// <param name="source">傷害來源</param>
-    public virtual void TakeDamage(int damage, string source = "")
+    /// <param name="attackerPosition">攻擊者位置（用於視野檢測，可選）</param>
+    public virtual void TakeDamage(int damage, string source = "", Vector2? attackerPosition = null)
     {
         if (entityHealth == null) return;
         
@@ -206,7 +207,7 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
         // 如果生命值歸零，EntityHealth 會觸發 OnEntityDied 事件
         // BaseEntity 已訂閱此事件，會自動調用 HandleEntityDeath() -> Die()
         // 子類可以覆寫 GetEntityDisplayName() 來自定義實體名稱（用於日誌）
-        entityHealth.TakeDamage(damage, source, GetEntityDisplayName());
+        entityHealth.TakeDamage(damage, source, GetEntityDisplayName(), attackerPosition);
     }
     
     /// <summary>

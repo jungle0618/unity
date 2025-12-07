@@ -133,7 +133,7 @@ public class AreaManager : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log($"[AreaManager] ✓ Player in SAFE AREA at {playerPos}");
+                    //Debug.Log($"[AreaManager] ✓ Player in SAFE AREA at {playerPos}");
                 }
                 lastAreaType = currentAreaType;
             }
@@ -178,7 +178,7 @@ public class AreaManager : MonoBehaviour
             size = new Vector2(6f, 10f)
         });
         
-        Debug.Log($"[AreaManager] Initialized {guardAreas.Count} predefined guard areas");
+        //Debug.Log($"[AreaManager] Initialized {guardAreas.Count} predefined guard areas");
     }
     
     /// <summary>

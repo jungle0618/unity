@@ -320,7 +320,7 @@ public class ItemHolder : MonoBehaviour
         Vector2 origin = transform.position;
 
         bool success = weapon.TryPerformAttack(origin, attacker);
-        Debug.Log("TryAttack: " + success);
+        //Debug.Log("TryAttack: " + success);
         if (success)
         {
             TriggerAttackAnimation();
@@ -769,7 +769,7 @@ public class ItemHolder : MonoBehaviour
     {
         if (currentItem != null)
         {
-            Debug.Log($"武器 {currentItem.name} 已損壞並將被銷毀！");
+            //Debug.Log($"武器 {currentItem.name} 已損壞並將被銷毀！");
             
             // 從可用物品列表中移除
             Item brokenItem = currentItem;
@@ -790,7 +790,7 @@ public class ItemHolder : MonoBehaviour
             {
                 // 找到下一個武器，切換到它
                 SwitchToItemInstance(nextWeapon);
-                Debug.Log($"武器損壞後切換到: {nextWeapon.ItemName}");
+                //Debug.Log($"武器損壞後切換到: {nextWeapon.ItemName}");
             }
             else
             {
@@ -798,14 +798,14 @@ public class ItemHolder : MonoBehaviour
                 if (useEmptyHands && emptyHands != null)
                 {
                     EquipEmptyHands();
-                    Debug.Log("所有武器都已損壞！已裝備空手。");
+                    //Debug.Log("所有武器都已損壞！已裝備空手。");
                 }
                 else
                 {
                     currentItem = null;
                     currentItemIndex = 0;
                     equippedPrefab = null;
-                    Debug.Log("所有武器都已損壞！");
+                    //Debug.Log("所有武器都已損壞！");
                     
                     // 觸發物品變更事件，讓 UI 知道沒有武器了
                     OnItemChanged?.Invoke(null);
@@ -936,7 +936,7 @@ public class ItemHolder : MonoBehaviour
         bool currentIsWeapon = IsCurrentItemWeapon;
         bool currentIsEmptyHands = IsEmptyHands();
         
-        Debug.Log($"[ItemHolder] AddItemFromPrefab called on {gameObject.name}: item={item.ItemName}, isWeapon={isWeapon}, currentItem={currentItem?.ItemName ?? "null"}, currentIsWeapon={currentIsWeapon}, currentIsEmptyHands={currentIsEmptyHands}");
+        ////Debug.Log($"[ItemHolder] AddItemFromPrefab called on {gameObject.name}: item={item.ItemName}, isWeapon={isWeapon}, currentItem={currentItem?.ItemName ?? "null"}, currentIsWeapon={currentIsWeapon}, currentIsEmptyHands={currentIsEmptyHands}");
         
         // 加入到可用物品列表尾端
         availableItems.Add(item);
@@ -948,7 +948,7 @@ public class ItemHolder : MonoBehaviour
         // 觸發物品變更事件以更新 UI（讓 UI 知道有新物品加入）
         OnItemChanged?.Invoke(currentItem);
         
-        Debug.Log($"[ItemHolder] ✅ Finished AddItemFromPrefab: {item.ItemName} added to {gameObject.name}. Total items: {availableItems.Count}, Currently equipped: {(currentItem != null ? currentItem.ItemName : "None")}");
+        ////Debug.Log($"[ItemHolder] ✅ Finished AddItemFromPrefab: {item.ItemName} added to {gameObject.name}. Total items: {availableItems.Count}, Currently equipped: {(currentItem != null ? currentItem.ItemName : "None")}");
         
         return item;
     }
@@ -1191,7 +1191,7 @@ public class ItemHolder : MonoBehaviour
             Destroy(item.gameObject);
         }
         
-        Debug.Log($"[ItemHolder] 移除物品: {item.ItemName}，剩餘物品數: {availableItems.Count}");
+        ////Debug.Log($"[ItemHolder] 移除物品: {item.ItemName}，剩餘物品數: {availableItems.Count}");
         return true;
     }
     
@@ -1227,7 +1227,7 @@ public class ItemHolder : MonoBehaviour
     /// </summary>
     public void ClearAllItems()
     {
-        Debug.Log($"[ItemHolder] ClearAllItems called on {gameObject.name}. Current items: {availableItems.Count}, currentItem: {currentItem?.ItemName ?? "null"}, useEmptyHands: {useEmptyHands}");
+        ////Debug.Log($"[ItemHolder] ClearAllItems called on {gameObject.name}. Current items: {availableItems.Count}, currentItem: {currentItem?.ItemName ?? "null"}, useEmptyHands: {useEmptyHands}");
         
         // 銷毀所有物品實例（不包括空手）
         foreach (var item in availableItems)
@@ -1251,14 +1251,14 @@ public class ItemHolder : MonoBehaviour
             // 確保空手已初始化（如果 ClearAllItems 在 Start 之前被調用）
             if (emptyHands == null)
             {
-                Debug.Log($"[ItemHolder] ClearAllItems: emptyHands is null, initializing now on {gameObject.name}");
+                ////Debug.Log($"[ItemHolder] ClearAllItems: emptyHands is null, initializing now on {gameObject.name}");
                 InitializeEmptyHands();
             }
             
             // 由於列表已清空，裝備空手
             if (emptyHands != null)
             {
-                Debug.Log($"[ItemHolder] ClearAllItems: No items remaining, equipping empty hands on {gameObject.name}");
+                ////Debug.Log($"[ItemHolder] ClearAllItems: No items remaining, equipping empty hands on {gameObject.name}");
                 EquipEmptyHands();
             }
             else
@@ -1268,10 +1268,10 @@ public class ItemHolder : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[ItemHolder] ClearAllItems: useEmptyHands is false, not equipping empty hands");
+            //Debug.Log($"[ItemHolder] ClearAllItems: useEmptyHands is false, not equipping empty hands");
         }
         
-        Debug.Log($"[ItemHolder] ClearAllItems complete on {gameObject.name}. currentItem: {currentItem?.ItemName ?? "null"}");
+        //Debug.Log($"[ItemHolder] ClearAllItems complete on {gameObject.name}. currentItem: {currentItem?.ItemName ?? "null"}");
     }
     
     /// <summary>
@@ -1292,7 +1292,7 @@ public class ItemHolder : MonoBehaviour
         emptyHands = emptyHandsGO.AddComponent<EmptyHands>();
         emptyHands.gameObject.SetActive(false); // 初始時隱藏
         
-        Debug.Log($"[ItemHolder] Initialized EmptyHands for {gameObject.name}");
+        //Debug.Log($"[ItemHolder] Initialized EmptyHands for {gameObject.name}");
     }
     
     /// <summary>
@@ -1318,7 +1318,7 @@ public class ItemHolder : MonoBehaviour
         // 觸發物品變更事件
         OnItemChanged?.Invoke(emptyHands);
         
-        Debug.Log($"[ItemHolder] Equipped EmptyHands for {gameObject.name}");
+        //Debug.Log($"[ItemHolder] Equipped EmptyHands for {gameObject.name}");
     }
     
     /// <summary>
@@ -1328,7 +1328,7 @@ public class ItemHolder : MonoBehaviour
     {
         if (!useEmptyHands)
         {
-            Debug.Log("[ItemHolder] TryEquipEmptyHands ignored - useEmptyHands=false");
+            //Debug.Log("[ItemHolder] TryEquipEmptyHands ignored - useEmptyHands=false");
             return false;
         }
         if (emptyHands == null)

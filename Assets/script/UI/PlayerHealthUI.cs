@@ -5,34 +5,36 @@ using TMPro;
 /// <summary>
 /// 玩家血量UI顯示器
 /// 顯示玩家的血量條和相關信息
+/// 使用兩個矩形（背景和前景）來實現血量條，統一邏輯
 /// </summary>
 public class PlayerHealthUI : MonoBehaviour
 {
     [Header("UI Components")]
-    [SerializeField] private Slider healthSlider;
-    [SerializeField] private TextMeshProUGUI healthText;
-    [SerializeField] private Image healthFillImage;
-    [SerializeField] private Image healthBackgroundImage;
-    
+    [SerializeField] private RectTransform healthBarBorderRect;     // 血量條邊框矩形
+    [SerializeField] private RectTransform healthBarBackgroundRect;  // 血量條背景矩形
+    [SerializeField] private RectTransform healthBarForegroundRect;  // 血量條前景矩形
+    [SerializeField] private RectTransform healthBarIconRect;        // 血量條圖標矩形
+    [SerializeField] private TextMeshProUGUI healthText;            // 血量文字（可選）
     
     [Header("UI Settings")]
-    [SerializeField] private bool showPercentage = true;
     [SerializeField] private bool showHealthText = true;
-    [SerializeField] private bool animateColorChange = true;
-    [SerializeField] private float colorChangeSpeed = 2f;
     
-    [Header("Color Settings")]
-    [SerializeField] private Color highHealthColor = Color.green;
-    [SerializeField] private Color mediumHealthColor = Color.yellow;
-    [SerializeField] private Color lowHealthColor = Color.red;
-    [SerializeField] private float lowHealthThreshold = 0.3f;
-    [SerializeField] private float mediumHealthThreshold = 0.6f;
+    [Header("Bar Settings")]
+    [SerializeField] private float borderWidth = 2f; // 邊框寬度
+    [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
+    [SerializeField] private Color backgroundColor = new Color(0.5f, 0.5f, 0.5f, 1f); // 背景顏色（灰色）
+    [SerializeField] private Color foregroundColor = Color.green; // 前景顏色（固定，不會變化）
+    
+    [Header("Icon Settings")]
+    [SerializeField] private Sprite healthIcon; // 血量圖標
+    [SerializeField] private Vector2 iconSize = new Vector2(40f, 40f); // 圖標尺寸
+    [SerializeField] private float iconOverlap = 10f; // 圖標覆蓋血條的距離（從左邊）
     
     [Header("Target Player")]
     [SerializeField] private Player player;
     
-    private Color targetColor;
-    private Color currentColor;
+    private float barWidth; // 血條寬度（用於計算前景條寬度）
+    private float barHeight; // 血條高度
     
     private void Start()
     {
@@ -42,7 +44,6 @@ public class PlayerHealthUI : MonoBehaviour
             InitializePlayer();
         }
         // 否則，等待 HealthUIManager 通過 SetPlayer() 設定
-        // 這確保了正確的執行順序（EntityManager 先初始化 Player）
         else
         {
             // 備用方案：嘗試查找 Player（如果 HealthUIManager 沒有使用）
@@ -65,6 +66,9 @@ public class PlayerHealthUI : MonoBehaviour
     {
         if (player == null) return;
         
+        // 初始化血量條矩形
+        InitializeHealthBar();
+        
         // 取消舊的訂閱（如果有）
         player.OnHealthChanged -= OnHealthChanged;
         player.OnPlayerDied -= OnPlayerDied;
@@ -77,14 +81,170 @@ public class PlayerHealthUI : MonoBehaviour
         UpdateHealthDisplay();
     }
     
-    private void Update()
+    /// <summary>
+    /// 初始化血量條矩形
+    /// </summary>
+    private void InitializeHealthBar()
     {
-        // 顏色動畫
-        if (animateColorChange && healthFillImage != null)
+        // 如果沒有手動設定，嘗試自動創建或查找
+        if (healthBarBackgroundRect == null || healthBarForegroundRect == null)
         {
-            currentColor = Color.Lerp(currentColor, targetColor, Time.deltaTime * colorChangeSpeed);
-            healthFillImage.color = currentColor;
+            Debug.LogWarning("PlayerHealthUI: 血量條矩形未設定，請在 Inspector 中設定 healthBarBackgroundRect 和 healthBarForegroundRect");
+            return;
         }
+        
+        // 獲取父物件的 RectTransform（用於對齊）
+        RectTransform parentRect = transform as RectTransform;
+        if (parentRect == null)
+        {
+            Debug.LogWarning("PlayerHealthUI: 父物件沒有 RectTransform 組件");
+            return;
+        }
+        
+        // 獲取父物件的尺寸（預設使用 parent object 的長寬）
+        barWidth = parentRect.rect.width;
+        barHeight = parentRect.rect.height;
+        
+        if (barWidth <= 0 || barHeight <= 0)
+        {
+            Debug.LogWarning("PlayerHealthUI: 父物件尺寸無效，請確保父物件有正確的尺寸");
+            return;
+        }
+        
+        // 設置邊框矩形 - 最外層，比背景稍大
+        if (healthBarBorderRect != null)
+        {
+            SetupBorderRect(healthBarBorderRect);
+        }
+        
+        // 設置背景矩形 - 左右對齊到父物件
+        if (healthBarBackgroundRect != null)
+        {
+            SetupBackgroundRect(healthBarBackgroundRect);
+        }
+        
+        // 設置前景矩形 - 左邊對齊到父物件，寬度根據血量調整
+        if (healthBarForegroundRect != null)
+        {
+            SetupForegroundRect(healthBarForegroundRect);
+        }
+        
+        // 設置圖標矩形 - 在左邊，覆蓋部分血條
+        if (healthBarIconRect != null)
+        {
+            SetupIconRect(healthBarIconRect);
+        }
+    }
+    
+    /// <summary>
+    /// 設置邊框矩形
+    /// </summary>
+    private void SetupBorderRect(RectTransform rect)
+    {
+        // 設置錨點：左邊和右邊都對齊到父物件
+        rect.anchorMin = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.anchorMax = new Vector2(1f, 0.5f); // 右邊，垂直居中
+        rect.pivot = new Vector2(0.5f, 0.5f);   // 中心點
+        
+        // 設置偏移，讓邊框比背景大 borderWidth
+        rect.offsetMin = new Vector2(-borderWidth, -(barHeight * 0.5f + borderWidth)); // 左邊和底部
+        rect.offsetMax = new Vector2(borderWidth, barHeight * 0.5f + borderWidth);  // 右邊和頂部
+        
+        // 確保邊框在最底層（作為最外層顯示）
+        rect.SetAsFirstSibling();
+        
+        // 自動獲取或添加 Image 組件
+        Image image = GetOrAddImage(rect);
+        if (image != null)
+        {
+            image.color = borderColor;
+        }
+    }
+    
+    /// <summary>
+    /// 設置背景矩形
+    /// </summary>
+    private void SetupBackgroundRect(RectTransform rect)
+    {
+        // 設置錨點：左邊和右邊都對齊到父物件
+        rect.anchorMin = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.anchorMax = new Vector2(1f, 0.5f); // 右邊，垂直居中
+        rect.pivot = new Vector2(0.5f, 0.5f);   // 中心點
+        
+        // 設置偏移為 0，讓矩形完全填充父物件的寬度（在邊框內部）
+        rect.offsetMin = new Vector2(0f, -barHeight * 0.5f); // 左邊和底部
+        rect.offsetMax = new Vector2(0f, barHeight * 0.5f);  // 右邊和頂部
+        
+        // 自動獲取或添加 Image 組件
+        Image image = GetOrAddImage(rect);
+        if (image != null)
+        {
+            image.color = backgroundColor;
+        }
+    }
+    
+    /// <summary>
+    /// 設置前景矩形
+    /// </summary>
+    private void SetupForegroundRect(RectTransform rect)
+    {
+        // 設置錨點：左邊對齊到父物件
+        rect.anchorMin = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.anchorMax = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.pivot = new Vector2(0f, 0.5f);     // 左邊中心點
+        
+        // 初始設置為完整寬度（會在 UpdateHealthDisplay 中根據血量調整）
+        rect.offsetMin = new Vector2(0f, -barHeight * 0.5f); // 左邊和底部
+        rect.offsetMax = new Vector2(barWidth, barHeight * 0.5f); // 右邊和頂部
+        
+        // 自動獲取或添加 Image 組件
+        Image image = GetOrAddImage(rect);
+        if (image != null)
+        {
+            image.color = foregroundColor;
+        }
+    }
+    
+    /// <summary>
+    /// 設置圖標矩形
+    /// </summary>
+    private void SetupIconRect(RectTransform rect)
+    {
+        // 設置錨點：左邊對齊到父物件
+        rect.anchorMin = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.anchorMax = new Vector2(0f, 0.5f); // 左邊，垂直居中
+        rect.pivot = new Vector2(0.5f, 0.5f);   // 中心點
+        
+        // 設置位置：在左邊，部分覆蓋血條
+        float iconX = -iconSize.x * 0.5f + iconOverlap; // 圖標中心點位置（負值表示在左邊，正值表示覆蓋）
+        rect.offsetMin = new Vector2(iconX - iconSize.x * 0.5f, -iconSize.y * 0.5f); // 左邊和底部
+        rect.offsetMax = new Vector2(iconX + iconSize.x * 0.5f, iconSize.y * 0.5f); // 右邊和頂部
+        
+        // 確保圖標在最上層
+        rect.SetAsLastSibling();
+        
+        // 自動獲取或添加 Image 組件
+        Image image = GetOrAddImage(rect);
+        if (image != null)
+        {
+            image.sprite = healthIcon;
+            image.preserveAspect = true; // 保持圖標比例
+        }
+    }
+    
+    /// <summary>
+    /// 自動獲取或添加 Image 組件（如果 SerializeField 中有 rect 就不需要 image 的選項）
+    /// </summary>
+    private Image GetOrAddImage(RectTransform rect)
+    {
+        if (rect == null) return null;
+        
+        Image image = rect.GetComponent<Image>();
+        if (image == null)
+        {
+            image = rect.gameObject.AddComponent<Image>();
+        }
+        return image;
     }
     
     private void OnDestroy()
@@ -123,63 +283,34 @@ public class PlayerHealthUI : MonoBehaviour
         
         float healthPercentage = player.HealthPercentage;
         
-        // 更新滑桿
-        if (healthSlider != null)
+        // 更新前景矩形寬度
+        if (healthBarForegroundRect != null && barWidth > 0)
         {
-            healthSlider.value = healthPercentage;
+            // 計算前景條的寬度（基於血量百分比）
+            float foregroundWidth = barWidth * healthPercentage;
+            
+            // 確保寬度不小於一個最小值
+            if (foregroundWidth < 0.01f)
+            {
+                foregroundWidth = 0.01f;
+            }
+            
+            // 更新前景矩形的寬度（使用 offsetMax 來調整右邊位置，保持左邊對齊）
+            healthBarForegroundRect.offsetMax = new Vector2(foregroundWidth, barHeight * 0.5f);
         }
         
         // 更新文字
         if (healthText != null && showHealthText)
         {
-            if (showPercentage)
-            {
-                healthText.text = $"{player.CurrentHealth}/{player.MaxHealth} ({healthPercentage:P0})";
-            }
-            else
-            {
-                healthText.text = $"{player.CurrentHealth}/{player.MaxHealth}";
-            }
+            healthText.text = $"{player.CurrentHealth}/{player.MaxHealth}";
         }
         
-        // 更新顏色
-        if (healthFillImage != null)
+        // 更新前景顏色（固定顏色，不會變化）
+        Image foregroundImage = GetOrAddImage(healthBarForegroundRect);
+        if (foregroundImage != null)
         {
-            targetColor = GetHealthColor(healthPercentage);
-            if (!animateColorChange)
-            {
-                healthFillImage.color = targetColor;
-                currentColor = targetColor;
-            }
+            foregroundImage.color = foregroundColor;
         }
-    }
-    
-    /// <summary>
-    /// 根據血量百分比獲取顏色
-    /// </summary>
-    private Color GetHealthColor(float healthPercentage)
-    {
-        if (healthPercentage <= lowHealthThreshold)
-        {
-            return lowHealthColor;
-        }
-        else if (healthPercentage <= mediumHealthThreshold)
-        {
-            return mediumHealthColor;
-        }
-        else
-        {
-            return highHealthColor;
-        }
-    }
-    
-    /// <summary>
-    /// 設定是否顯示百分比
-    /// </summary>
-    public void SetShowPercentage(bool show)
-    {
-        showPercentage = show;
-        UpdateHealthDisplay();
     }
     
     /// <summary>
@@ -195,18 +326,11 @@ public class PlayerHealthUI : MonoBehaviour
     }
     
     /// <summary>
-    /// 設定顏色動畫速度
-    /// </summary>
-    public void SetColorChangeSpeed(float speed)
-    {
-        colorChangeSpeed = Mathf.Max(0.1f, speed);
-    }
-    
-    /// <summary>
     /// 設定目標玩家
     /// </summary>
     public void SetPlayer(Player targetPlayer)
     {
+        Debug.Log("PlayerHealthUI: 設定目標玩家: " + targetPlayer.name);
         // 取消訂閱舊的玩家
         if (player != null)
         {

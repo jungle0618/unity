@@ -317,7 +317,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b93ddbb9c87cfa4a8703f000f8345d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityHealth
-  maxHealth: 4000
+  maxHealth: 50
   currentHealth: 0
   damageReduction: 0
   invulnerabilityTime: 0

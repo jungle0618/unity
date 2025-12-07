@@ -40,7 +40,7 @@ public class GreedyPathfinding : MonoBehaviour
     /// <returns>路徑節點列表，如果找不到路徑則返回null</returns>
     public List<PathfindingNode> FindPath(Vector3 startPos, Vector3 targetPos)
     {
-        Debug.Log($"GreedyPathfinding: 開始計算路徑從 {startPos} 到 {targetPos}");
+        //Debug.Log($"GreedyPathfinding: 開始計算路徑從 {startPos} 到 {targetPos}");
         
         if (pathfindingGrid == null)
         {
@@ -63,7 +63,7 @@ public class GreedyPathfinding : MonoBehaviour
             return null;
         }
 
-        Debug.Log($"GreedyPathfinding: 使用改進貪心算法: {useImprovedGreedy}");
+        //Debug.Log($"GreedyPathfinding: 使用改進貪心算法: {useImprovedGreedy}");
         
         if (useImprovedGreedy)
         {
@@ -193,10 +193,10 @@ public class GreedyPathfinding : MonoBehaviour
         }
         
         // 除錯信息：輸出路徑
-        Debug.Log($"優化貪心算法找到路徑，包含 {currentPath.Count} 個節點，迭代次數: {iterations}");
+        //Debug.Log($"優化貪心算法找到路徑，包含 {currentPath.Count} 個節點，迭代次數: {iterations}");
         for (int i = 0; i < currentPath.Count; i++)
         {
-            Debug.Log($"  路徑點 {i}: {currentPath[i].worldPosition}");
+            //Debug.Log($"  路徑點 {i}: {currentPath[i].worldPosition}");
         }
         
         return currentPath;
@@ -218,7 +218,7 @@ public class GreedyPathfinding : MonoBehaviour
         // 檢查起點和終點是否相同或非常接近
         if (startNode == targetNode)
         {
-            Debug.Log("起點和終點是同一節點，返回空路徑");
+            //Debug.Log("起點和終點是同一節點，返回空路徑");
             return path; // 返回空路徑，表示已經在目標位置
         }
 
@@ -226,7 +226,7 @@ public class GreedyPathfinding : MonoBehaviour
         float distance = Vector2.Distance(startNode.worldPosition, targetNode.worldPosition);
         if (distance < pathfindingGrid.CellSize * 0.5f)
         {
-            Debug.Log($"起點和終點非常接近 (距離: {distance:F2})，返回空路徑");
+            //Debug.Log($"起點和終點非常接近 (距離: {distance:F2})，返回空路徑");
             return path; // 返回空路徑，表示已經在目標位置附近
         }
 
@@ -314,7 +314,7 @@ public class GreedyPathfinding : MonoBehaviour
 
         if (iterations >= maxIterations)
         {
-            Debug.Log("改進貪心算法達到最大迭代次數！");
+            //Debug.Log("改進貪心算法達到最大迭代次數！");
             return null;
         }
 
@@ -334,10 +334,10 @@ public class GreedyPathfinding : MonoBehaviour
         }
         
         // 除錯信息：輸出路徑
-        Debug.Log($"改進貪心算法找到路徑，包含 {currentPath.Count} 個節點，迭代次數: {iterations}");
+        //Debug.Log($"改進貪心算法找到路徑，包含 {currentPath.Count} 個節點，迭代次數: {iterations}");
         for (int i = 0; i < currentPath.Count; i++)
         {
-            Debug.Log($"  路徑點 {i}: {currentPath[i].worldPosition}");
+            //Debug.Log($"  路徑點 {i}: {currentPath[i].worldPosition}");
         }
         
         return currentPath;

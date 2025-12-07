@@ -1,0 +1,26 @@
+{
+  "missionStart": {
+    "dialogues": [
+      "Good evening, agent 67.",
+      "The Dertian Secret Agency has identified a malicious hacker who gained unauthorized access to a cryptocurrency exchange. He is using Bitcoins to buy smuggled weapons.",
+      "The hacker is now staying at his mansion secured by armed guards.",
+      "Your mission, agent 67, is to infiltrate the mansion and eliminate the malicious hacker. Make sure to stay out of the guards' sight and secure a safe exit route after taking down the target.",
+      "Good luck on your mission, agent 67."
+    ]
+  },
+  "missionWin": {
+    "dialogues": [
+      "Mission accomplished",
+      "Well done, agent 67.",
+      "You have successfully stopped the relentless hacker. The Dertian Secret Agency has always trusted your skills."
+    ]
+  },
+  "missionFail": {
+    "dialogues": [
+      "Mission failed",
+      "Be patient and cautious, agent 67.",
+      "Patience and caution are keys to a successful mission and a professional assassin."
+    ]
+  }
+}
+

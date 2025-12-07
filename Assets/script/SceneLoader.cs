@@ -14,14 +14,14 @@ public static class SceneLoader {
 
     public static void Load(Scene targetScene) {
         _targetScene = targetScene;
-        Debug.Log($"[SceneLoader] Loading scene: {targetScene} via LoadingScene");
+        //Debug.Log($"[SceneLoader] Loading scene: {targetScene} via LoadingScene");
         SceneManager.LoadScene(nameof(Scene.LoadingScene));
     }
 
     public static void LoaderCallback() {
-        Debug.Log("[SceneLoader] LoaderCallback - Old method called");
+        //Debug.Log("[SceneLoader] LoaderCallback - Old method called");
         SceneManager.LoadScene(_targetScene.ToString());
-        Debug.Log("Loaded scene: " + _targetScene.ToString());
+        //Debug.Log("Loaded scene: " + _targetScene.ToString());
     }
     
     /// <summary>
@@ -30,7 +30,7 @@ public static class SceneLoader {
     public static string GetTargetSceneName()
     {
         string sceneName = _targetScene.ToString();
-        Debug.Log($"[SceneLoader] GetTargetSceneName returning: {sceneName}");
+        //Debug.Log($"[SceneLoader] GetTargetSceneName returning: {sceneName}");
         return sceneName;
     }
     

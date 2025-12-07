@@ -93,7 +93,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Initialized with {TotalItemCount} items");
+            //Debug.Log($"ItemManager: Initialized with {TotalItemCount} items");
         }
     }
     
@@ -117,7 +117,7 @@ public class ItemManager : MonoBehaviour
                 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"ItemManager: Loaded {itemPrefabDict.Count} item mappings from EntityManager");
+                    //Debug.Log($"ItemManager: Loaded {itemPrefabDict.Count} item mappings from EntityManager");
                 }
                 return;
             }
@@ -153,7 +153,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Built prefab dictionary with {itemPrefabDict.Count} item types");
+            //Debug.Log($"ItemManager: Built prefab dictionary with {itemPrefabDict.Count} item types");
         }
     }
     
@@ -205,12 +205,12 @@ public class ItemManager : MonoBehaviour
                     
                     if (showDebugInfo)
                     {
-                        Debug.Log($"ItemManager: Loaded item {itemIndex} - Type: {itemType}, Position: ({x}, {y}, {z})");
+                        //Debug.Log($"ItemManager: Loaded item {itemIndex} - Type: {itemType}, Position: ({x}, {y}, {z})");
                     }
                 }
             }
             
-            Debug.Log($"ItemManager: Loaded {worldItemsData.Count} items from {itemDataFile.name}");
+            //Debug.Log($"ItemManager: Loaded {worldItemsData.Count} items from {itemDataFile.name}");
         }
         catch (System.Exception e)
         {
@@ -231,7 +231,7 @@ public class ItemManager : MonoBehaviour
         worldItemsData.Add(new WorldItemData { index = 1, itemType = "Bow", position = new Vector3(20, 10, 0) });
         worldItemsData.Add(new WorldItemData { index = 2, itemType = "Knife", position = new Vector3(30, 10, 0) });
         
-        Debug.Log($"ItemManager: Created {worldItemsData.Count} default items");
+        //Debug.Log($"ItemManager: Created {worldItemsData.Count} default items");
     }
     
     #endregion
@@ -254,7 +254,7 @@ public class ItemManager : MonoBehaviour
             SpawnItem(itemData);
         }
         
-        Debug.Log($"ItemManager: Spawned {spawnedItems.Count} items");
+        //Debug.Log($"ItemManager: Spawned {spawnedItems.Count} items");
     }
     
     /// <summary>
@@ -283,7 +283,7 @@ public class ItemManager : MonoBehaviour
             
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: Spawned {itemData.itemType} at {itemData.position}");
+                //Debug.Log($"ItemManager: Spawned {itemData.itemType} at {itemData.position}");
             }
         }
     }
@@ -347,7 +347,7 @@ public class ItemManager : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log("ItemManager: No items available to pick up");
+                //Debug.Log("ItemManager: No items available to pick up");
             }
             return false;
         }
@@ -365,7 +365,7 @@ public class ItemManager : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: No items within pickup range ({pickupRange})");
+                //Debug.Log($"ItemManager: No items within pickup range ({pickupRange})");
             }
             return false;
         }
@@ -412,7 +412,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[ItemManager] Attempting to pickup {worldItem.ItemType}. Current items in holder: {targetHolder.ItemCount}");
+            //Debug.Log($"[ItemManager] Attempting to pickup {worldItem.ItemType}. Current items in holder: {targetHolder.ItemCount}");
         }
         
         // 將物品 Prefab 加入 ItemHolder（不裝備，只加到列表尾端）
@@ -432,7 +432,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Picked up {worldItem.ItemType}. Remaining items: {spawnedItems.Count}");
+            //Debug.Log($"ItemManager: Picked up {worldItem.ItemType}. Remaining items: {spawnedItems.Count}");
         }
         
         return true;
@@ -474,7 +474,7 @@ public class ItemManager : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: No '{itemType}' items found within range");
+                //Debug.Log($"ItemManager: No '{itemType}' items found within range");
             }
             return false;
         }
@@ -564,7 +564,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Respawned {spawnedItems.Count} items");
+            //Debug.Log($"ItemManager: Respawned {spawnedItems.Count} items");
         }
     }
     
@@ -577,7 +577,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log("ItemManager: Cleared all items");
+            //Debug.Log("ItemManager: Cleared all items");
         }
     }
     
@@ -612,7 +612,7 @@ public class ItemManager : MonoBehaviour
             
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: Dropped {itemType} at {position}");
+                //Debug.Log($"ItemManager: Dropped {itemType} at {position}");
             }
         }
         
@@ -654,7 +654,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Dropped {droppedItems.Count} items at {position}");
+            //Debug.Log($"ItemManager: Dropped {droppedItems.Count} items at {position}");
         }
         
         return droppedItems;

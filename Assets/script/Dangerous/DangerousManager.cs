@@ -286,7 +286,7 @@ public class DangerousManager : MonoBehaviour
             case DangerLevel.High:
                 return Color.red;
             case DangerLevel.Critical:
-                return new Color(0.5f, 0f, 0.5f); // 紫色
+                return new Color(0.8f, 0f, 0f); // 深紅色（與 High 等級區分，但保持紅色系）
             default:
                 return Color.white;
         }

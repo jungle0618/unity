@@ -12,29 +12,29 @@ public class SceneLoaderCallback : MonoBehaviour
 
     private void Start()
     {
-        Debug.Log("[SceneLoaderCallback] _isFirstUpdate set to true in Start");
+        //Debug.Log("[SceneLoaderCallback] _isFirstUpdate set to true in Start");
         _isFirstUpdate = true;
     }
 
     private void Update()
     {
-        Debug.Log("[SceneLoaderCallback] Update called, isFirstUpdate: " + _isFirstUpdate);
+        //Debug.Log("[SceneLoaderCallback] Update called, isFirstUpdate: " + _isFirstUpdate);
         // Backup method in case Start doesn't work
         if (!_isFirstUpdate) return;
         _isFirstUpdate = false;
-        Debug.Log("[SceneLoaderCallback] Update called - Starting as backup");
+        //Debug.Log("[SceneLoaderCallback] Update called - Starting as backup");
         StartCoroutine(LoadSceneAsync());
     }
 
     private IEnumerator LoadSceneAsync()
     {
-        Debug.Log("[SceneLoaderCallback] LoadSceneAsync coroutine started");
+        //Debug.Log("[SceneLoaderCallback] LoadSceneAsync coroutine started");
         
         // Small delay to ensure LoadingProgressUI is initialized
         yield return null;
         
         string targetSceneName = SceneLoader.GetTargetSceneName();
-        Debug.Log($"[SceneLoaderCallback] Starting async load of scene: {targetSceneName}");
+        //Debug.Log($"[SceneLoaderCallback] Starting async load of scene: {targetSceneName}");
 
         // Validate scene name
         if (string.IsNullOrEmpty(targetSceneName))
@@ -49,7 +49,7 @@ public class SceneLoaderCallback : MonoBehaviour
         try
         {
             asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
-            Debug.Log($"[SceneLoaderCallback] AsyncOperation created for: {targetSceneName}");
+            //Debug.Log($"[SceneLoaderCallback] AsyncOperation created for: {targetSceneName}");
         }
         catch (System.Exception e)
         {
@@ -66,7 +66,7 @@ public class SceneLoaderCallback : MonoBehaviour
         // Don't activate the scene immediately
         asyncLoad.allowSceneActivation = false;
         
-        Debug.Log("[SceneLoaderCallback] Scene loading started, updating progress...");
+        //Debug.Log("[SceneLoaderCallback] Scene loading started, updating progress...");
 
         // Update progress while loading
         int frameCount = 0;
@@ -79,7 +79,7 @@ public class SceneLoaderCallback : MonoBehaviour
             
             if (frameCount % 30 == 0) // Log every 30 frames to avoid spam
             {
-                Debug.Log($"[SceneLoaderCallback] Progress: {progress * 100:F1}% (raw: {asyncLoad.progress}, frame: {frameCount})");
+                //Debug.Log($"[SceneLoaderCallback] Progress: {progress * 100:F1}% (raw: {asyncLoad.progress}, frame: {frameCount})");
             }
             
             // Notify the loading progress UI
@@ -95,7 +95,7 @@ public class SceneLoaderCallback : MonoBehaviour
             // When loading is almost done (0.9), wait a bit then activate
             if (asyncLoad.progress >= 0.9f)
             {
-                Debug.Log("[SceneLoaderCallback] Loading reached 90%, finalizing...");
+                //Debug.Log("[SceneLoaderCallback] Loading reached 90%, finalizing...");
                 
                 // Optional: wait a moment to show 100% completion
                 yield return new WaitForSeconds(0.5f);
@@ -108,7 +108,7 @@ public class SceneLoaderCallback : MonoBehaviour
                 
                 // Small delay before scene activation
                 yield return new WaitForSeconds(0.3f);
-                Debug.Log("[SceneLoaderCallback] Activating scene now!");
+                //Debug.Log("[SceneLoaderCallback] Activating scene now!");
                 
                 // Allow scene activation
                 // --- OPTIONAL: Wait for key press ---
@@ -124,6 +124,6 @@ public class SceneLoaderCallback : MonoBehaviour
             yield return null;
         }
         
-        Debug.Log("[SceneLoaderCallback] Scene loading complete!");
+        //Debug.Log("[SceneLoaderCallback] Scene loading complete!");
     }
 }

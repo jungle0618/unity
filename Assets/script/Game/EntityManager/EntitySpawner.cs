@@ -85,7 +85,7 @@ namespace Game.EntityManager
             {
                 if (showDebugInfo)
                 {
-                    Debug.Log("[EntitySpawner] Player already exists, skipping spawn");
+                    //Debug.Log("[EntitySpawner] Player already exists, skipping spawn");
                 }
                 return true;
             }
@@ -106,7 +106,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"[EntitySpawner] Player spawned from prefab: {playerPrefab.name}");
+                //Debug.Log($"[EntitySpawner] Player spawned from prefab: {playerPrefab.name}");
             }
 
             return true;
@@ -186,7 +186,7 @@ namespace Game.EntityManager
                 enemy.transform.rotation = Quaternion.Euler(0f, 0f, enemyData.initialRotation);
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntitySpawner: Moved enemy to spawn point {enemyData.patrolPoints[0]} with rotation {enemyData.initialRotation}°");
+                    //Debug.Log($"EntitySpawner: Moved enemy to spawn point {enemyData.patrolPoints[0]} with rotation {enemyData.initialRotation}°");
                 }
             }
 
@@ -195,7 +195,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"EntitySpawner: Initialized enemy at {enemy.transform.position}, Active: {enemy.gameObject.activeSelf}");
+                //Debug.Log($"EntitySpawner: Initialized enemy at {enemy.transform.position}, Active: {enemy.gameObject.activeSelf}");
             }
 
             // 加入已生成列表
@@ -233,7 +233,7 @@ namespace Game.EntityManager
             if (showDebugInfo)
             {
                 string itemsStr = enemyData.itemNames.Count > 0 ? string.Join(", ", enemyData.itemNames) : "None";
-                Debug.Log($"EntitySpawner: Spawned enemy {enemyData.entityIndex} ({enemyData.type}) at {enemy.transform.position} with items [{itemsStr}] and {enemyData.patrolPoints.Length} patrol points");
+                //Debug.Log($"EntitySpawner: Spawned enemy {enemyData.entityIndex} ({enemyData.type}) at {enemy.transform.position} with items [{itemsStr}] and {enemyData.patrolPoints.Length} patrol points");
             }
         }
 
@@ -314,7 +314,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"EntitySpawner: Spawned Target {targetIndex} at {position} with escape point {escapePoint}");
+                //Debug.Log($"EntitySpawner: Spawned Target {targetIndex} at {position} with escape point {escapePoint}");
             }
         }
 
@@ -350,14 +350,14 @@ namespace Game.EntityManager
 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntitySpawner: Set player initial position to {PlayerInitialPosition} with rotation {playerData.initialRotation}°");
+                    //Debug.Log($"EntitySpawner: Set player initial position to {PlayerInitialPosition} with rotation {playerData.initialRotation}°");
                 }
             }
             else
             {
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntitySpawner: Player spawned at default position: {player.transform.position}");
+                    //Debug.Log($"EntitySpawner: Player spawned at default position: {player.transform.position}");
                 }
             }
 
@@ -375,7 +375,7 @@ namespace Game.EntityManager
             }
             else if (showDebugInfo)
             {
-                Debug.Log("EntitySpawner: No initial items for Player from patroldata.txt, using prefab default items");
+                //Debug.Log("EntitySpawner: No initial items for Player from patroldata.txt, using prefab default items");
             }
 
             // 訂閱 Player 攻擊事件
@@ -388,7 +388,7 @@ namespace Game.EntityManager
             var enemyDataList = dataLoader.GetEntitiesByType(EntityDataLoader.EntityType.Enemy);
             int enemyCount = enemyDataList.Count;
 
-            Debug.Log($"EntitySpawner: Attempting to spawn {enemyCount} enemies");
+            //Debug.Log($"EntitySpawner: Attempting to spawn {enemyCount} enemies");
 
             // 生成所有 Enemy 類型的實體
             int enemyIndex = 0;
@@ -401,7 +401,7 @@ namespace Game.EntityManager
                 }
             }
 
-            Debug.Log($"EntitySpawner: Successfully spawned {spawnedEnemies.Count} enemies and {eventManager.ActiveTargets.Count} targets");
+            //Debug.Log($"EntitySpawner: Successfully spawned {spawnedEnemies.Count} enemies and {eventManager.ActiveTargets.Count} targets");
         }
 
         /// <summary>

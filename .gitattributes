@@ -1,0 +1,26 @@
+# Unity YAML 文件使用 UnityYAMLMerge 進行合併
+*.unity merge=unityyamlmerge
+*.prefab merge=unityyamlmerge
+*.asset merge=unityyamlmerge
+*.meta merge=unityyamlmerge
+*.controller merge=unityyamlmerge
+*.anim merge=unityyamlmerge
+*.overrideController merge=unityyamlmerge
+*.physicMaterial merge=unityyamlmerge
+*.physicsMaterial2D merge=unityyamlmerge
+*.playable merge=unityyamlmerge
+*.preset merge=unityyamlmerge
+*.mask merge=unityyamlmerge
+*.brush merge=unityyamlmerge
+*.flare merge=unityyamlmerge
+*.renderTexture merge=unityyamlmerge
+*.spriteatlas merge=unityyamlmerge
+*.terrainlayer merge=unityyamlmerge
+*.guiskin merge=unityyamlmerge
+*.fontsettings merge=unityyamlmerge
+*.shadergraph merge=unityyamlmerge
+*.shadersubgraph merge=unityyamlmerge
+*.mat merge=unityyamlmerge
+*.physicsMaterial merge=unityyamlmerge
+*.inputactions merge=unityyamlmerge
+
