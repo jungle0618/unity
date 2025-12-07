@@ -193,8 +193,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40f5cef53b5c72c40bdbfdd28315fb16, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyMovement
-  arriveThreshold: 1
   patrolPoints: []
+  arriveThreshold: 1
   patrolSpeedMultiplier: 0.35
   usePathfinding: 1
   pathUpdateDistance: 2
@@ -242,7 +242,7 @@ MonoBehaviour:
   showRuntimeVision: 1
   useRuntimeMesh: 1
   visionMaterial: {fileID: 0}
-  runtimeVisionColor: {r: 0, g: 1, b: 1, a: 0.3}
+  runtimeVisionColor: {r: 0.9150943, g: 0.26582888, b: 0.16834284, a: 0.48235294}
   runtimeLineWidth: 0
   wallsLayer:
     serializedVersion: 2
@@ -276,6 +276,7 @@ MonoBehaviour:
   searchSpeedMultiplier: 1.5
   returnSpeedMultiplier: 1
   patrolPauseDuration: 3
+  nearViewRange: 1.5
 --- !u!114 &5292676631361536599
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -307,6 +308,8 @@ MonoBehaviour:
   currentHealth: 100
   damageReduction: 0
   invulnerabilityTime: 0
+  showDamagePopup: 1
+  popupOffset: {x: 0, y: 1, z: 0}
 --- !u!114 &8702932840761697106
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -555,11 +558,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb91a5801a6070d4e9885e7887a39e17, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  Hurt2AnimationThreshold: 0.5
   enemy: {fileID: 5228463781032995454}
   animator: {fileID: 7627645579756735084}
   gun: {fileID: 1769089518498058588}
-  deathVFXPrefab: {fileID: 8829929842113561361, guid: eb34ceafb001e1f499c74f32eb6a691e,
-    type: 3}
 --- !u!4 &4566075954430822957 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: e8e87aa3c3819c443acf032f5460ecac,
