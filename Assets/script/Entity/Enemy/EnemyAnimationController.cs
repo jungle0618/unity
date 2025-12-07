@@ -61,6 +61,7 @@ public class EnemyAnimationController : MonoBehaviour
         {
             weapon = enemy.ItemHolder.CurrentWeapon;
             weapon.OnAttackPerformed += OnAttackPerformedHandler;
+            weapon.OnAttackPerformed += VFXManager.Instance.PlayMuzzleFlashVFXHandler;
         }
     }
 
@@ -84,6 +85,7 @@ public class EnemyAnimationController : MonoBehaviour
         if (weapon != null)
         {
             weapon.OnAttackPerformed -= OnAttackPerformedHandler;
+            weapon.OnAttackPerformed -= VFXManager.Instance.PlayMuzzleFlashVFXHandler;
         }
     }
 }

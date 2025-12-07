@@ -54,7 +54,10 @@ public class PlayerAnimationController : MonoBehaviour
 
         OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
         
-        OnWeaponAttackHandler = (weapon) => {animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");};
+        OnWeaponAttackHandler = (weapon) => {
+            if (weapon is RangedWeapon) VFXManager.Instance.PlayerPlayMuzzleFlashVFXHandler(weapon); 
+            animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");
+        };
         OnActionPerformedHandler = () => {animator.SetTrigger("Interact");};
 
         if (player != null)

@@ -11,6 +11,10 @@ public class VFXManager : MonoBehaviour
     public float fadeDelay = 0.2f;
     public float fadeDuration = 0.6f;
 
+    [Header("Muzzle Flash VFX Settings")]
+    public GameObject muzzleFlashPrefab;
+    public float offsetFromGun = 0.5f;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -39,6 +43,20 @@ public class VFXManager : MonoBehaviour
         mat.renderQueue = 3000;
     }
 
+    Transform FindDeepChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name)
+                return child;
+
+            Transform result = FindDeepChild(child, name);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+
     public void PlayDeathVFXHandler<TState>(BaseEntity<TState> entity) where TState : System.Enum
     {
         StartCoroutine(PlayDeathVFX(entity));
@@ -47,10 +65,10 @@ public class VFXManager : MonoBehaviour
     public void PlayerPlayDeathVFXHandler()
     {
         Player player = FindObjectOfType<Player>();
-        if (player != null)
-        {
-            StartCoroutine(PlayDeathVFX(player));
-        }
+        if (player == null)
+            return;
+
+        StartCoroutine(PlayDeathVFX(player));
     }
 
     private IEnumerator PlayDeathVFX<TState>(BaseEntity<TState> entity) where TState : System.Enum
@@ -114,5 +132,36 @@ public class VFXManager : MonoBehaviour
         }
 
         Destroy(clone);
+    }
+
+    public void PlayMuzzleFlashVFXHandler(GameObject attacker)
+    {
+        Transform gun = FindDeepChild(attacker.transform, "Gun");
+
+        if (gun == null)
+        {
+            Debug.LogWarning("Gun transform not found");
+            return;
+        }
+
+        GameObject muzzleFlash = Instantiate(muzzleFlashPrefab, gun.position + gun.right * offsetFromGun, gun.rotation);
+        muzzleFlash.GetComponent<MuzzleFlashVFX>().StartCoroutine("PlayMuzzleFlashVFX");
+    }
+
+    public void PlayerPlayMuzzleFlashVFXHandler(Weapon weapon)
+    {
+        Player player = FindObjectOfType<Player>();
+        if (player == null)
+            return;
+        Transform gun = FindDeepChild(player.transform, "Gun");
+
+        if (gun == null)
+        {
+            Debug.LogWarning("Gun transform not found");
+            return;
+        }
+
+        GameObject muzzleFlash = Instantiate(muzzleFlashPrefab, gun.position + gun.right * offsetFromGun, gun.rotation);
+        muzzleFlash.GetComponent<MuzzleFlashVFX>().StartCoroutine("PlayMuzzleFlashVFX");
     }
 }
