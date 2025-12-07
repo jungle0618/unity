@@ -14,15 +14,15 @@ AvatarMask:
   - m_Path: CharacterArmature
     m_Weight: 1
   - m_Path: CharacterArmature/Root
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: CharacterArmature/Root/Body
     m_Weight: 0
   - m_Path: CharacterArmature/Root/Body/Hips
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: CharacterArmature/Root/Body/Hips/Abdomen
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: CharacterArmature/Root/Body/Hips/Abdomen/Torso
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: CharacterArmature/Root/Body/Hips/Abdomen/Torso/Chest
     m_Weight: 1
   - m_Path: CharacterArmature/Root/Body/Hips/Abdomen/Torso/Chest/Neck
@@ -172,7 +172,7 @@ AvatarMask:
   - m_Path: CharacterArmature/Root/PT.R/PT.R_end
     m_Weight: 0
   - m_Path: Suit_Body
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: Suit_Feet
     m_Weight: 0
   - m_Path: Suit_Head

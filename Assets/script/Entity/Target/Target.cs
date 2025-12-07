@@ -548,8 +548,8 @@ public class Target : BaseEntity<TargetState>, IEntity
     protected override void OnDeath()
     {
         targetStateMachine?.ChangeState(TargetState.Dead);
-        gameObject.SetActive(false);
         OnTargetDied?.Invoke(this);
+        gameObject.SetActive(false);
         
         // Target 特定邏輯：清除地圖上的逃亡路徑
         MapUIManager mapUI = FindFirstObjectByType<MapUIManager>();

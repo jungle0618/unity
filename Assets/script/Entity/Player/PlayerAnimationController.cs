@@ -12,7 +12,12 @@ public class PlayerAnimationController : MonoBehaviour
     [SerializeField] private GameObject gun;
     [SerializeField] private GameObject knife;
 
-    private float speed = 0f;
+    [Header("Bones")]
+    [SerializeField] private Transform torso;
+    [SerializeField] private Transform chest;
+    [SerializeField, Range(0f, 1f)] private float upperBodyWeight = 0.5f;
+
+    private Vector2 speed = Vector2.zero;
     private Vector2 direction = Vector2.zero;
     private Vector2 weaponDirection = Vector2.zero;
     private Action<Item> OnEquipChangedHandler;
@@ -72,20 +77,35 @@ public class PlayerAnimationController : MonoBehaviour
 
     public void Update()
     {   
-        speed = playerMovement.GetSpeed();
         direction = playerMovement.MoveInput;
         weaponDirection = player.GetWeaponDirection().normalized;
 
-        animator.SetFloat("moveX", Vector2.Dot(direction, new Vector2(weaponDirection.y, -weaponDirection.x)));
-        animator.SetFloat("moveY", Vector2.Dot(direction, weaponDirection));
+        speed.x = Vector2.Dot(direction, new Vector2(weaponDirection.y, -weaponDirection.x));
+        speed.y = Vector2.Dot(direction, weaponDirection);
 
-        if (playerMovement.IsCameraMode) {
-            animator.SetFloat("moveX", 0f);
-            animator.SetFloat("moveY", 0f);
-        }
+        if (playerMovement.IsCameraMode)
+            speed = Vector2.zero;
+
+
+        animator.SetFloat("moveX", speed.x);
+        animator.SetFloat("moveY", speed.y);
 
         animator.SetBool("isRunning", playerMovement.IsRunning);
-        animator.SetBool("isWalking", (speed > 0f));
-        animator.SetBool("isCrouching", playerMovement.IsSquatting);   
+        animator.SetBool("isWalking", (speed.magnitude > 0f));
+        animator.SetBool("isCrouching", playerMovement.IsSquatting); 
+
+
     }
+
+    void LateUpdate()
+    {
+        // Vector3 aimDir = new Vector3(weaponDirection.x, weaponDirection.y, 0f);
+
+        // if (aimDir.sqrMagnitude > 0.001f)
+        // {
+        //     Quaternion targetRot = Quaternion.LookRotation(aimDir, Vector3.up);
+        //     chest.localRotation = Quaternion.Euler(0f, targetRot.eulerAngles.y - torso.rotation.eulerAngles.y, 0f);
+        // }
+    }
+
 }
