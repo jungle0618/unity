@@ -138,4 +138,4 @@ MonoBehaviour:
   itemName: GreenKey
   itemIcon: {fileID: -859464744, guid: 9224289d41044aa4b83cc12512e2bd02, type: 3}
   keyType: 3
-  consumeOnUse: 1
+  consumeOnUse: 0

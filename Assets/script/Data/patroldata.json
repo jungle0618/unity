@@ -299,14 +299,14 @@
       "entityIndex": 0,
       "type": "Exit",
       "items": [],
-      "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
+      "patrolPoints": [{"x": 4, "y": 40, "z": 0}],
       "rotation": 0
     },
     {
       "entityIndex": 0,
       "type": "Target",
       "items": [],
-      "patrolPoints": [{"x": 80, "y": 26, "z": 0}],
+      "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
       "rotation": 0,
       "escapePoint": {"x": 26, "y": 45, "z": 0}
     }

@@ -49,7 +49,7 @@ MonoBehaviour:
   itemIcon: {fileID: 8381372631601266164, guid: 831817793d516ac438d2ea09700eda70,
     type: 3}
   keyType: 2
-  consumeOnUse: 1
+  consumeOnUse: 0
 --- !u!1 &8777004573474368923
 GameObject:
   m_ObjectHideFlags: 0

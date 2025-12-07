@@ -48,7 +48,7 @@ MonoBehaviour:
   itemName: YellowKey
   itemIcon: {fileID: -1166374718, guid: bac5a4e8761267c41af6cd39cb3fbbe5, type: 3}
   keyType: 4
-  consumeOnUse: 1
+  consumeOnUse: 0
 --- !u!1 &2980365186163128612
 GameObject:
   m_ObjectHideFlags: 0
