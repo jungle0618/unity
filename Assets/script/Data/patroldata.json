@@ -26,7 +26,7 @@
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 23, "y": 10, "z": 0}],
-      "rotation": 180
+      "rotation": 0
     },
     {
       "entityIndex": 4,
@@ -47,12 +47,12 @@
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 32, "y": 4, "z": 0}],
-      "rotation": 0
+      "rotation": 180
     },
     {
       "entityIndex": 7,
       "type": "Enemy",
-      "items": ["Gun"],
+      "items": ["Gun", "RedKey"],
       "patrolPoints": [{"x": 40, "y": 47, "z": 0}, {"x": 46, "y": 53, "z": 0}],
       "rotation": 0
     },
@@ -82,14 +82,14 @@
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 49, "y": 10, "z": 0}],
-      "rotation": 0
+      "rotation": 180
     },
     {
       "entityIndex": 12,
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 49, "y": 6, "z": 0}],
-      "rotation": 0
+      "rotation": 180
     },
     {
       "entityIndex": 13,
@@ -109,8 +109,8 @@
       "entityIndex": 15,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 57, "y": 40, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [{"x": 57, "y": 38, "z": 0}],
+      "rotation": 180
     },
     {
       "entityIndex": 16,
@@ -124,28 +124,31 @@
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 62, "y": 49, "z": 0}],
-      "rotation": 0
+      "rotation": 180
     },
     {
       "entityIndex": 18,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 62, "y": 40, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [{"x": 62, "y": 38, "z": 0}],
+      "rotation": 270
     },
     {
       "entityIndex": 19,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 62, "y": 23, "z": 0}, {"x": 62, "y": 25, "z": 0}, {"x": 55, "y": 25, "z": 0}, {"x": 55, "y": 4, "z": 0}, {"x": 65, "y": 4, "z": 0}, {"x": 55, "y": 4, "z": 0}, {"x": 55, "y": 25, "z": 0}, {"x": 62, "y": 25, "z": 0}],
+      "patrolPoints": [{"x": 54, "y": 32, "z": 0}, {"x": 54, "y": 9, "z": 0}],
       "rotation": 0
     },
     {
       "entityIndex": 20,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 70, "y": 24, "z": 0}, {"x": 66, "y": 24, "z": 0}, {"x": 66, "y": 26, "z": 0}, {"x": 55, "y": 26, "z": 0}, {"x": 55, "y": 33, "z": 0}, {"x": 55, "y": 26, "z": 0}, {"x": 66, "y": 26, "z": 0}, {"x": 66, "y": 24, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [
+        {"x": 68, "y": 15, "z": 0},
+        {"x": 62, "y": 15, "z": 0}
+      ],
+      "rotation": 180
     },
     {
       "entityIndex": 21,
@@ -159,14 +162,14 @@
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 75, "y": 33, "z": 0}, {"x": 75, "y": 34, "z": 0}, {"x": 60, "y": 34, "z": 0}, {"x": 60, "y": 33, "z": 0}],
-      "rotation": 0
+      "rotation": 90
     },
     {
       "entityIndex": 23,
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 75, "y": 29, "z": 0}, {"x": 75, "y": 10, "z": 0}],
-      "rotation": 0
+      "rotation": 90
     },
     {
       "entityIndex": 24,
@@ -179,7 +182,7 @@
       "entityIndex": 25,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 76, "y": 40, "z": 0}],
+      "patrolPoints": [{"x": 76, "y":38, "z": 0}],
       "rotation": 0
     },
     {
@@ -193,22 +196,22 @@
       "entityIndex": 27,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 80, "y": 33, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [{"x": 80, "y": 30, "z": 0}],
+      "rotation": 270
     },
     {
       "entityIndex": 28,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 80, "y": 24, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [{"x": 80, "y": 22, "z": 0}],
+      "rotation": 90
     },
     {
       "entityIndex": 29,
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 80, "y": 3, "z": 0}],
-      "rotation": 0
+      "rotation": 90
     },
     {
       "entityIndex": 30,
@@ -221,15 +224,15 @@
       "entityIndex": 31,
       "type": "Enemy",
       "items": ["Gun"],
-      "patrolPoints": [{"x": 84, "y": 40, "z": 0}],
-      "rotation": 0
+      "patrolPoints": [{"x": 84, "y": 38, "z": 0}],
+      "rotation": 180
     },
     {
       "entityIndex": 32,
       "type": "Enemy",
       "items": ["Gun"],
       "patrolPoints": [{"x": 90, "y": 14, "z": 0}],
-      "rotation": 0
+      "rotation": 270
     },
     {
       "entityIndex": 33,
@@ -253,6 +256,39 @@
       "rotation": 0
     },
     {
+      "entityIndex": 36,
+      "type": "Enemy",
+      "items": ["Gun"],
+      "patrolPoints": [
+        {"x": 71, "y": 49, "z": 0},
+        {"x": 71, "y": 44, "z": 0},
+        {"x": 76, "y": 43, "z": 0},
+        {"x": 71, "y": 44, "z": 0}
+      ],
+      "rotation": 180
+    },
+    {
+      "entityIndex": 37,
+      "type": "Enemy",
+      "items": ["Gun"],
+      "patrolPoints": [{"x": 45, "y": 27, "z": 0}],
+      "rotation": 90
+    },
+    {
+      "entityIndex": 38,
+      "type": "Enemy",
+      "items": ["Gun"],
+      "patrolPoints": [{"x": 57, "y": 3, "z": 0}],
+      "rotation": 270
+    },
+    {
+      "entityIndex": 39,
+      "type": "Enemy",
+      "items": ["Gun"],
+      "patrolPoints": [{"x": 65, "y": 4, "z": 0}],
+      "rotation": 90
+    },
+    {
       "entityIndex": 0,
       "type": "Player",
       "items": ["Knife", "Gun"],
@@ -263,7 +299,7 @@
       "entityIndex": 0,
       "type": "Exit",
       "items": [],
-      "patrolPoints": [{"x": 4, "y": 54, "z": 0}],
+      "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
       "rotation": 0
     },
     {
@@ -272,7 +308,7 @@
       "items": [],
       "patrolPoints": [{"x": 80, "y": 26, "z": 0}],
       "rotation": 0,
-      "escapePoint": {"x": 47, "y": 54, "z": 0}
+      "escapePoint": {"x": 26, "y": 45, "z": 0}
     }
   ]
 }
