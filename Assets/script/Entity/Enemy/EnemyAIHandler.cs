@@ -227,15 +227,20 @@ public class EnemyAIHandler : MonoBehaviour
         
         // 檢查是否危險等級被觸發
         bool isDangerTriggered = false;
+        bool isDangerAboveThreshold = true; // 預設為 true 以維持向後兼容（無管理器時不阻擋）
         DangerousManager dangerManager = DangerousManager.Instance;
         if (dangerManager != null)
         {
             // 危險等級 > Safe 時視為觸發
             isDangerTriggered = dangerManager.CurrentDangerLevelType != DangerousManager.DangerLevel.Safe;
+            
+            // 必須超過 DangerousManager 設定的追擊門檻才允許追擊
+            int chaseThreshold = dangerManager.ChaseDangerThreshold;
+            isDangerAboveThreshold = dangerManager.CurrentDangerLevel > chaseThreshold;
         }
         
-        // Safe Area 邏輯：玩家持有武器 OR 危險等級觸發 → 追擊
-        bool shouldChase = playerHasWeapon || isDangerTriggered;
+        // Safe Area 邏輯：玩家持有武器 OR 危險等級觸發，且危險值超過門檻 → 追擊
+        bool shouldChase = (playerHasWeapon || isDangerTriggered) && isDangerAboveThreshold;
         
         if (!shouldChase)
         {
@@ -245,9 +250,16 @@ public class EnemyAIHandler : MonoBehaviour
         {
             Debug.Log($"[EnemyAI] Player in SAFE AREA with WEAPON - will chase");
         }
-        else if (isDangerTriggered)
+        else if (isDangerTriggered && isDangerAboveThreshold)
         {
-            Debug.Log($"[EnemyAI] Player in SAFE AREA but danger is TRIGGERED - will chase");
+            Debug.Log($"[EnemyAI] Player in SAFE AREA but danger is TRIGGERED and above threshold - will chase");
+        }
+        else if (!isDangerAboveThreshold)
+        {
+            DangerousManager dm = DangerousManager.Instance;
+            string thresholdMsg = dm != null ? dm.ChaseDangerThreshold.ToString() : "N/A";
+            string currentMsg = dm != null ? dm.CurrentDangerLevel.ToString() : "N/A";
+            Debug.Log($"[EnemyAI] Danger below chase threshold (current: {currentMsg}, threshold: {thresholdMsg}) - will NOT chase");
         }
         
         return shouldChase;

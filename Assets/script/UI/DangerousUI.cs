@@ -14,6 +14,7 @@ public class DangerousUI : MonoBehaviour
     [SerializeField] private RectTransform dangerBarBackgroundRect;    // 危險指數條背景矩形
     [SerializeField] private RectTransform dangerBarForegroundRect;  // 危險指數條前景矩形
     [SerializeField] private RectTransform dangerBarIconRect;        // 危險指數條圖標矩形
+    [SerializeField] private RectTransform dangerBarCenterLineRect;  // 危險指數條中線
     [SerializeField] private TextMeshProUGUI dangerText;
     [SerializeField] private TextMeshProUGUI dangerLevelText;
     [SerializeField] private Image dangerLevelIcon;
@@ -26,7 +27,10 @@ public class DangerousUI : MonoBehaviour
     [SerializeField] private float borderWidth = 2f; // 邊框寬度
     [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
     [SerializeField] private Color backgroundColor = new Color(0.5f, 0.5f, 0.5f, 1f); // 背景顏色（灰色）
-    [SerializeField] private Color foregroundColor = Color.red; // 前景顏色（固定，不會變化）
+    [SerializeField] private Color foregroundBelowThresholdColor = Color.yellow; // 危險值低於門檻時顏色
+    [SerializeField] private Color foregroundColor = Color.red; // 危險值超過門檻時顏色
+    [SerializeField] private float centerLineThickness = 2f; // 中線粗細
+    [SerializeField] private Color centerLineColor = Color.black; // 中線顏色
     
     [Header("Bar Icon Settings")]
     [SerializeField] private Sprite dangerBarIcon; // 危險指數條圖標
@@ -143,6 +147,12 @@ public class DangerousUI : MonoBehaviour
         {
             SetupIconRect(dangerBarIconRect);
         }
+
+        // 設置中線 - 位於條中央
+        if (dangerBarCenterLineRect != null)
+        {
+            SetupCenterLineRect(dangerBarCenterLineRect);
+        }
     }
     
     /// <summary>
@@ -255,6 +265,37 @@ public class DangerousUI : MonoBehaviour
         }
         return image;
     }
+
+    /// <summary>
+    /// 設置中線矩形（位置依據 chaseDangerThreshold 百分比）
+    /// </summary>
+    private void SetupCenterLineRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 0.5f);
+        rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+
+        float percent = 0.5f; // 預設置中
+        if (dangerousManager != null)
+        {
+            percent = Mathf.Clamp01(dangerousManager.ChaseDangerThreshold / 100f);
+        }
+
+        float x = barWidth * percent;
+        float halfThickness = centerLineThickness * 0.5f;
+        float halfHeight = barHeight * 0.5f;
+        rect.offsetMin = new Vector2(x - halfThickness, -halfHeight);
+        rect.offsetMax = new Vector2(x + halfThickness, halfHeight);
+
+        // 確保在前景之上但在圖標之下
+        rect.SetSiblingIndex(Mathf.Min(rect.parent.childCount - 1, dangerBarForegroundRect != null ? dangerBarForegroundRect.GetSiblingIndex() + 1 : rect.GetSiblingIndex()));
+
+        Image image = GetOrAddImage(rect);
+        if (image != null)
+        {
+            image.color = centerLineColor;
+        }
+    }
     
     private void OnDestroy()
     {
@@ -328,11 +369,16 @@ public class DangerousUI : MonoBehaviour
             }
         }
         
-        // 更新前景顏色（固定顏色，不會變化）
+        // 更新前景顏色（依門檻變化）
         Image foregroundImage = GetOrAddImage(dangerBarForegroundRect);
         if (foregroundImage != null)
         {
-            foregroundImage.color = foregroundColor;
+            bool aboveThreshold = true;
+            if (dangerousManager != null)
+            {
+                aboveThreshold = dangerousManager.CurrentDangerLevel > dangerousManager.ChaseDangerThreshold;
+            }
+            foregroundImage.color = aboveThreshold ? foregroundColor : foregroundBelowThresholdColor;
         }
     }
     

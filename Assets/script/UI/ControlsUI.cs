@@ -51,22 +51,22 @@ public class ControlsUI : MonoBehaviour
         // 生成關閉按鈕
         generatedButtons.Add(CreateButton("Close", closeButtonPos, CloseButton));
     }
-
+    
     /// <summary>
     /// 銷毀所有生成的按鈕
     /// </summary>
     private void DestroyButtons()
     {
         foreach (var btn in generatedButtons)
-        {
+    {
             if (btn != null)
-            {
+        {
                 Destroy(btn);
             }
         }
         generatedButtons.Clear();
     }
-
+    
     /// <summary>
     /// 創建單個按鈕
     /// </summary>

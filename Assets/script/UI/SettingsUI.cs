@@ -61,8 +61,8 @@ public class SettingsUI : MonoBehaviour
         
         string difficultyName = GameSettings.Instance.GetDifficultyName();
         difficultyText.text = $"Current Difficulty: {difficultyName}";
-    }
-    
+        }
+        
     /// <summary>
     /// 銷毀所有生成的按鈕
     /// </summary>
@@ -114,8 +114,8 @@ public class SettingsUI : MonoBehaviour
                 TextMeshProUGUI tmpComp = label.GetComponent<TextMeshProUGUI>();
                 if (tmpComp != null) tmpComp.text = text;
             }
-        }
-        
+    }
+    
         // 設定點擊事件 (SF Button 上的 Button 組件)
         Button btnComp = btnObj.GetComponent<Button>();
         if (btnComp != null && onClickAction != null)
@@ -153,7 +153,7 @@ public class SettingsUI : MonoBehaviour
         {
             if (settingsPanel.activeSelf) Hide();
             else Show();
-        }
+    }
     }
     
     #endregion
