@@ -291,7 +291,7 @@
     {
       "entityIndex": 0,
       "type": "Player",
-      "items": ["Knife"],
+      "items": [],
       "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
       "rotation": 0
     },
@@ -299,7 +299,7 @@
       "entityIndex": 0,
       "type": "Exit",
       "items": [],
-      "patrolPoints": [{"x": 4, "y": 40, "z": 0}],
+      "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
       "rotation": 0
     },
     {
