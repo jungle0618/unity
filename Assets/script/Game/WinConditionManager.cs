@@ -185,7 +185,7 @@ public class WinConditionManager : MonoBehaviour
     /// </summary>
     private void CheckPlayerReachedExit()
     {
-        if (playerReachedExit || exitPoint == Vector3.zero) return;
+        if (!targetKilled || playerReachedExit || exitPoint == Vector3.zero) return;
         
         Player currentPlayer = GetPlayer();
         if (currentPlayer == null) return;
