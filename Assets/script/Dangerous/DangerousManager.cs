@@ -17,6 +17,7 @@ public class DangerousManager : MonoBehaviour
     [SerializeField] private int lowDangerThreshold = 30;
     [SerializeField] private int mediumDangerThreshold = 60;
     [SerializeField] private int highDangerThreshold = 80;
+    [SerializeField] private int chaseDangerThreshold = 30;
     
     [Header("自動減少設定")]
     [SerializeField] private bool enableAutoDecrease = true;
@@ -54,6 +55,7 @@ public class DangerousManager : MonoBehaviour
     public int MinDangerLevel => minDangerLevel;
     public float DangerPercentage => maxDangerLevel > 0 ? (float)currentDangerLevel / maxDangerLevel : 0f;
     public DangerLevel CurrentDangerLevelType => GetDangerLevelType(currentDangerLevel);
+    public int ChaseDangerThreshold => chaseDangerThreshold;
     
     private float lastAutoDecreaseTime;
     
