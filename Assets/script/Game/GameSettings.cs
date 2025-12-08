@@ -1,4 +1,4 @@
-﻿﻿using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Game Settings - Persistent game settings that can be configured in menus
@@ -26,6 +26,10 @@ public class GameSettings : MonoBehaviour
     [SerializeField] private bool showMinimap = true;
     [SerializeField] private bool useGuardAreaSystem = true; // Enable guard/safe area system by default
     
+    [Header("Difficulty Settings")]
+    [SerializeField] private int difficultyLevel = 0; // 0=Easy, 1=Medium, 2=Hard
+    [SerializeField] private int playerMaxHealth = 150; // Player max HP based on difficulty
+    
     // PlayerPrefs keys
     private const string KEY_RUN_ENABLED = "Settings_RunEnabled";
     private const string KEY_MASTER_VOLUME = "Settings_MasterVolume";
@@ -36,6 +40,8 @@ public class GameSettings : MonoBehaviour
     private const string KEY_DAMAGE_NUMBERS = "Settings_DamageNumbers";
     private const string KEY_MINIMAP = "Settings_Minimap";
     private const string KEY_GUARD_AREA_SYSTEM = "Settings_GuardAreaSystem";
+    private const string KEY_DIFFICULTY = "Settings_Difficulty";
+    private const string KEY_PLAYER_MAX_HEALTH = "Settings_PlayerMaxHealth";
     
     // Properties
     public bool RunEnabled 
@@ -134,6 +140,26 @@ public class GameSettings : MonoBehaviour
         }
     }
     
+    public int DifficultyLevel
+    {
+        get => difficultyLevel;
+        set
+        {
+            difficultyLevel = Mathf.Clamp(value, 0, 2);
+            SaveSettings();
+        }
+    }
+    
+    public int PlayerMaxHealth
+    {
+        get => playerMaxHealth;
+        set
+        {
+            playerMaxHealth = value;
+            SaveSettings();
+        }
+    }
+    
     private void Awake()
     {
         // Singleton pattern
@@ -163,11 +189,13 @@ public class GameSettings : MonoBehaviour
         showDamageNumbers = PlayerPrefs.GetInt(KEY_DAMAGE_NUMBERS, 1) == 1; // Default: true
         showMinimap = PlayerPrefs.GetInt(KEY_MINIMAP, 1) == 1; // Default: true
         useGuardAreaSystem = PlayerPrefs.GetInt(KEY_GUARD_AREA_SYSTEM, 1) == 1; // Default: true
+        difficultyLevel = PlayerPrefs.GetInt(KEY_DIFFICULTY, 0); // Default: Easy
+        playerMaxHealth = PlayerPrefs.GetInt(KEY_PLAYER_MAX_HEALTH, 150); // Default: 150
         
         // Apply loaded settings
         ApplyAllSettings();
         
-        Debug.Log($"[GameSettings] Loaded settings - Run: {runEnabled}, Master Vol: {masterVolume}, Fullscreen: {fullscreen}, Guard Area System: {useGuardAreaSystem}");
+        Debug.Log($"[GameSettings] Loaded settings - Run: {runEnabled}, Master Vol: {masterVolume}, Fullscreen: {fullscreen}, Guard Area System: {useGuardAreaSystem}, Difficulty: {difficultyLevel}, Player HP: {playerMaxHealth}");
     }
     
     /// <summary>
@@ -184,6 +212,8 @@ public class GameSettings : MonoBehaviour
         PlayerPrefs.SetInt(KEY_DAMAGE_NUMBERS, showDamageNumbers ? 1 : 0);
         PlayerPrefs.SetInt(KEY_MINIMAP, showMinimap ? 1 : 0);
         PlayerPrefs.SetInt(KEY_GUARD_AREA_SYSTEM, useGuardAreaSystem ? 1 : 0);
+        PlayerPrefs.SetInt(KEY_DIFFICULTY, difficultyLevel);
+        PlayerPrefs.SetInt(KEY_PLAYER_MAX_HEALTH, playerMaxHealth);
         PlayerPrefs.Save();
         
         Debug.Log($"[GameSettings] Saved settings");
@@ -203,6 +233,8 @@ public class GameSettings : MonoBehaviour
         showDamageNumbers = true;
         showMinimap = true;
         useGuardAreaSystem = true; // Default: enabled
+        difficultyLevel = 0; // Default: Easy
+        playerMaxHealth = 150; // Default: 150
         
         ApplyAllSettings();
         SaveSettings();
@@ -228,6 +260,71 @@ public class GameSettings : MonoBehaviour
         AudioListener.volume = masterVolume;
         // Note: Individual music/sfx volume would need AudioMixer setup
         // For now, we just apply master volume
+    }
+    
+    /// <summary>
+    /// Apply difficulty settings to player
+    /// </summary>
+    public void ApplyDifficultySettings()
+    {
+        Player player = FindFirstObjectByType<Player>();
+        if (player != null)
+        {
+            EntityHealth health = player.GetComponent<EntityHealth>();
+            if (health != null)
+            {
+                health.MaxHealth = playerMaxHealth;
+                health.FullHeal(); // 恢復滿血
+                Debug.Log($"[GameSettings] Applied difficulty settings - Player HP: {playerMaxHealth}");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Set difficulty level and apply settings
+    /// </summary>
+    public void SetDifficulty(int level)
+    {
+        difficultyLevel = Mathf.Clamp(level, 0, 2);
+        
+        // Apply difficulty settings
+        switch (difficultyLevel)
+        {
+            case 0: // Easy
+                playerMaxHealth = 150;
+                runEnabled = true;
+                useGuardAreaSystem = true;
+                break;
+            case 1: // Medium
+                playerMaxHealth = 150;
+                runEnabled = false;
+                useGuardAreaSystem = true;
+                break;
+            case 2: // Hard
+                playerMaxHealth = 50;
+                runEnabled = false;
+                useGuardAreaSystem = false;
+                break;
+        }
+        
+        SaveSettings();
+        ApplyDifficultySettings();
+        
+        Debug.Log($"[GameSettings] Difficulty set to: {GetDifficultyName()}");
+    }
+    
+    /// <summary>
+    /// Get difficulty name
+    /// </summary>
+    public string GetDifficultyName()
+    {
+        return difficultyLevel switch
+        {
+            0 => "Easy",
+            1 => "Medium",
+            2 => "Hard",
+            _ => "Unknown"
+        };
     }
 }
 
