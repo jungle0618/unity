@@ -23,6 +23,9 @@ public class VFXManager : MonoBehaviour
     [SerializeField] private ParticleSystem bloodSplatGunVFXPrefab;
     [SerializeField] private ParticleSystem objectHitVFXPrefab;
 
+    [Header("Screen Shake VFX Settings")]
+    [SerializeField] private ScreenShakeVFX screenShakeVFX;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -202,5 +205,10 @@ public class VFXManager : MonoBehaviour
         ParticleSystem objectHitVFX = Instantiate(objectHitVFXPrefab, position, Quaternion.Euler(rotation));
         objectHitVFX.Play();
         Destroy(objectHitVFX.gameObject, objectHitVFX.main.duration + objectHitVFX.main.startLifetime.constantMax);
+    }
+
+    public void PlayScreenShakeVFXHandler()
+    {
+        screenShakeVFX.Shake();
     }
 }

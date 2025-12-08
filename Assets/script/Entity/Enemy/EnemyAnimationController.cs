@@ -44,12 +44,16 @@ public class EnemyAnimationController : MonoBehaviour
             animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
             VFXManager.Instance.PlayBloodSplatKnifeVFXHandler(enemy.transform);
         };
-        OnAttackPerformedHandler = (attacker) => {animator.SetTrigger("Shoot");};
+        OnAttackPerformedHandler = (attacker) => {
+            animator.SetTrigger("Shoot");
+            VFXManager.Instance.PlayMuzzleFlashVFXHandler(weapon.gameObject);
+            VFXManager.Instance.PlayScreenShakeVFXHandler();
+        };
 
         if (enemy != null)
         {
             enemy.OnStartedChasing += EquipItemHandler;
-            enemy.OnStoppedChasing += UnequipItemHandler;
+            // enemy.OnStoppedChasing += UnequipItemHandler;
             enemy.OnEnteredPatrol += UnequipItemHandler;
             enemy.OnEnteredSearch += EquipItemHandler;
             enemy.OnEnteredReturn += UnequipItemHandler;
@@ -79,7 +83,7 @@ public class EnemyAnimationController : MonoBehaviour
         if (enemy != null)
         {
             enemy.OnStartedChasing -= EquipItemHandler;
-            enemy.OnStoppedChasing -= UnequipItemHandler;
+            // enemy.OnStoppedChasing -= UnequipItemHandler;
             enemy.OnEnteredPatrol -= UnequipItemHandler;
             enemy.OnEnteredAlert -= EquipItemHandler;
             enemy.OnEnteredSearch -= EquipItemHandler;

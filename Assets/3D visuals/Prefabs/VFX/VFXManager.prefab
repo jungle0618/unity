@@ -56,3 +56,5 @@ MonoBehaviour:
     type: 3}
   objectHitVFXPrefab: {fileID: 1871939298237742518, guid: 8a949362660229c4a8d50aa505d634cf,
     type: 3}
+  screenShakeVFXPrefab: {fileID: 4115195506775384649, guid: 23d7fcf4a69f1d84aa6441c45fbe7fe2,
+    type: 3}

@@ -58,7 +58,10 @@ public class PlayerAnimationController : MonoBehaviour
         };
         
         OnWeaponAttackHandler = (weapon) => {
-            if (weapon is RangedWeapon) VFXManager.Instance.PlayerPlayMuzzleFlashVFXHandler(weapon); 
+            if (weapon is RangedWeapon) {
+                VFXManager.Instance.PlayerPlayMuzzleFlashVFXHandler(weapon); 
+                VFXManager.Instance.PlayScreenShakeVFXHandler();
+            }
             animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");
         };
         OnItemUseHandler = (success) => {animator.SetTrigger("Interact");};
