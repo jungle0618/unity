@@ -48,4 +48,4 @@ MonoBehaviour:
   fadeDuration: 0.6
   muzzleFlashPrefab: {fileID: 8264210602271692969, guid: 929a6a8976814af4f9900dca83ead0e5,
     type: 3}
-  offsetFromGun: 3
+  offsetFromGun: -1
