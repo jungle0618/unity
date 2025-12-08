@@ -138,10 +138,12 @@ public class Bullet : MonoBehaviour
             else if (enemyAttacker != null)
             {
                 // Enemy 不能攻擊 Enemy（同類型），只銷毀子彈
+                return;
                 //Debug.Log($"[Bullet] Enemy bullet hit Enemy - no damage (Enemy cannot attack Enemy)");
             }
             else if (targetAttacker != null)
             {
+                return;
                 // Target 不能攻擊 Enemy，只銷毀子彈
                 //Debug.Log($"[Bullet] Target bullet hit Enemy - no damage (Target cannot attack Enemy)");
             }

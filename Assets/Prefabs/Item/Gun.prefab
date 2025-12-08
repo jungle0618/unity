@@ -5017,7 +5017,7 @@ MonoBehaviour:
   startingAmmo: 3
   bulletPrefab: {fileID: 3795827902366607150, guid: 1e30be19f9284df4cbe350826c5bbac4,
     type: 3}
-  bulletSpeed: 500
+  bulletSpeed: 100
   firePoint: {fileID: 2495505718286392461}
   alertRange: 15
   muzzleFlash: {fileID: 0}
