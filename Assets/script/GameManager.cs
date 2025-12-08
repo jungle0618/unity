@@ -180,6 +180,11 @@ public class GameManager : MonoBehaviour
                 Debug.Log("[GameManager] Game is playing, pausing game");
                 TogglePause();
             }
+            else if (currentState == GameState.Paused)
+            {
+                Debug.Log("[GameManager] Game is paused, resuming game");
+                TogglePause();
+            }
         }
     }
 

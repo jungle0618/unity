@@ -302,7 +302,11 @@ public class Player : BaseEntity<PlayerState>, IEntity
     private void LateUpdate()
     {
         // 在 LateUpdate 中處理視覺相關的旋轉，避免與物理更新衝突
-        HandleRotation();
+        // 只有在遊戲進行中時才旋轉玩家
+        if (GameManager.Instance == null || !GameManager.Instance.IsPaused)
+        {
+            HandleRotation();
+        }
     }
 
     #endregion
