@@ -4,7 +4,7 @@ using System.Collections;
 public class BulletTracerLine : MonoBehaviour
 {
     public float stretchLength = 5f;
-    public float zOffset = 1f;
+    public float zOffset = -2f;
     private LineRenderer lr;
 
 

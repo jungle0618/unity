@@ -4,7 +4,7 @@ using System;
 public class EnemyAnimationController : MonoBehaviour
 {   
     [Header("Settings")]
-    public float Hurt2AnimationThreshold = 0.5f;
+    public float Hurt2AnimationThreshold = 1f;
     [Header("References")]
     [SerializeField] private Enemy enemy;
     [SerializeField] private Animator animator;
@@ -34,7 +34,10 @@ public class EnemyAnimationController : MonoBehaviour
         EquipItemHandler = () => {gun.SetActive(true); animator.SetInteger("weaponState", 1);};
         UnequipItemHandler = () => {gun.SetActive(false); animator.SetInteger("weaponState", -1);};
 
-        OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
+        OnHealthChangedHandler = (current, max) => {
+            animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
+            VFXManager.Instance.PlayBloodSplatKnifeVFXHandler(enemy.transform);
+        };
         OnAttackPerformedHandler = (attacker) => {animator.SetTrigger("Shoot");};
 
         if (enemy != null)

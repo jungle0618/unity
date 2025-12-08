@@ -19,6 +19,10 @@ public class Bullet : MonoBehaviour
     private float _spawnTime;
     private bool _hasHitTarget = false;
 
+    public Vector2 Direction => _direction;
+    // Event for VFX on hit
+    public event System.Action<GameObject, Bullet> OnBulletHit;
+
     public void Initialize(Vector2 shootDirection, GameObject shooter, int bulletDamage, float bulletSpeed, float bulletLifetime)
     {
         _direction = shootDirection.normalized;
@@ -129,6 +133,7 @@ public class Bullet : MonoBehaviour
                 //Debug.Log($"[Bullet] Player shot Enemy for {damage} damage");
                 Vector2 attackerPos = _owner != null ? (Vector2)_owner.transform.position : transform.position;
                 enemy.TakeDamage(damage, "Player Gun", attackerPos);
+                OnBulletHit?.Invoke(enemy.gameObject, this);
             }
             else if (enemyAttacker != null)
             {
@@ -168,6 +173,7 @@ public class Bullet : MonoBehaviour
                 //Debug.Log($"[Bullet] Enemy {enemyAttacker.gameObject.name} shot player for {damage} damage");
                 Vector2 attackerPos = _owner != null ? (Vector2)_owner.transform.position : transform.position;
                 player.TakeDamage(damage, "Enemy Gun", attackerPos);
+                OnBulletHit?.Invoke(player.gameObject, this); 
             }
             else if (targetAttacker != null)
             {
@@ -175,6 +181,7 @@ public class Bullet : MonoBehaviour
                 //Debug.Log($"[Bullet] Target {targetAttacker.gameObject.name} shot player for {damage} damage");
                 Vector2 attackerPos = _owner != null ? (Vector2)_owner.transform.position : transform.position;
                 player.TakeDamage(damage, "Target Gun", attackerPos);
+                OnBulletHit?.Invoke(player.gameObject, this);
             }
             else
             {
@@ -199,6 +206,7 @@ public class Bullet : MonoBehaviour
                 //Debug.Log($"[Bullet] Player shot Target for {damage} damage");
                 Vector2 attackerPos = _owner != null ? (Vector2)_owner.transform.position : transform.position;
                 target.TakeDamage(damage, "Player Gun", attackerPos);
+                OnBulletHit?.Invoke(target.gameObject, this);
             }
             else if (enemyAttacker != null)
             {
@@ -223,6 +231,7 @@ public class Bullet : MonoBehaviour
         if (doorController != null)
         {
             //Debug.Log($"[Bullet] Hit door: {collision.gameObject.name}");
+            OnBulletHit?.Invoke(doorController.gameObject, this);
             Destroy(gameObject);
             return;
         }
@@ -232,6 +241,7 @@ public class Bullet : MonoBehaviour
         if (tilemap != null)
         {
             //Debug.Log($"[Bullet] Hit tilemap (wall/obstacle)");
+            OnBulletHit?.Invoke(tilemap.gameObject, this);
             Destroy(gameObject);
             return;
         }
@@ -241,6 +251,7 @@ public class Bullet : MonoBehaviour
         if (tilemapCollider != null)
         {
             //Debug.Log($"[Bullet] Hit tilemap collider (wall/obstacle)");
+            OnBulletHit?.Invoke(tilemapCollider.gameObject, this);
             Destroy(gameObject);
             return;
         }

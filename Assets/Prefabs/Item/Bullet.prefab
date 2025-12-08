@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 1970167022947094448}
   - component: {fileID: 891828220133697179}
   - component: {fileID: 6745248142320523728}
+  - component: {fileID: 6982136595125549682}
   m_Layer: 0
   m_Name: 3D Visual
   m_TagString: Untagged
@@ -92,7 +93,7 @@ LineRenderer:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0.15882984
+        value: 0.33529875
         inSlope: 0
         outSlope: 0
         tangentMode: 0
@@ -155,8 +156,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c28730730f427c440b9003d47916af9c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BulletTraceVFX
-  stretchLength: 30
+  stretchLength: 3
   zOffset: -2
+--- !u!114 &6982136595125549682
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2872135317552026507}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6426854ab3c6e2343a38ba6ac430a123, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BulletImpactVFX
 --- !u!1 &3795827902366607150
 GameObject:
   m_ObjectHideFlags: 0
