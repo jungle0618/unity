@@ -194,45 +194,8 @@ public class MapUIManager : MonoBehaviour
     /// </summary>
     public MapMarker AddMarker(Vector3 worldPosition, string markerName = "Marker")
     {
-        if (mapMarkerPrefab == null)
-        {
-            Debug.LogWarning("MapUIManager: 地圖標記預製體未設定");
-            return null;
-        }
-        
-        Transform container = markersContainer != null ? markersContainer : mapContainer;
-        if (container == null)
-        {
-            Debug.LogWarning("MapUIManager: 找不到標記容器");
-            return null;
-        }
-        
-        // 創建標記
-        Debug.Log("[MapUIManager] 添加地圖標記: " + markerName + " at " + worldPosition);
-        GameObject markerObj = Instantiate(mapMarkerPrefab, container);
-        MapMarker marker = markerObj.GetComponent<MapMarker>();
-        
-        if (marker != null)
-        {
-            // 設定標記位置
-            RectTransform markerRect = markerObj.GetComponent<RectTransform>();
-            if (markerRect != null)
-            {
-                Vector2 mapPos = WorldToMapPosition(worldPosition);
-                markerRect.anchoredPosition = mapPos;
-            }
-            
-            marker.SetWorldPosition(worldPosition);
-            marker.SetMarkerName(markerName);
-            mapMarkers.Add(marker);
-        }
-        else
-        {
-            Debug.LogError("MapUIManager: 標記預製體缺少 MapMarker 組件！");
-            Destroy(markerObj);
-        }
-        
-        return marker;
+        // Map marker 功能已停用，直接返回 null（不再生成任何標記）
+        return null;
     }
     
     /// <summary>

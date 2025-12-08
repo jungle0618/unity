@@ -91,6 +91,13 @@ public class GameUIManager : MonoBehaviour
         // 當遊戲結束或勝利時，隱藏除了 Dialogue 以外的所有 UI
         if (newState == GameManager.GameState.GameOver || newState == GameManager.GameState.GameWin)
         {
+            // 先關閉通知，避免結束狀態仍顯示彈窗
+            if (notificationUIManager != null)
+            {
+                notificationUIManager.HideNotification();
+                notificationUIManager.gameObject.SetActive(false);
+            }
+            
             HideAllUIExceptDialogue();
         }
     }
@@ -508,7 +515,7 @@ public class GameUIManager : MonoBehaviour
         if (pauseUIManager != null)
             pauseUIManager.gameObject.SetActive(false);
         
-        // 隱藏通知 UI
+        // 隱藏通知 UI（避免結束時仍彈出）
         if (notificationUIManager != null)
             notificationUIManager.gameObject.SetActive(false);
         

@@ -40,6 +40,14 @@ public class TilemapMapUIManager : MonoBehaviour
     [SerializeField] private RectTransform playerIcon;          // 玩家圖標
     [SerializeField] private bool rotateWithPlayer = true;      // 玩家圖標是否跟隨旋轉
     
+    [Header("Exit Icon")]
+    [SerializeField] private RectTransform exitIcon;            // 出口圖標
+    [SerializeField] private bool autoFindExitPoint = true;     // 是否自動從 WinConditionManager 取得出口點
+    
+    [Header("Target Icon")]
+    [SerializeField] private RectTransform targetIcon;          // 目標圖標（手動指定，不再自動生成）
+    [SerializeField] private bool autoFindTarget = true;        // 是否自動尋找 Target（僅賦值，不生成額外圖示）
+    
     [Header("Update Settings")]
     [SerializeField] private bool updateInRealtime = true;      // 是否即時更新
     [SerializeField] private float updateInterval = 0.1f;       // 更新間隔（秒）
@@ -64,6 +72,7 @@ public class TilemapMapUIManager : MonoBehaviour
     [SerializeField] private Color borderColor = Color.black; // 邊框顏色（黑色）
     
     private Player player;
+    private Target target;
     private EntityManager entityManager;
     private bool isInitialized = false;
     private RenderTexture mapRenderTexture;
@@ -89,6 +98,18 @@ public class TilemapMapUIManager : MonoBehaviour
     // 玩家圖標縮放狀態
     private Vector3 originalPlayerIconScale; // 玩家圖標原始縮放
     private Vector3 zoomedPlayerIconScale; // 玩家圖標放大後的縮放
+    private Vector3 originalExitIconScale;   // 出口圖標原始縮放
+    private Vector3 zoomedExitIconScale;     // 出口圖標放大後的縮放（與玩家同樣倍率）
+    private Vector3 originalTargetIconScale; // 目標圖標原始縮放
+    private Vector3 zoomedTargetIconScale;   // 目標圖標放大後的縮放（與玩家同樣倍率）
+    
+    // 出口資訊
+    private Vector3 exitWorldPosition = Vector3.zero;
+    private bool hasExitPoint = false;
+    
+    // 目標資訊
+    private Vector3 targetWorldPosition = Vector3.zero;
+    private bool hasTarget = false;
     
     private void Awake()
     {
@@ -100,6 +121,26 @@ public class TilemapMapUIManager : MonoBehaviour
         if (useEntityManager)
         {
             entityManager = FindFirstObjectByType<EntityManager>();
+        }
+    }
+    
+    /// <summary>
+    /// 嘗試尋找目標（Target）
+    /// </summary>
+    private void TryFetchTarget()
+    {
+        if (!autoFindTarget || hasTarget) return;
+        
+        target = FindFirstObjectByType<Target>();
+        if (target != null)
+        {
+            hasTarget = true;
+            targetWorldPosition = target.transform.position;
+            UpdateTargetPosition();
+        }
+        else
+        {
+            Debug.LogWarning("TilemapMapUIManager: 找不到 Target，目標圖標不會顯示");
         }
     }
     
@@ -167,8 +208,40 @@ public class TilemapMapUIManager : MonoBehaviour
             Debug.LogWarning("TilemapMapUIManager: 玩家圖標未設定");
         }
         
+        if (targetIcon == null)
+        {
+            Debug.LogWarning("TilemapMapUIManager: 目標圖標未設定");
+        }
+
+        // 嘗試取得出口點
+        TryFetchExitPoint();
+        
+        // 自動尋找目標（僅賦值，不會生成新圖示）
+        TryFetchTarget();
+        
         // 設置邊框
         SetupMapBorder();
+    }
+    
+    /// <summary>
+    /// 嘗試從 WinConditionManager 取得出口點
+    /// </summary>
+    private void TryFetchExitPoint()
+    {
+        if (!autoFindExitPoint) return;
+        
+        WinConditionManager win = FindFirstObjectByType<WinConditionManager>();
+        if (win != null)
+        {
+            Vector3 exit = win.GetExitPoint();
+            if (exit != Vector3.zero)
+            {
+                SetExitPoint(exit);
+                return;
+            }
+        }
+        
+        Debug.LogWarning("TilemapMapUIManager: 找不到出口點或位置為零，請確認 WinConditionManager 已初始化");
     }
     
     /// <summary>
@@ -262,13 +335,23 @@ public class TilemapMapUIManager : MonoBehaviour
             UpdateMapTransition();
         }
         
-        // 只有在地圖可見且需要即時更新時才更新玩家位置
-        if (isVisible && updateInRealtime && player != null)
+        // 只有在地圖可見且需要即時更新時才更新圖示位置
+        if (isVisible && updateInRealtime)
         {
             // 使用獨立的更新間隔來降低性能消耗
             if (Time.time - lastPlayerUpdateTime >= updateInterval)
             {
-                UpdatePlayerPosition();
+                if (!hasTarget && autoFindTarget)
+                {
+                    TryFetchTarget();
+                }
+                
+                if (player != null)
+                {
+                    UpdatePlayerPosition();
+                }
+                UpdateExitPosition();
+                UpdateTargetPosition();
                 lastPlayerUpdateTime = Time.time;
             }
         }
@@ -294,9 +377,19 @@ public class TilemapMapUIManager : MonoBehaviour
         gameObject.SetActive(visible);
         
         // 當地圖顯示時，立即更新
-        if (visible && player != null)
+        if (visible)
         {
-            UpdatePlayerPosition();
+            if (!hasTarget && autoFindTarget)
+            {
+                TryFetchTarget();
+            }
+            
+            if (player != null)
+            {
+                UpdatePlayerPosition();
+            }
+            UpdateExitPosition();
+            UpdateTargetPosition();
             lastUpdateTime = Time.time;
             lastPlayerUpdateTime = Time.time;
             
@@ -324,6 +417,53 @@ public class TilemapMapUIManager : MonoBehaviour
         if (isVisible && player != null)
         {
             UpdatePlayerPosition();
+        }
+    }
+    
+    /// <summary>
+    /// 設定出口位置（可供外部調用）
+    /// </summary>
+    public void SetExitPoint(Vector3 exitPos)
+    {
+        exitWorldPosition = exitPos;
+        hasExitPoint = exitPos != Vector3.zero;
+        
+        if (isVisible && hasExitPoint)
+        {
+            UpdateExitPosition();
+        }
+    }
+    
+    /// <summary>
+    /// 設定目標實例（供外部動態指定）
+    /// </summary>
+    public void SetTarget(Target newTarget)
+    {
+        target = newTarget;
+        hasTarget = target != null;
+        
+        if (hasTarget)
+        {
+            targetWorldPosition = target.transform.position;
+        }
+        
+        if (isVisible && hasTarget)
+        {
+            UpdateTargetPosition();
+        }
+    }
+    
+    /// <summary>
+    /// 設定目標位置（若不直接提供 Target 實例，可用此方法）
+    /// </summary>
+    public void SetTargetPoint(Vector3 targetPos)
+    {
+        targetWorldPosition = targetPos;
+        hasTarget = targetPos != Vector3.zero;
+        
+        if (isVisible && hasTarget)
+        {
+            UpdateTargetPosition();
         }
     }
     
@@ -687,6 +827,37 @@ public class TilemapMapUIManager : MonoBehaviour
     }
     
     /// <summary>
+    /// 更新出口圖標位置
+    /// </summary>
+    private void UpdateExitPosition()
+    {
+        if (!hasExitPoint || exitIcon == null || mapDisplay == null) return;
+        
+        Vector2 mapPos = WorldToMapUIPosition(exitWorldPosition);
+        exitIcon.anchoredPosition = mapPos;
+    }
+    
+    /// <summary>
+    /// 更新目標圖標位置
+    /// </summary>
+    private void UpdateTargetPosition()
+    {
+        if (targetIcon == null || mapDisplay == null) return;
+        
+        if (!hasTarget && autoFindTarget)
+        {
+            TryFetchTarget();
+        }
+        
+        if (!hasTarget) return;
+        
+        // 如果有 Target 實例，使用當前位置；否則使用手動設定的位置
+        Vector3 worldPos = target != null ? target.transform.position : targetWorldPosition;
+        Vector2 mapPos = WorldToMapUIPosition(worldPos);
+        targetIcon.anchoredPosition = mapPos;
+    }
+    
+    /// <summary>
     /// 將世界座標轉換為地圖UI座標（公開方法供其他組件使用）
     /// </summary>
     public Vector2 WorldToMapUIPosition(Vector3 worldPosition)
@@ -731,44 +902,8 @@ public class TilemapMapUIManager : MonoBehaviour
     /// </summary>
     public MapMarker AddMarker(Vector3 worldPosition, string markerName = "Marker")
     {
-        if (mapMarkerPrefab == null)
-        {
-            Debug.LogWarning("TilemapMapUIManager: 地圖標記預製體未設定");
-            return null;
-        }
-        
-        Transform container = markersContainer != null ? markersContainer : mapContainer;
-        if (container == null)
-        {
-            Debug.LogWarning("TilemapMapUIManager: 找不到標記容器");
-            return null;
-        }
-        
-        // 創建標記
-        GameObject markerObj = Instantiate(mapMarkerPrefab, container);
-        MapMarker marker = markerObj.GetComponent<MapMarker>();
-        
-        if (marker != null)
-        {
-            // 設定標記位置
-            RectTransform markerRect = markerObj.GetComponent<RectTransform>();
-            if (markerRect != null)
-            {
-                Vector2 mapPos = WorldToMapUIPosition(worldPosition);
-                markerRect.anchoredPosition = mapPos;
-            }
-            
-            marker.SetWorldPosition(worldPosition);
-            marker.SetMarkerName(markerName);
-            mapMarkers.Add(marker);
-        }
-        else
-        {
-            Debug.LogError("TilemapMapUIManager: 標記預製體缺少 MapMarker 組件！");
-            Destroy(markerObj);
-        }
-        
-        return marker;
+        // Map marker 功能已停用，直接返回 null（不再生成任何標記）
+        return null;
     }
     
     /// <summary>
@@ -918,6 +1053,28 @@ public class TilemapMapUIManager : MonoBehaviour
             zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
         }
         
+        if (exitIcon != null)
+        {
+            originalExitIconScale = exitIcon.localScale;
+            zoomedExitIconScale = originalExitIconScale * playerIconZoomScale / zoomScale;
+        }
+        else
+        {
+            originalExitIconScale = Vector3.one;
+            zoomedExitIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+        }
+        
+        if (targetIcon != null)
+        {
+            originalTargetIconScale = targetIcon.localScale;
+            zoomedTargetIconScale = originalTargetIconScale * playerIconZoomScale / zoomScale;
+        }
+        else
+        {
+            originalTargetIconScale = Vector3.one;
+            zoomedTargetIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+        }
+        
         hasStoredOriginalValues = true;
     }
     
@@ -990,6 +1147,26 @@ public class TilemapMapUIManager : MonoBehaviour
             playerIcon.localScale = currentPlayerIconScale;
         }
         
+        if (exitIcon != null)
+        {
+            Vector3 currentExitIconScale = Vector3.Lerp(
+                isZoomed ? originalExitIconScale : zoomedExitIconScale,
+                isZoomed ? zoomedExitIconScale : originalExitIconScale,
+                smoothT
+            );
+            exitIcon.localScale = currentExitIconScale;
+        }
+        
+        if (targetIcon != null)
+        {
+            Vector3 currentTargetIconScale = Vector3.Lerp(
+                isZoomed ? originalTargetIconScale : zoomedTargetIconScale,
+                isZoomed ? zoomedTargetIconScale : originalTargetIconScale,
+                smoothT
+            );
+            targetIcon.localScale = currentTargetIconScale;
+        }
+        
         // 如果過渡完成，確保最終值正確
         if (transitionTimer <= 0f)
         {
@@ -1016,6 +1193,14 @@ public class TilemapMapUIManager : MonoBehaviour
             {
                 playerIcon.localScale = zoomedPlayerIconScale;
             }
+            if (exitIcon != null)
+            {
+                exitIcon.localScale = zoomedExitIconScale;
+            }
+            if (targetIcon != null)
+            {
+                targetIcon.localScale = zoomedTargetIconScale;
+            }
         }
         else
         {
@@ -1027,6 +1212,14 @@ public class TilemapMapUIManager : MonoBehaviour
             if (playerIcon != null)
             {
                 playerIcon.localScale = originalPlayerIconScale;
+            }
+            if (exitIcon != null)
+            {
+                exitIcon.localScale = originalExitIconScale;
+            }
+            if (targetIcon != null)
+            {
+                targetIcon.localScale = originalTargetIconScale;
             }
         }
     }
@@ -1062,6 +1255,24 @@ public class TilemapMapUIManager : MonoBehaviour
                 zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
             }
             
+            if (exitIcon != null)
+            {
+                zoomedExitIconScale = originalExitIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedExitIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
+            if (targetIcon != null)
+            {
+                zoomedTargetIconScale = originalTargetIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedTargetIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
             // 如果當前是放大狀態，立即應用新的大小和縮放
             if (isZoomed)
             {
@@ -1070,6 +1281,14 @@ public class TilemapMapUIManager : MonoBehaviour
                 if (playerIcon != null)
                 {
                     playerIcon.localScale = zoomedPlayerIconScale;
+                }
+                if (exitIcon != null)
+                {
+                    exitIcon.localScale = zoomedExitIconScale;
+                }
+                if (targetIcon != null)
+                {
+                    targetIcon.localScale = zoomedTargetIconScale;
                 }
             }
         }
@@ -1094,10 +1313,36 @@ public class TilemapMapUIManager : MonoBehaviour
                 zoomedPlayerIconScale = Vector3.one * playerIconZoomScale / zoomScale;
             }
             
+            if (exitIcon != null)
+            {
+                zoomedExitIconScale = originalExitIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedExitIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
+            if (targetIcon != null)
+            {
+                zoomedTargetIconScale = originalTargetIconScale * playerIconZoomScale / zoomScale;
+            }
+            else
+            {
+                zoomedTargetIconScale = Vector3.one * playerIconZoomScale / zoomScale;
+            }
+            
             // 如果當前是放大狀態，立即應用新的縮放
             if (isZoomed && playerIcon != null)
             {
                 playerIcon.localScale = zoomedPlayerIconScale;
+            }
+            if (isZoomed && exitIcon != null)
+            {
+                exitIcon.localScale = zoomedExitIconScale;
+            }
+            if (isZoomed && targetIcon != null)
+            {
+                targetIcon.localScale = zoomedTargetIconScale;
             }
         }
     }
