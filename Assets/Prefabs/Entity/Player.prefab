@@ -231,6 +231,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12d3483cf8f7c7d4c9fb282031e89179, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerVisualizer
+  enableSpriteRendererToggle: 1
   showRuntimeVision: 1
   useRuntimeMesh: 1
   visionMaterial: {fileID: 0}
@@ -318,7 +319,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b93ddbb9c87cfa4a8703f000f8345d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EntityHealth
-  maxHealth: 50
+  maxHealth: 50000
   currentHealth: 0
   damageReduction: 0
   invulnerabilityTime: 0
@@ -496,6 +497,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VisionCone
   player: {fileID: 8582089880973559608}
+  wallsLayer:
+    serializedVersion: 2
+    m_Bits: 64
   circleRadius: 1
   coneAngle: 100
   coneRange: 10

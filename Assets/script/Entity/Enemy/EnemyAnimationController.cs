@@ -22,6 +22,12 @@ public class EnemyAnimationController : MonoBehaviour
 
     private Action<GameObject> OnAttackPerformedHandler;
 
+    private void toggleItemVisibility(GameObject item, bool visible)
+    {
+        foreach (var r in item.GetComponentsInChildren<Renderer>(true))
+            r.enabled = visible;
+    }
+
     public void OnEnable()
     {
         animator = GetComponent<Animator>();
@@ -31,8 +37,8 @@ public class EnemyAnimationController : MonoBehaviour
         StartMovingHandler = () => {Debug.Log($"{enemy.name}: Started Moving"); animator.SetBool("isMoving", true);};
         StopMovingHandler = () => {Debug.Log($"{enemy.name}: Stopped Moving"); animator.SetBool("isMoving", false);};
 
-        EquipItemHandler = () => {gun.SetActive(true); animator.SetInteger("weaponState", 1);};
-        UnequipItemHandler = () => {gun.SetActive(false); animator.SetInteger("weaponState", -1);};
+        EquipItemHandler = () => {toggleItemVisibility(gun, true); animator.SetInteger("weaponState", 1);};
+        UnequipItemHandler = () => {toggleItemVisibility(gun, false); animator.SetInteger("weaponState", -1);};
 
         OnHealthChangedHandler = (current, max) => {
             animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
@@ -55,7 +61,7 @@ public class EnemyAnimationController : MonoBehaviour
             enemy.OnEnemyDied += VFXManager.Instance.PlayDeathVFXHandler;
         }
 
-        gun.SetActive(false);
+        toggleItemVisibility(gun, false);
     }
 
     public void Start()

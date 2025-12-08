@@ -46,7 +46,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VFXManager
   fadeDelay: 0.2
   fadeDuration: 0.6
-  muzzleFlashVFXPrefab: {fileID: 0}
+  muzzleFlashVFXPrefab: {fileID: 8264210602271692969, guid: 929a6a8976814af4f9900dca83ead0e5,
+    type: 3}
   offsetFromGun: -1
   bloodSplatKnifeVFXPrefab: {fileID: 7883583319153007355, guid: 7e42ebafb5d2caa44a5ec1ac7e69659b,
     type: 3}
