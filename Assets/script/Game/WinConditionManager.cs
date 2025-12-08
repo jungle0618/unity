@@ -464,4 +464,12 @@ public class WinConditionManager : MonoBehaviour
         UnityEditor.Handles.Label(exitPoint + Vector3.up * 3.5f, "出口 (Exit)");
 #endif
     }
+
+    /// <summary>
+    /// 取得出口點位置（供其他系統使用）
+    /// </summary>
+    public Vector3 GetExitPoint()
+    {
+        return exitPoint;
+    }
 }
