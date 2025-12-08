@@ -370,12 +370,12 @@ Light:
   m_Type: 0
   m_Color: {r: 0.9716981, g: 0.9306379, b: 0.7654414, a: 1}
   m_Intensity: 40
-  m_Range: 100
+  m_Range: 20
   m_SpotAngle: 109.75248
   m_InnerSpotAngle: 55.653465
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 0
+    m_Type: 1
     m_Resolution: -1
     m_CustomResolution: -1
     m_Strength: 1
@@ -505,6 +505,7 @@ MonoBehaviour:
   coneRange: 10
   featherDistance: 2
   featherAngle: 15
+  fadeSpeed: 2
 --- !u!1001 &3296242097869377969
 PrefabInstance:
   m_ObjectHideFlags: 0
