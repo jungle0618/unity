@@ -53,7 +53,7 @@ public class TilemapMapUIManager : MonoBehaviour
     [SerializeField] private bool useEntityManager = true; // 是否使用 EntityManager 獲取 Player
     
     [Header("Map Zoom Settings")]
-    [SerializeField] private KeyCode zoomKey = KeyCode.M; // 放大鍵
+    [SerializeField] private KeyCode zoomKey = KeyCode.V; // 放大鍵
     [SerializeField] private float zoomScale = 7.5f; // 地圖放大倍率
     [SerializeField] private float playerIconZoomScale = 1.5f; // 玩家圖標放大倍率（相對於原始大小）
     [SerializeField] private float transitionDuration = 0.2f; // 過渡動畫時間
