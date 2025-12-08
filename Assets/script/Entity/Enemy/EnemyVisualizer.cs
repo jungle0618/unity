@@ -19,11 +19,24 @@ public class EnemyVisualizer : BaseVisualizer
         movement = GetComponent<EnemyMovement>();
         detection = GetComponent<EnemyDetection>();
         
+        // 【3D 遷移】禁用 SpriteRenderer 的顯示/隱藏切換（已遷移到 3D，不再需要通過視野系統控制 2D Sprite）
+        // 如果需要為特殊敵人保留此功能，可以在 Inspector 中手動啟用 "Enable Sprite Renderer Toggle"
+        SetEnableSpriteRendererToggle(false);
+        
         // 訂閱敵人血量變化事件
         if (enemy != null)
         {
             enemy.OnHealthChanged += HandleHealthChanged;
         }
+        
+        // 訂閱物品變化事件，用於檢測鑰匙的拾取/丟棄
+        if (itemHolder != null)
+        {
+            itemHolder.OnItemChanged += HandleItemChanged;
+        }
+        
+        // 初始化時檢查是否持有鑰匙
+        UpdateSpriteRendererByKeyStatus();
     }
     
     private void OnDestroy()
@@ -32,6 +45,12 @@ public class EnemyVisualizer : BaseVisualizer
         if (enemy != null)
         {
             enemy.OnHealthChanged -= HandleHealthChanged;
+        }
+        
+        // 取消訂閱物品變化事件
+        if (itemHolder != null)
+        {
+            itemHolder.OnItemChanged -= HandleItemChanged;
         }
     }
     
@@ -42,6 +61,15 @@ public class EnemyVisualizer : BaseVisualizer
     {
         // 調用基類的血量變化處理方法
         OnHealthChanged(currentHealth, maxHealth);
+    }
+    
+    /// <summary>
+    /// 處理物品變化事件（用於檢測鑰匙的拾取/丟棄）
+    /// </summary>
+    private void HandleItemChanged(Item item)
+    {
+        // 當物品變化時，更新 SpriteRenderer 狀態
+        UpdateSpriteRendererByKeyStatus();
     }
 
     /// <summary>
