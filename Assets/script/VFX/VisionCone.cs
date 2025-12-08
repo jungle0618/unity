@@ -84,6 +84,11 @@ public class VisionCone : MonoBehaviour
         int idx = 0;
         foreach (Renderer rend in renderers)
         {
+            if (rend == null)
+            {
+                idx++;
+                continue;
+            }
             Vector2 toEnemy = (Vector2)rend.transform.position - playerPos;
             float distance = toEnemy.magnitude;
 

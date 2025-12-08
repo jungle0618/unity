@@ -34,8 +34,8 @@ public class EnemyAnimationController : MonoBehaviour
         if (gun == null)
             gun = GetComponentInChildren<RangedWeapon>(true).gameObject;
 
-        StartMovingHandler = () => {Debug.Log($"{enemy.name}: Started Moving"); animator.SetBool("isMoving", true);};
-        StopMovingHandler = () => {Debug.Log($"{enemy.name}: Stopped Moving"); animator.SetBool("isMoving", false);};
+        StartMovingHandler = () => {animator.SetBool("isMoving", true);};
+        StopMovingHandler = () => {animator.SetBool("isMoving", false);};
 
         EquipItemHandler = () => {toggleItemVisibility(gun, true); animator.SetInteger("weaponState", 1);};
         UnequipItemHandler = () => {toggleItemVisibility(gun, false); animator.SetInteger("weaponState", -1);};
@@ -89,7 +89,10 @@ public class EnemyAnimationController : MonoBehaviour
             enemy.OnStoppedMoving -= StopMovingHandler;
 
             enemy.OnHealthChanged -= OnHealthChangedHandler;
-            enemy.OnEnemyDied -= VFXManager.Instance.PlayDeathVFXHandler;        
+            if (VFXManager.Instance != null)
+            {
+                enemy.OnEnemyDied -= VFXManager.Instance.PlayDeathVFXHandler;
+            }      
         }
         if (weapon != null)
         {

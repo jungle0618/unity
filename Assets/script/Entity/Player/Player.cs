@@ -117,7 +117,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
     // Hand/Weapon state events
     public event System.Action<Item> OnEquipChanged;
     public event System.Action<Weapon> OnWeaponAttack;
-    public event System.Action OnItemUse;
+    public event System.Action<bool> OnItemUse;
 
     // Internal tracking
     private bool wasMoving = false;
@@ -127,6 +127,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
     private Item lastEquippedItem = null;
     private bool wasAttacking = false;
     private bool wasUsingItem = false;
+    private bool doorSuccessed = false;
 
     #endregion
 
@@ -412,7 +413,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
         }
         if (wasUsingItem)
         {
-            OnItemUse?.Invoke();
+            OnItemUse?.Invoke(doorSuccessed);
             wasUsingItem = false;
         }
     }
@@ -468,7 +469,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
     {
         // 只處理開門（撿取物品已改為自動）
         wasUsingItem = true;
-        TryOpenDoor();
+        doorSuccessed = TryOpenDoor();
     }
     
     /// <summary>
@@ -489,7 +490,7 @@ public class Player : BaseEntity<PlayerState>, IEntity
     /// <summary>
     /// 嘗試開門
     /// </summary>
-    private void TryOpenDoor()
+    private bool TryOpenDoor()
     {
         // 呼叫 DoorController 來開啟範圍內最近的門
         if (DoorController.Instance != null)
@@ -503,10 +504,12 @@ public class Player : BaseEntity<PlayerState>, IEntity
             {
                 Debug.Log($"[Player] 無法開啟門（可能沒有鑰匙、沒有裝備鑰匙或範圍內沒有門）");
             }
+            return success;
         }
         else
         {
             Debug.LogWarning("[Player] DoorController 實例不存在");
+            return false;
         }
     }
 

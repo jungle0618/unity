@@ -34,7 +34,7 @@ public class PlayerAnimationController : MonoBehaviour
     private Action<int, int> OnHealthChangedHandler;
     
     private Action<Weapon> OnWeaponAttackHandler;
-    private Action OnActionPerformedHandler;
+    private Action<bool> OnItemUseHandler;
 
     public void OnEnable()
     {
@@ -61,7 +61,7 @@ public class PlayerAnimationController : MonoBehaviour
             if (weapon is RangedWeapon) VFXManager.Instance.PlayerPlayMuzzleFlashVFXHandler(weapon); 
             animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");
         };
-        OnActionPerformedHandler = () => {animator.SetTrigger("Interact");};
+        OnItemUseHandler = (success) => {animator.SetTrigger("Interact");};
 
         if (player != null)
         {
@@ -70,7 +70,7 @@ public class PlayerAnimationController : MonoBehaviour
             player.OnHealthChanged += OnHealthChangedHandler;
             player.OnPlayerDied += VFXManager.Instance.PlayerPlayDeathVFXHandler;
             player.OnWeaponAttack += OnWeaponAttackHandler;
-            player.OnItemUse += OnActionPerformedHandler;
+            player.OnItemUse += OnItemUseHandler;
         }
 
         knife.SetActive(false);
@@ -87,9 +87,13 @@ public class PlayerAnimationController : MonoBehaviour
             player.OnEquipChanged -= OnEquipChangedHandler;
 
             player.OnHealthChanged -= OnHealthChangedHandler;
-            player.OnPlayerDied -= VFXManager.Instance.PlayerPlayDeathVFXHandler;
             player.OnWeaponAttack -= OnWeaponAttackHandler;
-            player.OnItemUse -= OnActionPerformedHandler;
+            player.OnItemUse -= OnItemUseHandler;
+
+            if (VFXManager.Instance != null)
+            {
+                player.OnPlayerDied -= VFXManager.Instance.PlayerPlayDeathVFXHandler;
+            }     
         }
     }
 
@@ -111,8 +115,6 @@ public class PlayerAnimationController : MonoBehaviour
         animator.SetBool("isRunning", playerMovement.IsRunning);
         animator.SetBool("isWalking", (speed.magnitude > 0f));
         animator.SetBool("isCrouching", playerMovement.IsSquatting); 
-
-
     }
 
     void LateUpdate()
