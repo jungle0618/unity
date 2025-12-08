@@ -4,7 +4,7 @@ using System;
 public class TargetAnimationController : MonoBehaviour
 {   
     [Header("Settings")]
-    public float Hurt2AnimationThreshold = 0.5f;
+    public float Hurt2AnimationThreshold = 1f;
     [Header("References")]
     [SerializeField] private Target target;
     [SerializeField] private Animator animator;
@@ -22,7 +22,10 @@ public class TargetAnimationController : MonoBehaviour
         StartMovingHandler = () => {animator.SetBool("isMoving", true);};
         StopMovingHandler = () => {animator.SetBool("isMoving", false);};
 
-        OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
+        OnHealthChangedHandler = (current, max) => {
+            animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
+            VFXManager.Instance.PlayBloodSplatKnifeVFXHandler(target.transform);
+        };
 
 
         if (target != null)

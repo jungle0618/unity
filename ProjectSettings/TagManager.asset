@@ -21,7 +21,7 @@ TagManager:
   - Player
   - Enemy
   - Floor
-  - 
+  - Cull VFX
   - 
   - 
   - 
@@ -75,3 +75,5 @@ TagManager:
     locked: 0
   m_RenderingLayers:
   - Default
+  - Cull VFX
+  - Dont Cull

@@ -11,6 +11,18 @@ public class VFXManager : MonoBehaviour
     public float fadeDelay = 0.2f;
     public float fadeDuration = 0.6f;
 
+    [Header("Muzzle Flash VFX Settings")]
+    public GameObject muzzleFlashVFXPrefab;
+    [SerializeField] private float offsetFromGun = 0.5f;
+
+    [Header("Blood Splat VFX Settings")]
+    [SerializeField] private ParticleSystem bloodSplatKnifeVFXPrefab;
+    
+    [Header("Bullet Impact VFX Settings")]
+    public float zOffset = -2f;
+    [SerializeField] private ParticleSystem bloodSplatGunVFXPrefab;
+    [SerializeField] private ParticleSystem objectHitVFXPrefab;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -39,6 +51,20 @@ public class VFXManager : MonoBehaviour
         mat.renderQueue = 3000;
     }
 
+    Transform FindDeepChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name)
+                return child;
+
+            Transform result = FindDeepChild(child, name);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+
     public void PlayDeathVFXHandler<TState>(BaseEntity<TState> entity) where TState : System.Enum
     {
         StartCoroutine(PlayDeathVFX(entity));
@@ -47,10 +73,10 @@ public class VFXManager : MonoBehaviour
     public void PlayerPlayDeathVFXHandler()
     {
         Player player = FindObjectOfType<Player>();
-        if (player != null)
-        {
-            StartCoroutine(PlayDeathVFX(player));
-        }
+        if (player == null)
+            return;
+
+        StartCoroutine(PlayDeathVFX(player));
     }
 
     private IEnumerator PlayDeathVFX<TState>(BaseEntity<TState> entity) where TState : System.Enum
@@ -114,5 +140,67 @@ public class VFXManager : MonoBehaviour
         }
 
         Destroy(clone);
+    }
+
+    public void PlayMuzzleFlashVFXHandler(GameObject attacker)
+    {
+        Transform gun = FindDeepChild(attacker.transform, "Gun");
+
+        if (gun == null)
+        {
+            Debug.LogWarning("Gun transform not found");
+            return;
+        }
+
+        GameObject muzzleFlash = Instantiate(muzzleFlashVFXPrefab, gun.position + gun.right * offsetFromGun, gun.rotation);
+        muzzleFlash.GetComponent<MuzzleFlashVFX>().StartCoroutine("PlayMuzzleFlashVFX");
+    }
+
+    public void PlayerPlayMuzzleFlashVFXHandler(Weapon weapon)
+    {
+        Player player = FindObjectOfType<Player>();
+        if (player == null)
+            return;
+        Transform gun = FindDeepChild(player.transform, "Gun");
+
+        if (gun == null)
+        {
+            Debug.LogWarning("Gun transform not found");
+            return;
+        }
+
+        GameObject muzzleFlash = Instantiate(muzzleFlashVFXPrefab, gun.position + gun.right * offsetFromGun, gun.rotation);
+        muzzleFlash.GetComponent<MuzzleFlashVFX>().StartCoroutine("PlayMuzzleFlashVFX");
+    }
+
+    public void PlayBloodSplatKnifeVFXHandler(Transform position)
+    {
+        PlayBloodSplatVFX(position.position, Vector3.zero, false);
+    }
+
+    private void PlayBloodSplatVFX(Vector3 position, Vector3 rotation, bool isGunshot)
+    {
+        ParticleSystem bloodSplatPrefab = isGunshot ? bloodSplatGunVFXPrefab : bloodSplatKnifeVFXPrefab;
+        ParticleSystem bloodSplatInstance = Instantiate(bloodSplatPrefab, position, Quaternion.Euler(rotation));
+        Debug.Log("Playing Blood Splat VFX at " + position);
+        bloodSplatInstance.Play();
+        Destroy(bloodSplatInstance.gameObject, bloodSplatInstance.main.duration + bloodSplatInstance.main.startLifetime.constantMax);
+    }
+    public void PlayBulletImpactVFXHandler(GameObject hitObject, Bullet bullet)
+    {
+        Vector3 position = new Vector3(bullet.transform.position.x, bullet.transform.position.y, bullet.transform.position.z + zOffset);
+        Vector3 direction = new Vector3(-bullet.Direction.x, -bullet.Direction.y, 0f);
+        Quaternion rotation = Quaternion.LookRotation(direction, Vector3.forward);
+        if (hitObject is IEntity)
+            PlayBloodSplatVFX(position, rotation.eulerAngles, true);
+        else
+            PlayBulletObjectHitVFX(position, rotation.eulerAngles);
+    }
+
+    private void PlayBulletObjectHitVFX(Vector3 position, Vector3 rotation)
+    {
+        ParticleSystem objectHitVFX = Instantiate(objectHitVFXPrefab, position, Quaternion.Euler(rotation));
+        objectHitVFX.Play();
+        Destroy(objectHitVFX.gameObject, objectHitVFX.main.duration + objectHitVFX.main.startLifetime.constantMax);
     }
 }

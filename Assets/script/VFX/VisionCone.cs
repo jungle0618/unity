@@ -5,6 +5,7 @@ public class VisionCone : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Player player;
+    [SerializeField] private LayerMask wallsLayer = -1;
 
     [Header("Spotlight Settings")]
     public float circleRadius = 5f; 
@@ -12,9 +13,12 @@ public class VisionCone : MonoBehaviour
     public float coneRange = 10f;
     public float featherDistance = 1f;
     public float featherAngle = 5f;
+    public float fadeSpeed = 2f;
+
+    private Dictionary<Renderer, float> currentAlphas = new Dictionary<Renderer, float>();
 
     private List<Material> originalMaterials = new List<Material>();
-    private List<SkinnedMeshRenderer> renderers = new List<SkinnedMeshRenderer>();
+    private List<Renderer> renderers = new List<Renderer>();
 
 
     private void MakeMaterialTransparent(Material mat)
@@ -36,7 +40,6 @@ public class VisionCone : MonoBehaviour
     {
         if (player == null)
             player = FindObjectOfType<Player>();
-
         Invoke(nameof(InitializeRenderers), 0.1f);
     }
 
@@ -52,26 +55,26 @@ public class VisionCone : MonoBehaviour
 
         foreach (var enemy in enemies)
         {   
-            SkinnedMeshRenderer[] skinnedRenderers = enemy.GetComponentsInChildren<SkinnedMeshRenderer>();
-            renderers.AddRange(skinnedRenderers);
-            foreach (var r in skinnedRenderers)
+            Renderer[] r1 = enemy.GetComponentsInChildren<Renderer>();
+            renderers.AddRange(r1);
+            foreach (var r in r1)
                 originalMaterials.AddRange(r.materials);
-            Debug.Log($"Renderer count: {renderers.Count}");
         }
 
         foreach (var target in targets)
         {
-            SkinnedMeshRenderer[] skinnedRenderers = target.GetComponentsInChildren<SkinnedMeshRenderer>();
-            renderers.AddRange(skinnedRenderers);
-            foreach (var r in skinnedRenderers)
+            Renderer[] r1 = target.GetComponentsInChildren<Renderer>();
+            renderers.AddRange(r1);
+            foreach (var r in r1)
                 originalMaterials.AddRange(r.materials);
         }
 
         foreach (var mat in originalMaterials)
             MakeMaterialTransparent(mat);
-
+        
+        foreach (var rend in renderers)
+            currentAlphas[rend] = 0f;
     }
-
 
     void Update()
     {
@@ -83,6 +86,7 @@ public class VisionCone : MonoBehaviour
         {
             Vector2 toEnemy = (Vector2)rend.transform.position - playerPos;
             float distance = toEnemy.magnitude;
+
 
             float angleToEnemy = Vector2.Angle(aimDir, toEnemy.normalized);
 
@@ -100,15 +104,30 @@ public class VisionCone : MonoBehaviour
                 alpha = 1f - Mathf.Clamp(distance - circleRadius, 0, featherDistance) / featherDistance;
             }
             
-            float circleFade = Mathf.Clamp01(1f - distance / circleRadius);
-
-
+            if (wallsLayer != -1)
+            {
+                RaycastHit2D hit = Physics2D.Raycast(
+                    playerPos,
+                    toEnemy.normalized,
+                    distance,
+                    wallsLayer
+                );
+                if (hit.collider != null && hit.collider.gameObject != rend.gameObject)
+                {
+                    alpha = 0f;
+                }
+            }
+            
+            float currentAlpha = currentAlphas[rend];
+            currentAlpha = Mathf.MoveTowards(currentAlpha, alpha, Time.deltaTime * fadeSpeed);
+            currentAlphas[rend] = currentAlpha;
+            
             foreach (var mat in rend.materials)
             {
                 if (mat.HasProperty("_Color"))
                 {
                     Color c = mat.color;
-                    c.a = alpha;
+                    c.a = currentAlpha;
                     mat.color = c;
                 }
             }

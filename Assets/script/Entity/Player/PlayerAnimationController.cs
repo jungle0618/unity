@@ -4,7 +4,7 @@ using System;
 public class PlayerAnimationController : MonoBehaviour
 {
     [Header("Settings")]
-    public float Hurt2AnimationThreshold = 0.5f;
+    public float Hurt2AnimationThreshold = 1f;
     [Header("References")]
     [SerializeField] private Player player;
     [SerializeField] private PlayerMovement playerMovement;
@@ -52,9 +52,15 @@ public class PlayerAnimationController : MonoBehaviour
             animator.SetInteger("weaponState", isMelee);
         };
 
-        OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
+        OnHealthChangedHandler = (current, max) => {
+            animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
+            VFXManager.Instance.PlayBloodSplatKnifeVFXHandler(player.transform);
+        };
         
-        OnWeaponAttackHandler = (weapon) => {animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");};
+        OnWeaponAttackHandler = (weapon) => {
+            if (weapon is RangedWeapon) VFXManager.Instance.PlayerPlayMuzzleFlashVFXHandler(weapon); 
+            animator.SetTrigger(weapon is RangedWeapon ? "Shoot" : "Slash");
+        };
         OnActionPerformedHandler = () => {animator.SetTrigger("Interact");};
 
         if (player != null)

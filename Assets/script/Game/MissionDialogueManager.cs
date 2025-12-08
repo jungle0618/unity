@@ -163,9 +163,13 @@ public class MissionDialogueManager : MonoBehaviour
         }
         
         isDialogueActive = true;
+        // 使用 dialogueId "mission_start" 啟用跳過功能
+        // 第一次：顯示所有對話
+        // 之後：只顯示最後一條對話
         dialogueUIManager.ShowDialogues(
             dialogueData.missionStartDialogues, 
             "", 
+            "mission_start", // 對話唯一 ID
             OnMissionStartDialogueComplete
         );
     }

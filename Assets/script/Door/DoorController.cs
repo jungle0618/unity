@@ -272,6 +272,9 @@ public class DoorController : MonoBehaviour
     /// <param name="startPosition">起始位置</param>
     private void RemoveConnectedDoorTiles(Vector3Int startPosition)
     {
+        // 觸發 3D 門動畫（如果存在）
+        Trigger3DDoorAnimation(startPosition);
+        
         // 使用深度優先搜索找到所有相連的門tile
         var visited = new System.Collections.Generic.HashSet<Vector3Int>();
         var stack = new System.Collections.Generic.Stack<Vector3Int>();
@@ -311,6 +314,51 @@ public class DoorController : MonoBehaviour
                     }
                 }
             }
+        }
+    }
+    
+    /// <summary>
+    /// 觸發對應位置的 3D 門動畫
+    /// </summary>
+    /// <param name="cellPosition">門的 Cell 位置</param>
+    private void Trigger3DDoorAnimation(Vector3Int cellPosition)
+    {
+        // 將 Cell 位置轉換為世界位置
+        Vector3 worldPosition = tilemap.GetCellCenterWorld(cellPosition);
+        
+        // 查找所有 3D 門視覺效果
+        Door3DVisual[] allDoor3DVisuals = FindObjectsByType<Door3DVisual>(FindObjectsSortMode.None);
+        
+        if (allDoor3DVisuals == null || allDoor3DVisuals.Length == 0)
+        {
+            Debug.Log("[DoorController] 沒有找到任何 3D 門視覺效果");
+            return;
+        }
+        
+        // 找到最近的 3D 門
+        Door3DVisual nearestDoor = null;
+        float nearestDistance = float.MaxValue;
+        
+        foreach (Door3DVisual doorVisual in allDoor3DVisuals)
+        {
+            float distance = Vector3.Distance(worldPosition, doorVisual.TilemapWorldPosition);
+            
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestDoor = doorVisual;
+            }
+        }
+        
+        // 如果找到最近的門，播放動畫
+        if (nearestDoor != null)
+        {
+            Debug.Log($"[DoorController] 觸發 3D 門動畫：{nearestDoor.gameObject.name}，距離：{nearestDistance}");
+            nearestDoor.PlayOpenAnimation();
+        }
+        else
+        {
+            Debug.Log($"[DoorController] 在範圍 {openDoorRange} 內沒有找到匹配的 3D 門");
         }
     }
     

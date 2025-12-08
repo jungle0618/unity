@@ -4,7 +4,7 @@ using System;
 public class EnemyAnimationController : MonoBehaviour
 {   
     [Header("Settings")]
-    public float Hurt2AnimationThreshold = 0.5f;
+    public float Hurt2AnimationThreshold = 1f;
     [Header("References")]
     [SerializeField] private Enemy enemy;
     [SerializeField] private Animator animator;
@@ -22,6 +22,12 @@ public class EnemyAnimationController : MonoBehaviour
 
     private Action<GameObject> OnAttackPerformedHandler;
 
+    private void toggleItemVisibility(GameObject item, bool visible)
+    {
+        foreach (var r in item.GetComponentsInChildren<Renderer>(true))
+            r.enabled = visible;
+    }
+
     public void OnEnable()
     {
         animator = GetComponent<Animator>();
@@ -31,10 +37,13 @@ public class EnemyAnimationController : MonoBehaviour
         StartMovingHandler = () => {Debug.Log($"{enemy.name}: Started Moving"); animator.SetBool("isMoving", true);};
         StopMovingHandler = () => {Debug.Log($"{enemy.name}: Stopped Moving"); animator.SetBool("isMoving", false);};
 
-        EquipItemHandler = () => {gun.SetActive(true); animator.SetInteger("weaponState", 1);};
-        UnequipItemHandler = () => {gun.SetActive(false); animator.SetInteger("weaponState", -1);};
+        EquipItemHandler = () => {toggleItemVisibility(gun, true); animator.SetInteger("weaponState", 1);};
+        UnequipItemHandler = () => {toggleItemVisibility(gun, false); animator.SetInteger("weaponState", -1);};
 
-        OnHealthChangedHandler = (current, max) => {animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");};
+        OnHealthChangedHandler = (current, max) => {
+            animator.SetTrigger((float)current/ (float)max < Hurt2AnimationThreshold ? "Hurt2" : "Hurt");
+            VFXManager.Instance.PlayBloodSplatKnifeVFXHandler(enemy.transform);
+        };
         OnAttackPerformedHandler = (attacker) => {animator.SetTrigger("Shoot");};
 
         if (enemy != null)
@@ -52,7 +61,7 @@ public class EnemyAnimationController : MonoBehaviour
             enemy.OnEnemyDied += VFXManager.Instance.PlayDeathVFXHandler;
         }
 
-        gun.SetActive(false);
+        toggleItemVisibility(gun, false);
     }
 
     public void Start()
@@ -61,6 +70,7 @@ public class EnemyAnimationController : MonoBehaviour
         {
             weapon = enemy.ItemHolder.CurrentWeapon;
             weapon.OnAttackPerformed += OnAttackPerformedHandler;
+            weapon.OnAttackPerformed += VFXManager.Instance.PlayMuzzleFlashVFXHandler;
         }
     }
 
@@ -84,6 +94,7 @@ public class EnemyAnimationController : MonoBehaviour
         if (weapon != null)
         {
             weapon.OnAttackPerformed -= OnAttackPerformedHandler;
+            weapon.OnAttackPerformed -= VFXManager.Instance.PlayMuzzleFlashVFXHandler;
         }
     }
 }

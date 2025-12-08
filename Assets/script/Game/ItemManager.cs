@@ -9,7 +9,7 @@ using UnityEditor;
 /// ItemManager 類別：管理場景中所有散落的物品
 /// 職責：載入物品資料、生成物品、處理撿取邏輯
 /// 參考 EnemyManager 的架構設計
-/// </summary>
+/// </summary> 
 [DefaultExecutionOrder(200)] // 在 GameManager (150) 之後執行
 public class ItemManager : MonoBehaviour
 {
