@@ -69,7 +69,7 @@ public class Bullet : MonoBehaviour
         // Perform raycast to check for collisions before moving
         // Important: Start raycast slightly ahead to avoid hitting self
         RaycastHit2D hit = Physics2D.Raycast(
-            currentPosition + _direction * 0.1f, // Start slightly ahead
+            currentPosition + _direction * 0.5f, // Start slightly ahead
             _direction, 
             moveDistance + raycastCheckDistance,
             collisionLayers
@@ -138,12 +138,10 @@ public class Bullet : MonoBehaviour
             else if (enemyAttacker != null)
             {
                 // Enemy 不能攻擊 Enemy（同類型），只銷毀子彈
-                return;
                 //Debug.Log($"[Bullet] Enemy bullet hit Enemy - no damage (Enemy cannot attack Enemy)");
             }
             else if (targetAttacker != null)
             {
-                return;
                 // Target 不能攻擊 Enemy，只銷毀子彈
                 //Debug.Log($"[Bullet] Target bullet hit Enemy - no damage (Target cannot attack Enemy)");
             }

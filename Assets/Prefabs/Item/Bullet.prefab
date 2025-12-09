@@ -284,7 +284,7 @@ MonoBehaviour:
   collisionLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  raycastCheckDistance: 0.5
+  raycastCheckDistance: 30
 --- !u!212 &291064971460593912
 SpriteRenderer:
   m_ObjectHideFlags: 0

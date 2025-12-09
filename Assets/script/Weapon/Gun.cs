@@ -18,6 +18,12 @@ public class Gun : RangedWeapon
     [Header("Visual Effects")]
     [SerializeField] private ParticleSystem muzzleFlash; // Optional: muzzle flash effect
 
+    [Header("Base Jitter Settings")]
+    [Tooltip("是否啟用射擊時的基礎抖動")]
+    [SerializeField] private bool enableBaseJitter = true;
+    [Tooltip("最大基礎抖動角度（度）")]
+    [SerializeField] private float maxBaseJitterAngle = 2f;
+
     [Header("Movement Jitter (Player Only)")]
     [Tooltip("是否啟用移動時的射擊抖動")]
     [SerializeField] private bool enableMovementJitter = true;
@@ -50,10 +56,16 @@ public class Gun : RangedWeapon
         // Get shooting direction from gun's rotation
         Vector2 shootDirection = transform.right; // Gun should be rotated to face target
 
+        // Apply base jitter
+        if (enableBaseJitter && attacker != null)
+        {
+            ApplyMovementJitter(shootDirection, attacker, maxBaseJitterAngle);
+        }
+    
         // Apply movement jitter if player is moving (only for players, not enemies)
         if (enableMovementJitter && !IsEquippedByEnemy() && attacker != null)
         {
-            shootDirection = ApplyMovementJitter(shootDirection, attacker);
+            shootDirection = ApplyMovementJitter(shootDirection, attacker, maxJitterAngle);
         }
 
         // Spawn bullet
@@ -177,7 +189,7 @@ public class Gun : RangedWeapon
     /// 應用移動抖動到射擊方向
     /// 當玩家移動時，子彈會有輕微的隨機偏移
     /// </summary>
-    private Vector2 ApplyMovementJitter(Vector2 originalDirection, GameObject attacker)
+    private Vector2 ApplyMovementJitter(Vector2 originalDirection, GameObject attacker, float jitterAmount)
     {
         // 獲取玩家的移動速度
         Rigidbody2D rb = attacker.GetComponent<Rigidbody2D>();
@@ -192,7 +204,7 @@ public class Gun : RangedWeapon
         }
 
         // 計算抖動角度（直接使用最大抖動角度範圍）
-        float jitterAngle = Random.Range(-maxJitterAngle, maxJitterAngle);
+        float jitterAngle = Random.Range(-jitterAmount, jitterAmount);
 
         // 將原始方向旋轉一個隨機角度
         float currentAngle = Mathf.Atan2(originalDirection.y, originalDirection.x) * Mathf.Rad2Deg;

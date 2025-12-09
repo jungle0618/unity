@@ -416,6 +416,9 @@ public class EnemyAIHandler : MonoBehaviour
                 float distanceToTarget = Vector2.Distance(cachedPosition, target.position);
                 if (distanceToTarget <= effectiveAttackRange && enemy != null)
                 {
+                    currentMoveTarget = transform.position; // 停止移動以攻擊
+                    currentMoveType = MoveType.Chase;
+                    shouldMove = true;
                     enemy.TryAttackPlayer(target);
                 }
             }
@@ -459,6 +462,10 @@ public class EnemyAIHandler : MonoBehaviour
                 enemyMovement?.ClearPath();
                 
                 Debug.Log($"{gameObject.name}: 搜索時看到玩家，更新目標位置到 {lastSeenPlayerPosition}");
+
+                //  Seen player, enter chase state
+                enemyStateMachine?.ChangeState(EnemyState.Chase);
+                shouldMove = true;
             }
         }
 

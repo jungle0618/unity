@@ -419,7 +419,7 @@ public class DangerousManager : MonoBehaviour
             // 增加速度 = 每秒增加 5 * (視野半徑 - 距離)
             if (bestEnemyViewRangeMinusDistance > 0f)
             {
-                float increaseRatePerSecond = 5f * bestEnemyViewRangeMinusDistance;
+                float increaseRatePerSecond = 20f * bestEnemyViewRangeMinusDistance;
                 
                 dangerFloatAccumulator += increaseRatePerSecond * deltaTime;
                 int deltaInt = 0;
