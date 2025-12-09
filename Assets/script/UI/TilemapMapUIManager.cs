@@ -553,7 +553,7 @@ public class TilemapMapUIManager : MonoBehaviour
         // 確保其他 Tilemap 的渲染器啟用（walls, objects, door）
         // 注意：fogTilemap 和 mainTilemap (tilemap) 不添加永久渲染器
         // 它們只在 GenerateMapImage() 時臨時添加渲染器
-        EnsureTilemapRenderer(wallsTilemap, 0);
+        // EnsureTilemapRenderer(wallsTilemap, 0);
         EnsureTilemapRenderer(objectsTilemap, 1);
         EnsureTilemapRenderer(doorTilemap, 2);
         
