@@ -34,7 +34,21 @@ public class VFXManager : MonoBehaviour
             return;
         }
         Instance = this;
-        DontDestroyOnLoad(gameObject); // optional if you want it persistent
+
+        if (screenShakeVFX == null)
+        {
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null)
+            {
+                Debug.LogWarning("Main Camera not found for ScreenShakeVFX.");
+                return;
+            }
+            screenShakeVFX = mainCamera.GetComponent<ScreenShakeVFX>();
+            if (screenShakeVFX == null)
+            {
+                Debug.LogWarning("ScreenShakeVFX component not found on Main Camera.");
+            }
+        }
     }
 
 
@@ -209,6 +223,11 @@ public class VFXManager : MonoBehaviour
 
     public void PlayScreenShakeVFXHandler()
     {
+        if (screenShakeVFX == null)
+        {
+            Debug.LogWarning("ScreenShakeVFX reference is missing.");
+            return;
+        }
         screenShakeVFX.Shake();
     }
 }
