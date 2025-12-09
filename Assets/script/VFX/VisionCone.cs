@@ -6,6 +6,7 @@ public class VisionCone : MonoBehaviour
     [Header("References")]
     [SerializeField] private Player player;
     [SerializeField] private LayerMask wallsLayer = -1;
+    [SerializeField] protected LayerMask objectsLayer = -1;
 
     [Header("Spotlight Settings")]
     public float circleRadius = 5f; 
@@ -75,6 +76,18 @@ public class VisionCone : MonoBehaviour
         foreach (var rend in renderers)
             currentAlphas[rend] = 0f;
     }
+    private LayerMask GetObstacleLayerMask()
+    {
+        LayerMask baseMask = wallsLayer; // 獲取 walls layer        
+        // 如果玩家正在蹲下，添加 objects layer
+        if (player != null && player.IsSquatting)
+        {
+            return baseMask | objectsLayer;
+        }
+        
+        // 玩家站立時，只使用 walls layer
+        return baseMask;
+    }
 
     void Update()
     {
@@ -109,18 +122,22 @@ public class VisionCone : MonoBehaviour
                 alpha = 1f - Mathf.Clamp(distance - circleRadius, 0, featherDistance) / featherDistance;
             }
             
-            if (wallsLayer != -1)
+            if (wallsLayer != -1 && objectsLayer != -1)
             {
                 RaycastHit2D hit = Physics2D.Raycast(
                     playerPos,
                     toEnemy.normalized,
                     distance,
-                    wallsLayer
+                    GetObstacleLayerMask()
                 );
                 if (hit.collider != null && hit.collider.gameObject != rend.gameObject)
                 {
                     alpha = 0f;
                 }
+            }
+            else
+            {
+                Debug.LogWarning("WallsLayer or ObjectsLayer is not set properly in VisionCone.");
             }
             
             float currentAlpha = currentAlphas[rend];

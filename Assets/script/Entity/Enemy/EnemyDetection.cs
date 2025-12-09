@@ -374,7 +374,7 @@ public class EnemyDetection : BaseDetection
     /// </summary>
     private float GetNearViewRange()
     {
-        return enemy != null ? enemy.NearViewRange : 1.5f; // 默認值
+        return enemy != null ? enemy.NearViewRange : 2f; // 默認值
     }
 
     /// <summary>
