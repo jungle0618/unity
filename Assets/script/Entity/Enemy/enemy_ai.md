@@ -1,314 +1,638 @@
-# 警衛（Enemy）AI 系統
+# Enemy AI 系統文檔
 
-## 狀態機（State Machine）
+## 📋 目錄
 
-警衛使用有限狀態機控制行為，共有 6 種狀態：
+1. [系統概述](#系統概述)
+2. [組件架構](#組件架構)
+3. [狀態機系統](#狀態機系統)
+4. [AI 決策流程](#ai-決策流程)
+5. [各狀態詳細說明](#各狀態詳細說明)
+6. [區域系統整合](#區域系統整合)
+7. [攻擊系統](#攻擊系統)
+8. [性能優化](#性能優化)
+9. [API 參考](#api-參考)
+
+---
+
+## 系統概述
+
+Enemy AI 系統是一個基於狀態機的智能敵人行為系統，負責處理敵人的巡邏、警戒、追擊、搜索和返回等行為。系統採用組件化設計，將 AI 邏輯、移動、偵測、攻擊等功能分離，便於維護和擴展。
+
+### 核心特性
+
+- **狀態機驅動**：使用 `EnemyStateMachine` 管理敵人的狀態轉換
+- **智能決策**：`EnemyAIHandler` 負責所有 AI 決策邏輯
+- **區域感知**：整合 Guard Area 和 Safe Area 系統，根據玩家位置和狀態調整行為
+- **性能優化**：使用間隔更新和攝影機剔除減少 CPU 負載
+- **路徑規劃**：支援直接追擊和路徑規劃兩種移動方式
+
+---
+
+## 組件架構
+
+### 核心組件
+
+```
+Enemy (BaseEntity)
+├── EnemyStateMachine      # 狀態機（運行時創建）
+├── EnemyAIHandler         # AI 決策邏輯
+├── EnemyMovement          # 移動控制
+├── EnemyDetection         # 偵測系統
+├── EnemyVisualizer        # 視覺化
+├── EnemyAttackController  # 攻擊控制（可選）
+├── EntityHealth           # 血量管理
+└── EntityStats            # 屬性管理
+```
+
+### 組件職責
+
+| 組件 | 職責 |
+|------|------|
+| **Enemy** | 主控制器，整合所有組件，提供對外接口 |
+| **EnemyStateMachine** | 管理狀態轉換，處理狀態進入/退出邏輯 |
+| **EnemyAIHandler** | 執行 AI 決策，處理各狀態的行為邏輯 |
+| **EnemyMovement** | 處理移動邏輯，支援巡邏、追擊、路徑規劃 |
+| **EnemyDetection** | 視野偵測，判斷是否看到玩家 |
+| **EnemyAttackController** | 攻擊邏輯，處理攻擊冷卻和範圍檢查 |
+| **EnemyVisualizer** | 視覺化顯示，包括視野範圍和血量條 |
+
+---
+
+## 狀態機系統
+
+### 狀態定義
+
+```csharp
+public enum EnemyState
+{
+    Patrol,     // 巡邏：沿著巡邏點移動
+    Alert,      // 警戒：看到玩家但未追擊（等待或判斷是否追擊）
+    Chase,      // 追擊：主動追擊玩家
+    Search,     // 搜索：到最後看到玩家的位置搜索
+    Return,     // 返回：返回巡邏起點
+    Dead        // 死亡：敵人已死亡
+}
+```
+
+### 狀態轉換圖
+
+```
+[Patrol] ──(看到玩家)──> [Alert]
+   ↑                          │
+   │                          │
+   │                    (應該追擊)──> [Chase]
+   │                          │          │
+   │                    (警戒時間到)      │
+   │                          │          │
+   │                          ↓          │
+   │                      [Patrol]       │
+   │                                     │
+   │                          (失去視線) │
+   │                                     │
+   │                          (超出追擊範圍) │
+   │                                     │
+   └──(返回起點)──<──[Return] <─────────┘
+         │
+         │
+   (到達起點)
+         │
+         ↓
+   [Patrol]
+
+[Chase] ──(失去視線)──> [Search]
+   ↑                          │
+   │                          │
+   │                    (搜索時間到)──> [Alert]
+   │                          │
+   │                    (重新看到玩家)──> [Chase]
+   │
+   └──(卡住/撞牆)──────────────┘
+```
+
+### 狀態轉換條件
+
+| 從狀態 | 到狀態 | 條件 |
+|--------|--------|------|
+| Patrol | Alert | 看到玩家 |
+| Alert | Chase | 看到玩家 **且** 應該追擊（區域判斷） |
+| Alert | Patrol | 警戒時間結束 |
+| Chase | Search | 失去玩家視線 |
+| Chase | Return | 玩家超出追擊範圍 |
+| Chase | Alert | 看到玩家但不應該追擊（Safe Area + 空手） |
+| Search | Chase | 重新看到玩家 |
+| Search | Alert | 搜索時間結束 |
+| Search | Return | 超出追擊範圍 |
+| Return | Patrol | 到達返回目標 |
+| Return | Chase | 看到玩家 |
+
+---
+
+## AI 決策流程
+
+### 更新流程
+
+```
+FixedUpdate (Enemy)
+    │
+    ├──> UpdateCachedData()          # 更新快取數據（位置、方向、是否看到玩家）
+    │
+    └──> aiHandler.UpdateAIDecision() # AI 決策更新（間隔更新）
+            │
+            ├──> 更新 Alert Timer
+            │
+            └──> 根據當前狀態執行對應處理
+                    │
+                    ├──> HandlePatrolState()
+                    ├──> HandleAlertState()
+                    ├──> HandleChaseState()
+                    ├──> HandleSearchState()
+                    └──> HandleReturnState()
+
+Update (Enemy)
+    │
+    └──> aiHandler.ExecuteMovement() # 執行移動（每幀更新，確保流暢）
+```
+
+### 更新頻率
+
+- **AI 決策更新**：`aiUpdateInterval`（預設 0.15 秒，約 6-7 FPS）
+- **移動執行**：每幀更新（確保移動流暢）
+- **快取數據更新**：`CACHE_UPDATE_INTERVAL`（預設 0.1 秒）
+
+---
+
+## 各狀態詳細說明
 
 ### 1. Patrol（巡邏）
-- **行為**：沿著預設的巡邏點循環移動
-- **視野**：跟隨移動方向
-- **轉換條件**：
-  - 看到玩家 → `Alert`
-  - 聽到槍聲 → `Alert`（進入警戒狀態）
+
+**行為**：
+- 沿著設定的巡邏點循環移動
+- 如果沒有巡邏點，使用 `EnemyMovement.PerformPatrol()`
+- 視野方向跟隨移動方向
+
+**狀態轉換**：
+- 看到玩家 → `Alert`
+
+**移動方式**：
+```csharp
+enemyMovement.MoveAlongLocations(patrolLocations, currentPatrolIndex);
+```
+
+---
 
 ### 2. Alert（警戒）
-- **行為**：繼續巡邏路線，但保持警戒
-- **持續時間**：預設 2 秒（`alertTime`）
-- **計時器重置**：每次進入 Alert 狀態時，計時器會重置為 `alertTime`
-- **轉換條件**：
-  - 看到玩家 → `Chase`
-  - 警戒時間結束 → `Patrol`
-  - 聽到槍聲 → `Search`（前往槍聲位置）
+
+**行為**：
+- 看到玩家但尚未決定是否追擊
+- 繼續沿著巡邏點移動（如果有的話）
+- 更新警戒計時器
+
+**狀態轉換**：
+- 看到玩家 **且** 應該追擊 → `Chase`
+- 警戒時間結束 → `Patrol`
+
+**區域判斷**：
+- **Guard Area**：始終追擊
+- **Safe Area**：
+  - 玩家持有武器 → 追擊
+  - 危險等級觸發 → 追擊
+  - 玩家空手且危險等級安全 → 不追擊（保持在 Alert）
+
+---
 
 ### 3. Chase（追擊）
-- **行為**：
-  - 直接追向玩家（如果無障礙物）
-  - 使用路徑規劃繞過障礙物
-  - 在攻擊範圍內嘗試攻擊
-- **視野**：朝向玩家
-- **武器**：自動瞄準玩家
-- **轉換條件**：
-  - 失去視線且有最後位置 → `Search`
-  - 失去視線且無最後位置 → `Alert`
-  - 超出追擊範圍 → `Return`
-  - 卡住或撞牆 → `Search`
-  - 聽到槍聲 → 更新玩家位置（繼續追擊狀態）
+
+**行為**：
+- 直接追擊玩家位置
+- 更新武器方向朝向玩家
+- 更新視野方向朝向玩家
+- 在攻擊範圍內嘗試攻擊
+
+**狀態轉換**：
+- 失去玩家視線 → `Search`
+- 玩家超出追擊範圍 → `Return`
+- 卡住/撞牆 → `Search`
+- 看到玩家但不應該追擊 → `Alert`
+
+**移動方式**：
+```csharp
+enemyMovement.ChaseTarget(playerPosition);
+```
+
+**攻擊檢查**：
+- 使用 `GetEffectiveAttackRange()` 獲取有效攻擊範圍
+- 支援近戰武器和遠程武器（槍械）的不同攻擊範圍
+- 在攻擊範圍內調用 `enemy.TryAttackPlayer()`
+
+---
 
 ### 4. Search（搜索）
-- **行為**：前往玩家最後出現的位置
-- **視野**：朝向移動路徑的下一個點
-- **搜索時間**：從最後看到玩家的時間（`lastSeenTime`）開始計算，預設 3 秒（`searchTime`）
-- **轉換條件**：
-  - 在前往搜索位置途中看到玩家 → 更新目標位置，繼續前往新位置
-  - 到達搜索位置後重新看到玩家 → `Chase`
-  - 到達搜索位置且搜索時間結束（從最後看到玩家開始計算，3 秒）→ `Alert`
-  - 超出追擊範圍 → `Return`
-  - 聽到槍聲 → 更新目標位置並繼續 `Search`
+
+**行為**：
+- 移動到最後看到玩家的位置
+- 到達搜索位置後，在該位置停留一段時間（`searchTime`，預設 3 秒）
+- 如果重新看到玩家，立即轉到追擊狀態
+
+**狀態轉換**：
+- 重新看到玩家 → `Chase`
+- 搜索時間結束 → `Alert`
+- 超出追擊範圍 → `Return`
+
+**移動方式**：
+```csharp
+enemyMovement.ChaseTargetWithRotation(lastSeenPosition, enemyDetection);
+```
+
+**特殊邏輯**：
+- 如果搜索時重新看到玩家，更新最後看到的位置並清除路徑，強制重新計算路徑
+
+---
 
 ### 5. Return（返回）
-- **行為**：返回第一個巡邏點（出生點）
-- **轉換條件**：
-  - 到達出生點 → `Patrol`
-  - 看到玩家 → `Chase`（如果看到玩家，立即追擊）
-  - 聽到槍聲 → `Search`（前往槍聲位置）
+
+**行為**：
+- 使用路徑規劃返回第一個巡邏點（或起始位置）
+- 如果看到玩家，立即轉到追擊狀態
+
+**狀態轉換**：
+- 看到玩家 → `Chase`
+- 到達返回目標 → `Patrol`（重置巡邏索引為 0）
+
+**移動方式**：
+```csharp
+enemyMovement.MoveTowardsWithPathfinding(returnTarget, 1f);
+```
+
+---
 
 ### 6. Dead（死亡）
-- **行為**：停止所有移動和 AI 邏輯
-- **最終狀態**：不可逆
 
-## 偵測系統
+**行為**：
+- 停止所有移動
+- 禁用 GameObject
+- 觸發死亡事件
 
-### 視野偵測
-- **視野範圍**：`viewRange`（預設 8 單位）
-- **視野角度**：`viewAngle`（預設 90 度）
-- **追擊範圍**：`chaseRange`（預設 15 單位）
+**狀態轉換**：
+- 無（終止狀態）
 
-### 遮擋判斷
-- 玩家**站立**時：只有牆壁（Walls）會遮擋視線
-- 玩家**蹲下**時：牆壁 + 物件（Objects）都會遮擋視線
+---
 
-### 距離計算
-使用平方距離優化性能（避免開方運算）
+## 區域系統整合
 
-## 移動系統
+### Guard Area（守衛區域）
 
-### 移動模式
-1. **直線追擊**：無障礙物時直接朝玩家移動
-2. **路徑規劃**：有障礙物時使用 Greedy Pathfinding 繞過
-3. **卡住檢測**：如果卡住或撞牆會自動切換到搜索狀態
+**行為**：
+- 敵人始終追擊玩家
+- 敵人始終可以攻擊玩家
 
-### 速度設定
-- 基礎速度：`speed`（預設 2）
-- 追擊速度：`speed × chaseSpeedMultiplier`（預設 1.5 倍）
+**判斷邏輯**：
+```csharp
+if (AreaManager.Instance.IsInGuardArea(playerPosition))
+{
+    return true; // 追擊/攻擊
+}
+```
+
+---
+
+### Safe Area（安全區域）
+
+**行為**：
+- 只有在特定條件下才追擊/攻擊玩家
+
+**追擊條件**：
+- 玩家持有武器 **OR**
+- 危險等級被觸發（`DangerLevel > Safe`）
+
+**判斷邏輯**：
+```csharp
+bool playerHasWeapon = playerItemHolder.IsCurrentItemWeapon;
+bool isDangerTriggered = dangerManager.CurrentDangerLevelType != DangerLevel.Safe;
+bool shouldChase = playerHasWeapon || isDangerTriggered;
+```
+
+**應用場景**：
+- `EnemyAIHandler.ShouldChasePlayer()` - 判斷是否應該追擊
+- `EnemyAttackController.ShouldAttackPlayer()` - 判斷是否應該攻擊
+
+---
+
+### 系統開關
+
+可以通過 `GameSettings.UseGuardAreaSystem` 來啟用/停用區域系統：
+
+```csharp
+if (!GameSettings.Instance.UseGuardAreaSystem)
+{
+    return true; // 原始行為：總是追擊/攻擊
+}
+```
+
+---
 
 ## 攻擊系統
 
-### 攻擊條件
-1. 處於 `Chase` 狀態
-2. 玩家在攻擊偵測範圍內（`attackDetectionRange`，預設 3 單位）
-3. 攻擊冷卻完成（`attackCooldown`，預設 1 秒）
-4. 擁有可用武器且武器可以攻擊
-
 ### 攻擊流程
-1. 武器朝向玩家
-2. 呼叫 `ItemHolder.TryAttack()`
-3. 由武器執行實際攻擊邏輯
-
-**注意**：`attackDetectionRange` 是觸發攻擊嘗試的距離，實際攻擊範圍由武器本身決定（近戰或遠程武器有不同的攻擊範圍）。
-
-## 槍聲警報系統
-
-### 觸發條件
-玩家開槍時，`alertRange` 範圍內的所有敵人會被通知
-
-### 敵人反應
-- `Patrol` → `Alert`（進入警戒）
-- `Alert` / `Return` → `Search`（前往槍聲位置）
-- `Chase` / `Search` → 更新玩家位置（繼續當前狀態）
-
-### 槍聲反應邏輯
-當敵人聽到槍聲時：
-1. 記錄玩家位置作為最後看到的位置
-2. 根據當前狀態決定行為：
-   - 如果正在巡邏，進入警戒狀態
-   - 如果正在警戒或返回，切換到搜索狀態前往槍聲位置
-   - 如果正在追擊或搜索，更新目標位置繼續當前行為
-
-## AI 更新頻率
-
-### 性能優化
-- **AI 決策**：每 0.15 秒更新一次（`aiUpdateInterval`）
-- **移動執行**：每幀更新（`FixedUpdate`）
-- **快取更新**：每 0.1 秒更新位置和偵測資訊（`CACHE_UPDATE_INTERVAL`）
-
-這種分離確保移動流暢，同時降低 CPU 負載。
-
-## 攝影機剔除系統（Camera Culling）
-
-### 概述
-攝影機剔除是此遊戲的核心性能優化功能。由於遊戲與攝影機範圍密切相關，系統會根據敵人是否在攝影機視野內來決定是否執行 AI 邏輯。
-
-### 工作原理
-
-1. **視野檢查**：
-   - 系統會將敵人的世界座標轉換為螢幕座標
-   - 檢查敵人是否在攝影機視野範圍內（包含邊距 `cameraCullMargin`）
-   - 邊距預設為 2 單位，避免敵人在螢幕邊緣時頻繁切換
-
-2. **視野外判斷條件**：
-   - X 座標 < -邊距 或 > 螢幕寬度 + 邊距
-   - Y 座標 < -邊距 或 > 螢幕高度 + 邊距
-   - Z 座標 < 0（在攝影機後方）
-
-### 視野外行為限制
-
-當敵人**不在 `Chase` 或 `Search` 狀態**，且**不在攝影機範圍內**時：
-
-#### ❌ 不會執行的行為
-- **不進行偵測**（`detection`）：不會執行視野偵測、距離計算等偵測邏輯
-- **不會改變狀態**（`state`）：狀態機不會更新，不會觸發狀態轉換
-- **不會對外在事物做出反應**：
-  - 不會對槍聲警報做出反應
-  - 不會對玩家位置變化做出反應
-  - 不會對其他外部事件做出反應
-
-#### ✅ 仍會執行的行為
-- **移動**：敵人仍會繼續移動（巡邏、返回等移動邏輯仍會執行）
-  - 這確保敵人在視野外時仍能正常移動到需要的位置
-  - 移動邏輯在 `FixedUpdate` 中執行，不受攝影機剔除影響
-
-### 例外情況：Chase 和 Search 狀態
-
-當敵人處於 `Chase`（追擊）或 `Search`（搜索）狀態時，**即使不在攝影機視野內**，仍會：
-
-- ✅ 繼續執行偵測邏輯
-- ✅ 繼續更新狀態機
-- ✅ 繼續對外在事件做出反應
-
-**原因**：這兩個狀態是重要的追擊行為，即使暫時離開視野，也需要持續追蹤玩家，確保遊戲邏輯的連續性。
-
-### 性能效益
-
-1. **大幅減少 CPU 負載**：
-   - 視野外的敵人不會執行昂貴的偵測計算
-   - 減少不必要的狀態機更新
-   - 特別在大型場景中有顯著性能提升
-
-2. **維持遊戲體驗**：
-   - 重要狀態（Chase/Search）仍會正常運作
-   - 移動邏輯不受影響，確保敵人在視野外時仍能正常移動
-
-3. **與遊戲機制整合**：
-   - 符合遊戲與攝影機範圍密切相關的設計理念
-   - 玩家只能看到視野內的敵人行為，視野外的敵人可以暫時「休眠」
-
-### 參數設定
-
-- **`enableCameraCulling`**：啟用/禁用攝影機剔除（預設：`true`）
-- **`cameraCullMargin`**：攝影機剔除邊距（預設：`2` 單位）
-
-### 實現邏輯
 
 ```
-如果 (啟用攝影機剔除 且 敵人在攝影機視野外):
-    如果 (當前狀態 == Chase 或 Search):
-        繼續執行偵測和狀態更新
-    否則:
-        跳過偵測和狀態更新
-        但繼續執行移動邏輯
-否則:
-    正常執行所有邏輯
-```
-
-## 狀態轉換圖
-
-### 基本狀態轉換
-```
-     ┌──────────┐
-     │  Patrol  │ ◄────┐
-     └────┬─────┘      │
-          │看到玩家      │
-          │聽到槍聲      │警戒結束
-          ▼            │
-     ┌──────────┐      │
-     │  Alert   │──────┘
-     └────┬─────┘
-          │看到玩家
-          │聽到槍聲→Search
-          ▼
-     ┌──────────┐
-     │  Chase   │ ◄────┐
-     └────┬─────┘      │
-          │失去視線      │重新看到
-          │卡住          │
-          ▼            │
-     ┌──────────┐      │
-     │  Search  │──────┘
-     └────┬─────┘
-          │超出範圍
-          │看到玩家→Chase
-          ▼
-     ┌──────────┐
-     │  Return  │
-     └────┬─────┘
-          │到達出生點
-          │看到玩家→Chase
-          │聽到槍聲→Search
-          ▼
-     ┌──────────┐
-     │  Patrol  │
-     └──────────┘
-```
-
-### 槍聲反應路徑
-```
-槍聲觸發
+Chase State
     │
-    ├─ Patrol → Alert
-    ├─ Alert → Search
-    ├─ Return → Search
-    ├─ Chase → 更新位置（繼續 Chase）
-    └─ Search → 更新位置（繼續 Search）
+    ├──> 檢查距離 <= GetEffectiveAttackRange()
+    │
+    ├──> enemy.TryAttackPlayer(playerTransform)
+    │         │
+    │         ├──> EnemyAttackController.TryAttackPlayer()
+    │         │         │
+    │         │         ├──> 檢查 ShouldAttackPlayer() (區域判斷)
+    │         │         ├──> 檢查攻擊冷卻
+    │         │         ├──> 檢查距離
+    │         │         ├──> 更新武器方向
+    │         │         └──> itemHolder.TryAttack()
+    │         │
+    │         └──> 返回攻擊是否成功
+    │
+    └──> 更新攻擊冷卻計時器
 ```
 
-## 狀態轉換優先級
+### 攻擊範圍
 
-當多個轉換條件同時滿足時，優先級如下：
+**有效攻擊範圍**（`GetEffectiveAttackRange()`）：
+- 如果啟用 `useWeaponAttackRange`：
+  - **遠程武器**（RangedWeapon）：使用 `weapon.AttackRange`
+  - **近戰武器**（MeleeWeapon）：使用 `weapon.AttackRange`
+- 否則：使用 `attackDetectionRange`（預設 3f）
 
-1. **最高優先級**：看到玩家（在大部分狀態下會立即轉換）
-2. **高優先級**：聽到槍聲（根據當前狀態決定反應）
-3. **中優先級**：失去視線、卡住、超出範圍
-4. **低優先級**：時間相關（警戒時間結束、搜索時間結束）
+### 攻擊冷卻
 
-## 改進建議與擴展
+- 預設冷卻時間：`attackCooldown`（可在 Inspector 中設定）
+- 每次攻擊成功後更新 `lastAttackTime`
 
-### 可能的擴展狀態
+---
 
-#### Guard（站崗）
-- **行為**：在固定位置停留，360 度旋轉視野
-- **用途**：保護重要區域的警衛
-- **轉換條件**：
-  - 看到玩家 → `Alert` 或 `Chase`
-  - 聽到槍聲 → `Alert`
+## 性能優化
 
-#### Investigate（調查）
-- **行為**：前往可疑位置（如玩家最後出現的位置）進行調查
-- **用途**：更智能的搜索行為，可以檢查多個可疑點
-- **轉換條件**：
-  - 看到玩家 → `Chase`
-  - 調查完成 → `Alert` 或 `Patrol`
-  - 聽到槍聲 → 更新調查目標
+### 1. 間隔更新
 
-### 性能優化建議
+**AI 決策更新**：
+- 使用 `aiUpdateInterval`（預設 0.15 秒）控制更新頻率
+- 在 `Enemy.FixedUpdate()` 中檢查時間間隔
 
-1. **狀態機更新頻率調整**：
-   - 可以根據敵人距離玩家的遠近動態調整更新頻率
-   - 遠處的敵人使用更低的更新頻率（如 0.3 秒）
-   - 近處的敵人使用標準更新頻率（0.15 秒）
+**快取數據更新**：
+- 使用 `CACHE_UPDATE_INTERVAL`（預設 0.1 秒）
+- 減少重複計算位置、方向等數據
 
-2. **視野偵測優化**：
-   - 已經實現了攝影機剔除（`cameraCulling`）
-   - 可以進一步優化：只在需要時進行視線檢測
+### 2. 攝影機剔除
 
-3. **路徑規劃優化**：
-   - 可以快取常用路徑
-   - 使用更高效的尋路算法（如 A*）
+**條件**：
+- 敵人不在攝影機範圍內
+- **且** 不在 Chase 或 Search 狀態
 
-### 邏輯改進建議
+**實現**：
+```csharp
+if (!enemyDetection.ShouldUpdateAI())
+{
+    return; // 跳過 AI 更新
+}
+```
 
-1. **協同作戰**：
-   - 當一個警衛發現玩家時，可以通知附近的警衛
-   - 多個警衛可以協同追擊
+**注意**：移動邏輯仍會執行，確保敵人能繼續移動。
 
-2. **警戒區域**：
-   - 警衛可以設定警戒區域，離開區域後會停止追擊
-   - 可以在警戒區域內設置優先巡邏路線
+### 3. 快取數據
 
-3. **攻擊策略**：
-   - 可以根據武器類型調整攻擊距離
-   - 近戰武器應該更積極地接近玩家
-   - 遠程武器可以保持距離
+**快取的數據**：
+- `cachedPosition` - 敵人位置
+- `cachedDirectionToPlayer` - 到玩家的方向
+- `cachedCanSeePlayer` - 是否看到玩家
 
-4. **搜索模式改進**：
-   - 可以實現多點搜索（檢查多個可疑位置）
-   - 可以根據玩家移動方向預測下一步位置
+**更新時機**：
+- 在 `Enemy.UpdateCachedData()` 中定期更新
+- 傳遞給 `EnemyAIHandler.UpdateCachedData()` 供 AI 使用
+
+---
+
+## API 參考
+
+### Enemy 類
+
+#### 初始化
+```csharp
+public void Initialize(Transform playerTarget)
+```
+初始化敵人，設定目標並開始 AI。
+
+#### 狀態控制
+```csharp
+public void ForceChangeState(EnemyState newState)
+```
+強制改變敵人狀態（用於調試或特殊情況）。
+
+#### 攻擊
+```csharp
+public bool TryAttackPlayer(Transform playerTransform)
+```
+嘗試攻擊玩家（檢查距離、冷卻等）。
+
+#### 屬性查詢
+```csharp
+public float GetEffectiveAttackRange()
+```
+獲取有效攻擊範圍（根據武器類型自動調整）。
+
+---
+
+### EnemyAIHandler 類
+
+#### 初始化
+```csharp
+public void Initialize(float attackRange, float searchTime)
+```
+初始化 AI Handler，設定攻擊範圍和搜索時間。
+
+#### 巡邏點管理
+```csharp
+public void SetPatrolLocations(Vector3[] locations)
+public Vector3[] GetPatrolLocations()
+public int GetCurrentPatrolIndex()
+```
+設定和獲取巡邏點。
+
+#### 數據更新
+```csharp
+public void UpdateCachedData(Vector2 position, Vector2 directionToPlayer, bool canSeePlayer)
+```
+更新快取數據（由 Enemy 調用）。
+
+#### AI 更新
+```csharp
+public void UpdateAIDecision()
+```
+執行 AI 決策更新（間隔更新）。
+
+#### 移動執行
+```csharp
+public void ExecuteMovement()
+```
+執行移動（每幀更新，確保流暢）。
+
+---
+
+### EnemyStateMachine 類
+
+#### 狀態轉換
+```csharp
+public override void ChangeState(EnemyState newState)
+```
+改變狀態，觸發狀態進入/退出邏輯。
+
+#### 警戒計時器
+```csharp
+public void UpdateAlertTimer()
+public bool IsAlertTimeUp()
+```
+更新和檢查警戒計時器。
+
+---
+
+### EnemyAttackController 類
+
+#### 攻擊
+```csharp
+public bool TryAttackPlayer(Transform playerTransform)
+```
+嘗試攻擊玩家。
+
+#### 攻擊範圍
+```csharp
+public float GetEffectiveAttackRange()
+```
+獲取有效攻擊範圍。
+
+#### 攻擊冷卻
+```csharp
+public void SetAttackCooldown(float cooldownSeconds)
+```
+設定攻擊冷卻時間。
+
+---
+
+## 配置參數
+
+### Enemy Inspector 參數
+
+| 參數 | 類型 | 預設值 | 說明 |
+|------|------|--------|------|
+| `alertTime` | float | 2f | 警戒狀態持續時間（秒） |
+| `attackCooldown` | float | 0.5f | 攻擊冷卻時間（秒） |
+| `attackDetectionRange` | float | 3f | 攻擊偵測範圍 |
+| `useWeaponAttackRange` | bool | true | 是否使用武器的實際攻擊範圍 |
+| `chaseSpeedMultiplier` | float | 1.5f | 追擊速度倍數 |
+| `pickupRange` | float | 2f | 物品撿取範圍 |
+
+### EnemyAIHandler 初始化參數
+
+| 參數 | 類型 | 預設值 | 說明 |
+|------|------|--------|------|
+| `attackRange` | float | - | 攻擊範圍（從 Enemy.GetEffectiveAttackRange() 獲取） |
+| `searchTime` | float | 3f | 搜索狀態持續時間（秒） |
+
+---
+
+## 調試技巧
+
+### 1. 狀態轉換日誌
+
+狀態轉換時會輸出日誌：
+```
+ChangeState: Patrol -> Alert
+ChangeState: Alert -> Chase
+```
+
+### 2. 區域判斷日誌
+
+區域判斷時會輸出詳細日誌：
+```
+[EnemyAI] Player in GUARD AREA - will chase
+[EnemyAI] Player in SAFE AREA with WEAPON - will chase
+[EnemyAI] Player in SAFE AREA with EMPTY HANDS and danger is SAFE - will NOT chase
+```
+
+### 3. 搜索狀態日誌
+
+搜索狀態的關鍵事件會輸出日誌：
+```
+{enemyName}: 追擊時卡住，轉到搜索狀態
+{enemyName}: 已到達搜索位置，開始搜索玩家
+{enemyName}: 搜索時看到玩家，更新目標位置到 {position}
+```
+
+### 4. Gizmos 視覺化
+
+在 Scene 視圖中選擇 Enemy GameObject，可以看到：
+- 視野範圍（視野錐形）
+- 攻擊範圍（圓形）
+- 巡邏點（如果設定）
+
+---
+
+## 常見問題
+
+### Q: 敵人為什麼不追擊玩家？
+
+**可能原因**：
+1. 玩家在 Safe Area 且空手且危險等級為 Safe
+2. 敵人不在攝影機範圍內且不在 Chase/Search 狀態（被剔除）
+3. 敵人狀態機未正確初始化
+
+**解決方法**：
+- 檢查 `AreaManager.Instance.IsInGuardArea()` 返回值
+- 檢查 `GameSettings.Instance.UseGuardAreaSystem` 是否啟用
+- 檢查敵人狀態是否正確
+
+---
+
+### Q: 敵人為什麼卡住不動？
+
+**可能原因**：
+1. 路徑規劃失敗
+2. 移動目標被障礙物阻擋
+3. 敵人狀態未正確更新
+
+**解決方法**：
+- 檢查 `enemyMovement.IsStuckOrHittingWall()` 返回值
+- 檢查路徑規劃網格是否正確設定
+- 檢查敵人是否在 Chase 狀態（會自動轉到 Search）
+
+---
+
+### Q: 敵人攻擊範圍不正確？
+
+**可能原因**：
+1. `useWeaponAttackRange` 未啟用
+2. 武器未正確裝備
+3. 武器類型不支援
+
+**解決方法**：
+- 啟用 `useWeaponAttackRange`
+- 檢查 `itemHolder.CurrentWeapon` 是否為 null
+- 檢查武器是否為 `RangedWeapon` 或 `MeleeWeapon`
+
+---
+
+## 版本歷史
+
+- **v2.0** (2025-12)
+  - 整合區域系統（Guard Area / Safe Area）
+  - 優化性能（攝影機剔除、間隔更新）
+  - 移除重複的 detection 方法
+  - 統一 chaseRange 到 EnemyDetection
+
+- **v1.0** (2025-11)
+  - 初始版本
+  - 基本狀態機系統
+  - 巡邏、追擊、搜索功能
+
+---
+
+**最後更新**：2025-12  
+**維護者**：開發團隊
+

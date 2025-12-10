@@ -13,6 +13,15 @@ public class DoorController : MonoBehaviour
     [SerializeField] private TileBase doorTile;        // 普通門（不需要鑰匙）
     [SerializeField] private TileBase redDoorTile;     // 紅色門（需要紅色鑰匙）
     [SerializeField] private TileBase blueDoorTile;    // 藍色門（需要藍色鑰匙）
+    [SerializeField] private TileBase greenDoorTile;   // 綠色門（需要綠色鑰匙）
+    [SerializeField] private TileBase yellowDoorTile;  // 黃色門（需要黃色鑰匙）
+    [SerializeField] private TileBase purpleDoorTile;  // 紫色門（需要紫色鑰匙）
+    [SerializeField] private TileBase orangeDoorTile;  // 橙色門（需要橙色鑰匙）
+    [SerializeField] private TileBase whiteDoorTile;   // 白色門（需要白色鑰匙）
+    [SerializeField] private TileBase blackDoorTile;   // 黑色門（需要黑色鑰匙）
+    
+    // Tile 到 KeyType 的映射字典（運行時建立）
+    private Dictionary<TileBase, KeyType> tileToKeyTypeMap;
     
     [Header("觸發範圍")]
     [SerializeField] private float openDoorRange = 1.5f; // 多近可以開門
@@ -25,11 +34,40 @@ public class DoorController : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+            InitializeTileToKeyTypeMap();
         }
         else
         {
             Destroy(gameObject);
         }
+    }
+    
+    /// <summary>
+    /// 初始化 Tile 到 KeyType 的映射字典
+    /// </summary>
+    private void InitializeTileToKeyTypeMap()
+    {
+        tileToKeyTypeMap = new Dictionary<TileBase, KeyType>();
+        
+        // 建立映射（只添加非空的 tile）
+        if (doorTile != null)
+            tileToKeyTypeMap[doorTile] = KeyType.None;
+        if (redDoorTile != null)
+            tileToKeyTypeMap[redDoorTile] = KeyType.Red;
+        if (blueDoorTile != null)
+            tileToKeyTypeMap[blueDoorTile] = KeyType.Blue;
+        if (greenDoorTile != null)
+            tileToKeyTypeMap[greenDoorTile] = KeyType.Green;
+        if (yellowDoorTile != null)
+            tileToKeyTypeMap[yellowDoorTile] = KeyType.Yellow;
+        if (purpleDoorTile != null)
+            tileToKeyTypeMap[purpleDoorTile] = KeyType.Purple;
+        if (orangeDoorTile != null)
+            tileToKeyTypeMap[orangeDoorTile] = KeyType.Orange;
+        if (whiteDoorTile != null)
+            tileToKeyTypeMap[whiteDoorTile] = KeyType.White;
+        if (blackDoorTile != null)
+            tileToKeyTypeMap[blackDoorTile] = KeyType.Black;
     }
     
     /// <summary>
@@ -80,12 +118,17 @@ public class DoorController : MonoBehaviour
     /// </summary>
     private KeyType GetRequiredKeyTypeByTile(TileBase tile)
     {
-        if (tile == redDoorTile)
-            return KeyType.Red;
-        if (tile == blueDoorTile)
-            return KeyType.Blue;
+        // 如果 tile 為 null，返回 None（inspector 為空是正常的）
+        if (tile == null)
+            return KeyType.None;
         
-        // doorTile 或其他不認識的 tile 都不需要鑰匙
+        // 從映射字典中查找
+        if (tileToKeyTypeMap != null && tileToKeyTypeMap.TryGetValue(tile, out KeyType keyType))
+        {
+            return keyType;
+        }
+        
+        // 如果找不到映射，預設為不需要鑰匙（普通門）
         return KeyType.None;
     }
     
@@ -94,7 +137,17 @@ public class DoorController : MonoBehaviour
     /// </summary>
     private bool IsDoorTile(TileBase tile)
     {
-        return tile == doorTile || tile == redDoorTile || tile == blueDoorTile;
+        // 如果 tile 為 null，不是門
+        if (tile == null)
+            return false;
+        
+        // 檢查是否在映射字典中（表示是已知的門 tile）
+        if (tileToKeyTypeMap != null && tileToKeyTypeMap.ContainsKey(tile))
+        {
+            return true;
+        }
+        
+        return false;
     }
     
     /// <summary>
@@ -219,6 +272,9 @@ public class DoorController : MonoBehaviour
     /// <param name="startPosition">起始位置</param>
     private void RemoveConnectedDoorTiles(Vector3Int startPosition)
     {
+        // 觸發 3D 門動畫（如果存在）
+        Trigger3DDoorAnimation(startPosition);
+        
         // 使用深度優先搜索找到所有相連的門tile
         var visited = new System.Collections.Generic.HashSet<Vector3Int>();
         var stack = new System.Collections.Generic.Stack<Vector3Int>();
@@ -261,6 +317,51 @@ public class DoorController : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// 觸發對應位置的 3D 門動畫
+    /// </summary>
+    /// <param name="cellPosition">門的 Cell 位置</param>
+    private void Trigger3DDoorAnimation(Vector3Int cellPosition)
+    {
+        // 將 Cell 位置轉換為世界位置
+        Vector3 worldPosition = tilemap.GetCellCenterWorld(cellPosition);
+        
+        // 查找所有 3D 門視覺效果
+        Door3DVisual[] allDoor3DVisuals = FindObjectsByType<Door3DVisual>(FindObjectsSortMode.None);
+        
+        if (allDoor3DVisuals == null || allDoor3DVisuals.Length == 0)
+        {
+            Debug.Log("[DoorController] 沒有找到任何 3D 門視覺效果");
+            return;
+        }
+        
+        // 找到最近的 3D 門
+        Door3DVisual nearestDoor = null;
+        float nearestDistance = float.MaxValue;
+        
+        foreach (Door3DVisual doorVisual in allDoor3DVisuals)
+        {
+            float distance = Vector3.Distance(worldPosition, doorVisual.TilemapWorldPosition);
+            
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestDoor = doorVisual;
+            }
+        }
+        
+        // 如果找到最近的門，播放動畫
+        if (nearestDoor != null)
+        {
+            Debug.Log($"[DoorController] 觸發 3D 門動畫：{nearestDoor.gameObject.name}，距離：{nearestDistance}");
+            nearestDoor.PlayOpenAnimation();
+        }
+        else
+        {
+            Debug.Log($"[DoorController] 在範圍 {openDoorRange} 內沒有找到匹配的 3D 門");
+        }
+    }
+    
     #region Notification Helpers
     
     /// <summary>
@@ -299,6 +400,18 @@ public class DoorController : MonoBehaviour
                 return "The door is locked! Requires a RED key.";
             case KeyType.Blue:
                 return "The door is locked! Requires a BLUE key.";
+            case KeyType.Green:
+                return "The door is locked! Requires a GREEN key.";
+            case KeyType.Yellow:
+                return "The door is locked! Requires a YELLOW key.";
+            case KeyType.Purple:
+                return "The door is locked! Requires a PURPLE key.";
+            case KeyType.Orange:
+                return "The door is locked! Requires an ORANGE key.";
+            case KeyType.White:
+                return "The door is locked! Requires a WHITE key.";
+            case KeyType.Black:
+                return "The door is locked! Requires a BLACK key.";
             case KeyType.None:
                 return "The door is locked!";
             default:

@@ -1,0 +1,44 @@
+{
+  "controls": [
+    {
+      "key": "WASD",
+      "depiction": "Move character"
+    },
+    {
+      "key": "Shift",
+      "depiction": "Sprint (This is only effective in easy mode)"
+    },
+    {
+      "key": "Z",
+      "depiction": "Crouch (Toggle)"
+    },
+    {
+      "key": "Left Click",
+      "depiction": "Attack"
+    },
+    {
+      "key": "E",
+      "depiction": "Open doors"
+    },
+    {
+      "key": "Scroll",
+      "depiction": "Switch weapon"
+    },
+    {
+      "key": "Space (Hold)",
+      "depiction": "Move camera (Player cannot move while holding, use WASD to move camera)"
+    },
+    {
+      "key": "F",
+      "depiction": "Center camera on player"
+    },
+    {
+      "key": "ESC",
+      "depiction": "Pause/Resume game"
+    },
+    {
+      "key": "V",
+      "depiction": "Open map"
+    }
+  ]
+}

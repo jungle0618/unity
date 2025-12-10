@@ -105,10 +105,32 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -225
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 28b4d59713e4c84469c9ce37ffee7a80,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -7973905184910442757, guid: e8e87aa3c3819c443acf032f5460ecac,
+        type: 3}
+    - target: {fileID: -7511558181221131132, guid: 28b4d59713e4c84469c9ce37ffee7a80,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: -7973905184910442757, guid: e8e87aa3c3819c443acf032f5460ecac,
+        type: 3}
+    - target: {fileID: -7511558181221131132, guid: 28b4d59713e4c84469c9ce37ffee7a80,
+        type: 3}
+      propertyPath: 'm_Materials.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 659a9559a4c8a9c48a28bfe64a9a8373, type: 2}
     - target: {fileID: 919132149155446097, guid: 28b4d59713e4c84469c9ce37ffee7a80,
         type: 3}
       propertyPath: m_Name
       value: OfficeChair
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 28b4d59713e4c84469c9ce37ffee7a80,
+        type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 69
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

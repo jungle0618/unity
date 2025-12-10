@@ -21,8 +21,6 @@ public class EntityManager : MonoBehaviour
     
     [Header("玩家管理")]
     private Player player; // 運行時生成的 Player 實例（由 EntitySpawner 管理）
-    [SerializeField] private int maxActiveEnemies = 36; // 最大數量 - 設定為所有敵人數量
-    [SerializeField] private int poolSize = 50; // 最大 pool 大小 - 增加以容納所有敵人
 
     // 使用命名空間中的 ItemMapping 類型（為了 Unity 序列化兼容，保留一個別名）
     [System.Serializable]
@@ -46,10 +44,7 @@ public class EntityManager : MonoBehaviour
     [Header("Patrol Data 設定")]
     [SerializeField] private TextAsset patrolDataFile;
 
-    [Header("效能優化")]
-    [SerializeField] private float cullingDistance = 25f; // 最大距離
-    [SerializeField] private float updateInterval = 0.2f; // 最大更新頻率
-    [SerializeField] private int enemiesPerFrameUpdate = 3; // 最大每幀處理數量
+    [Header("AI 設定")]
     [SerializeField] private float aiUpdateInterval = 0.15f; // AI 更新間隔
 
     [Header("除錯資訊")]
@@ -64,12 +59,12 @@ public class EntityManager : MonoBehaviour
     public class DangerLevelMultipliers : Game.EntityManager.EntitySpawner.DangerLevelMultipliers { }
     
     [Header("危險等級調整參數")]
-    [Tooltip("五種危險等級對應的屬性乘數")]
-    [SerializeField] private DangerLevelMultipliers safeLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.0f, viewAngleMultiplier = 1.0f, speedMultiplier = 1.0f, damageReduction = 0f };
-    [SerializeField] private DangerLevelMultipliers lowLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.1f, viewAngleMultiplier = 1.1f, speedMultiplier = 1.1f, damageReduction = 0.1f };
-    [SerializeField] private DangerLevelMultipliers mediumLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.3f, viewAngleMultiplier = 1.3f, speedMultiplier = 1.3f, damageReduction = 0.2f };
-    [SerializeField] private DangerLevelMultipliers highLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.6f, viewAngleMultiplier = 1.6f, speedMultiplier = 1.6f, damageReduction = 0.3f };
-    [SerializeField] private DangerLevelMultipliers criticalLevel = new DangerLevelMultipliers { viewRangeMultiplier = 2.0f, viewAngleMultiplier = 2.0f, speedMultiplier = 2.0f, damageReduction = 0.5f };
+    [Tooltip("五種危險等級對應的視野屬性乘數（只影響視野範圍和視野角度）")]
+    [SerializeField] private DangerLevelMultipliers safeLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.0f, viewAngleMultiplier = 1.0f };
+    [SerializeField] private DangerLevelMultipliers lowLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.1f, viewAngleMultiplier = 1.1f };
+    [SerializeField] private DangerLevelMultipliers mediumLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.3f, viewAngleMultiplier = 1.3f };
+    [SerializeField] private DangerLevelMultipliers highLevel = new DangerLevelMultipliers { viewRangeMultiplier = 1.6f, viewAngleMultiplier = 1.6f };
+    [SerializeField] private DangerLevelMultipliers criticalLevel = new DangerLevelMultipliers { viewRangeMultiplier = 2.0f, viewAngleMultiplier = 2.0f };
 
     // 實體類型枚舉（保留用於 IEntity 接口，但內部統一使用 EntityDataLoader.EntityType）
     public enum EntityType
@@ -85,9 +80,7 @@ public class EntityManager : MonoBehaviour
     // ========== 子系統引用 ==========
     private EntityDataLoader dataLoader;
     private EntityItemManager itemManager;
-    private EntityPool entityPool;
     private AttackSystem attackSystem;
-    private EntityPerformanceOptimizer optimizer;
     private EntityEventManager eventManager;
     private EntitySpawner spawner;
     private WinConditionManager winConditionManager;
@@ -95,10 +88,9 @@ public class EntityManager : MonoBehaviour
     // 注意：統一實體註冊表已移至 AttackSystem，通過 attackSystem.ActiveEntities 訪問
 
     // 統計資訊 - 委託給子系統
-    public int ActiveEnemyCount => entityPool?.ActiveEnemyCount ?? 0;
-    public int PooledEnemyCount => entityPool?.PooledEnemyCount ?? 0;
-    public int DeadEnemyCount => entityPool?.DeadEnemyCount ?? 0;
-    public int TotalEnemyCount => entityPool?.TotalEnemyCount ?? 0;
+    public int ActiveEnemyCount => GetActiveEnemyCount();
+    public int DeadEnemyCount => GetDeadEnemyCount();
+    public int TotalEnemyCount => ActiveEnemyCount + DeadEnemyCount;
 
     // 玩家偵測系統引用
     private PlayerDetection playerDetection;
@@ -140,7 +132,7 @@ public class EntityManager : MonoBehaviour
         if (itemMappings == null || itemMappings.Length == 0)
         {
             Debug.LogError("[EntityManager] itemMappings 未配置！無法生成帶有物品的實體。請在 Inspector 中設置 itemMappings。");
-            return; // 如果沒有 item mappings，無法繼續初始化
+            return;
         }
         
         itemManager = new EntityItemManager(showDebugInfo);
@@ -161,7 +153,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Item mappings 已確定：{itemManager.ItemMappingDict.Count} 個物品映射");
+            //Debug.Log($"[EntityManager] Item mappings 已確定：{itemManager.ItemMappingDict.Count} 個物品映射");
         }
 
         // 3. 初始化攻擊系統
@@ -172,21 +164,17 @@ public class EntityManager : MonoBehaviour
         eventManager.OnTargetDied += HandleTargetDied;
         eventManager.OnTargetReachedEscapePoint += HandleTargetReachedEscapePoint;
 
-        // 5. 初始化對象池
-        entityPool = new EntityPool(enemyPrefab, poolSize, showDebugInfo);
-        StartCoroutine(InitializePoolAsync());
-
-        // 6. 初始化系統引用
+        // 5. 初始化系統引用
         InitializePlayerDetection();
         InitializeDangerousManager();
 
-        // 7. 初始化生成器（需要所有其他子系統）
+        // 6. 初始化生成器（需要所有其他子系統）
         InitializeSpawner();
 
-        // 8. 初始化勝利條件管理器
+        // 7. 初始化勝利條件管理器
         InitializeWinConditionManager();
 
-        // 9. 開始生成實體
+        // 8. 開始生成實體
         StartCoroutine(DelayedSpawnInitialEntities());
     }
     
@@ -226,16 +214,8 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] WinConditionManager 已初始化，出口點: {exitPoint}");
+            //Debug.Log($"[EntityManager] WinConditionManager 已初始化，出口點: {exitPoint}");
         }
-    }
-    
-    /// <summary>
-    /// 異步初始化對象池
-    /// </summary>
-    private IEnumerator InitializePoolAsync()
-    {
-        yield return entityPool.InitializePoolCoroutine(this);
     }
     
     /// <summary>
@@ -245,10 +225,10 @@ public class EntityManager : MonoBehaviour
     {
         spawner = new EntitySpawner(
             playerPrefab, enemyPrefab, targetPrefab,
-            entityPool, dataLoader, itemManager, eventManager, attackSystem,
+            dataLoader, itemManager, eventManager, attackSystem,
             dangerousManager, playerDetection,
             enablePlayerDetection, autoRegisterWithPlayerDetection,
-            maxActiveEnemies, aiUpdateInterval,
+            aiUpdateInterval,
             GetMultipliersForLevel,
             showDebugInfo
         );
@@ -263,19 +243,6 @@ public class EntityManager : MonoBehaviour
             {
                 attackSystem.AddEntity(playerEntity);
             }
-            
-            // 初始化性能優化器（需要 Player）
-            optimizer = new EntityPerformanceOptimizer(
-                entityPool,
-                player,
-                this,
-                cullingDistance,
-                updateInterval,
-                enemiesPerFrameUpdate,
-                aiUpdateInterval,
-                showDebugInfo
-            );
-            optimizer.StartManagement();
         }
     }
     
@@ -284,26 +251,19 @@ public class EntityManager : MonoBehaviour
     /// </summary>
     private IEnumerator DelayedSpawnInitialEntities()
     {
-        // 確保 itemManager 已完全初始化
-        if (itemManager == null || itemManager.ItemMappingDict == null || itemManager.ItemMappingDict.Count == 0)
+        // 等待一幀確保所有系統已初始化
+        yield return null;
+        
+        // 驗證 itemManager 是否準備好
+        if (!IsItemManagerReady())
         {
             Debug.LogError("[EntityManager] itemManager 未準備好，無法生成實體！");
             yield break;
         }
         
-        // 等待池初始化完成
-        yield return new WaitForSeconds(0.2f);
-        
-        // 再次驗證 itemManager（確保在生成前仍有效）
-        if (itemManager == null || itemManager.ItemMappingDict == null || itemManager.ItemMappingDict.Count == 0)
-        {
-            Debug.LogError("[EntityManager] itemManager 在生成實體前失效！");
-            yield break;
-        }
-        
         if (showDebugInfo)
         {
-            Debug.Log("[EntityManager] 開始生成實體（item mappings 已確定）");
+            //Debug.Log("[EntityManager] 開始生成實體（item mappings 已確定）");
         }
         
         // 生成所有實體
@@ -319,15 +279,17 @@ public class EntityManager : MonoBehaviour
         OnManagerInitialized?.Invoke();
     }
     
-
-    private void Update()
+    /// <summary>
+    /// 檢查 itemManager 是否準備好
+    /// </summary>
+    private bool IsItemManagerReady()
     {
-        optimizer?.UpdateCachedPlayerPosition();
+        return itemManager != null && itemManager.ItemMappingDict != null && itemManager.ItemMappingDict.Count > 0;
     }
+    
 
     private void OnDestroy()
     {
-        optimizer?.StopManagement();
         eventManager?.Cleanup();
         
         // 取消危險等級事件監聽
@@ -341,9 +303,10 @@ public class EntityManager : MonoBehaviour
     {
         if (!showDebugInfo || Player == null) return;
 
-        Gizmos.color = Color.red;
+        // 顯示玩家位置
+        Gizmos.color = Color.green;
         Vector3 playerPos = Player.transform.position;
-        Gizmos.DrawWireSphere(playerPos, cullingDistance);
+        Gizmos.DrawWireSphere(playerPos, 1f);
         
         // 顯示patrol points
         DrawPatrolPoints();
@@ -365,31 +328,15 @@ public class EntityManager : MonoBehaviour
             Vector3[] patrolPoints = enemyData.patrolPoints;
             Color enemyColor = Color.HSVToRGB((float)enemyIndex / enemyDataList.Count, 0.8f, 1f);
             
+            Gizmos.color = enemyColor;
             for (int i = 0; i < patrolPoints.Length; i++)
             {
                 Vector3 pos = patrolPoints[i];
+                float radius = i == 0 ? 0.5f : 0.3f;
+                Gizmos.DrawWireSphere(pos, radius);
                 
-                if (i == 0)
-                {
-                    Gizmos.color = enemyColor;
-                    Gizmos.DrawWireSphere(pos, 0.5f);
-                }
-                else
-                {
-                    Gizmos.color = enemyColor;
-                    Gizmos.DrawWireSphere(pos, 0.3f);
-                }
-                
-                if (i < patrolPoints.Length - 1)
-                {
-                    Gizmos.color = enemyColor;
-                    Gizmos.DrawLine(pos, patrolPoints[i + 1]);
-                }
-                else
-                {
-                    Gizmos.color = enemyColor;
-                    Gizmos.DrawLine(pos, patrolPoints[0]);
-                }
+                Vector3 nextPos = i < patrolPoints.Length - 1 ? patrolPoints[i + 1] : patrolPoints[0];
+                Gizmos.DrawLine(pos, nextPos);
                 
 #if UNITY_EDITOR
                 Handles.color = Color.white;
@@ -408,9 +355,9 @@ public class EntityManager : MonoBehaviour
     /// </summary>
     private void SubscribeToAllEnemyDeathEvents()
     {
-        if (entityPool == null) return;
+        if (spawner == null) return;
         
-        var allEnemies = entityPool.GetActiveEnemiesList();
+        var allEnemies = spawner.SpawnedEnemies;
         foreach (var enemy in allEnemies)
         {
             if (enemy != null)
@@ -424,7 +371,7 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Subscribed to {allEnemies.Count} enemies' death events");
+            //Debug.Log($"[EntityManager] Subscribed to {allEnemies.Count} enemies' death events");
         }
     }
     
@@ -435,25 +382,17 @@ public class EntityManager : MonoBehaviour
     {
         if (deadEnemy == null) return;
         
-        // 取消訂閱死亡事件（避免重複處理）
+        // 取消訂閱死亡事件
         deadEnemy.OnEnemyDied -= HandleEnemyDied;
         
-        // 從統一實體註冊表移除（通過 AttackSystem）
+        // 從統一實體註冊表移除
         if (deadEnemy is IEntity deadEnemyEntity)
         {
             attackSystem?.RemoveEntity(deadEnemyEntity);
         }
         
-        if (showDebugInfo)
-        {
-            Debug.Log($"[EntityManager] Enemy died: {deadEnemy.gameObject.name}");
-        }
-        
         // 通知 GameManager 註冊擊殺數
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.RegisterEnemyKill();
-        }
+        GameManager.Instance?.RegisterEnemyKill();
     }
     
     /// <summary>
@@ -471,14 +410,10 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Target died: {deadTarget.gameObject.name}");
+            //Debug.Log($"[EntityManager] Target died: {deadTarget.gameObject.name}");
         }
         
-        // 通知 GameManager
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.OnTargetDied(deadTarget);
-        }
+        // 注意：Target 死亡事件已由 WinConditionManager 直接監聽，不需要通過 GameManager
     }
 
     /// <summary>
@@ -490,14 +425,10 @@ public class EntityManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Target reached escape point: {target.gameObject.name}");
+            //Debug.Log($"[EntityManager] Target reached escape point: {target.gameObject.name}");
         }
         
-        // 通知 GameManager
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.OnTargetReachedEscapePoint(target);
-        }
+        // 注意：Target 到達逃亡點事件已由 WinConditionManager 直接監聽，不需要通過 GameManager
     }
 
     /// <summary>
@@ -518,8 +449,7 @@ public class EntityManager : MonoBehaviour
         DangerousManager.DangerLevel currentLevel = dangerousManager.CurrentDangerLevelType;
         var multipliers = GetMultipliersForLevel(currentLevel);
         
-        var allEnemies = entityPool?.GetActiveEnemiesList() ?? new List<Enemy>();
-        allEnemies.AddRange(entityPool?.CulledEnemies ?? new HashSet<Enemy>());
+        var allEnemies = GetAllActiveEnemies();
         
         foreach (var enemy in allEnemies)
         {
@@ -527,16 +457,14 @@ public class EntityManager : MonoBehaviour
             {
                 enemy.UpdateDangerLevelStats(
                     multipliers.viewRangeMultiplier,
-                    multipliers.viewAngleMultiplier,
-                    multipliers.speedMultiplier,
-                    multipliers.damageReduction
+                    multipliers.viewAngleMultiplier
                 );
             }
         }
         
         if (showDebugInfo)
         {
-            Debug.Log($"[EntityManager] Updated all enemies for danger level {currentLevel}");
+            //Debug.Log($"[EntityManager] Updated all enemies for danger level {currentLevel}");
         }
     }
 
@@ -570,9 +498,7 @@ public class EntityManager : MonoBehaviour
         return new Game.EntityManager.EntitySpawner.DangerLevelMultipliers
         {
             viewRangeMultiplier = multipliers.viewRangeMultiplier,
-            viewAngleMultiplier = multipliers.viewAngleMultiplier,
-            speedMultiplier = multipliers.speedMultiplier,
-            damageReduction = multipliers.damageReduction
+            viewAngleMultiplier = multipliers.viewAngleMultiplier
         };
     }
 
@@ -607,7 +533,7 @@ public class EntityManager : MonoBehaviour
         
         var enemyDataList = dataLoader?.GetEntitiesByType(EntityDataLoader.EntityType.Enemy) ?? new List<EntityDataLoader.EntityData>();
         
-        Debug.Log("=== 所有敵人生成點資訊 ===");
+        //Debug.Log("=== 所有敵人生成點資訊 ===");
         for (int i = 0; i < enemyDataList.Count; i++)
         {
             var data = enemyDataList[i];
@@ -615,31 +541,49 @@ public class EntityManager : MonoBehaviour
             {
                 string patrolInfo = string.Join(" -> ", data.patrolPoints.Select(p => $"({p.x:F1},{p.y:F1})"));
                 string itemsInfo = data.itemNames.Count > 0 ? string.Join(", ", data.itemNames) : "None";
-                Debug.Log($"敵人 {data.entityIndex} ({data.entityType}): 生成點 {data.patrolPoints[0]} | 物品: [{itemsInfo}] | 巡邏路線: {patrolInfo}");
+                //Debug.Log($"敵人 {data.entityIndex} ({data.type}): 生成點 {data.patrolPoints[0]} | 物品: [{itemsInfo}] | 巡邏路線: {patrolInfo}");
             }
             else
             {
                 Debug.LogWarning($"敵人 {i}: 沒有有效的資料");
             }
         }
-        Debug.Log($"總共 {enemyDataList.Count} 個敵人");
+        //Debug.Log($"總共 {enemyDataList.Count} 個敵人");
     }
 
     /// <summary>
-    /// 獲取剩餘（未死亡）的 Enemy 數量
+    /// 獲取活躍的 Enemy 數量
     /// </summary>
-    public int GetRemainingEnemyCount()
+    private int GetActiveEnemyCount()
     {
-        return (entityPool?.ActiveEnemyCount ?? 0) + (entityPool?.CulledEnemies.Count ?? 0);
+        return CountEnemies(enemy => enemy != null && !enemy.IsDead);
+    }
+    
+    /// <summary>
+    /// 獲取死亡的 Enemy 數量
+    /// </summary>
+    private int GetDeadEnemyCount()
+    {
+        return CountEnemies(enemy => enemy != null && enemy.IsDead);
+    }
+    
+    /// <summary>
+    /// 統計符合條件的敵人數量（共用方法）
+    /// </summary>
+    private int CountEnemies(System.Func<Enemy, bool> predicate)
+    {
+        if (spawner == null) return 0;
+        int count = 0;
+        foreach (var enemy in spawner.SpawnedEnemies)
+        {
+            if (predicate(enemy))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
-    /// <summary>
-    /// 檢查是否還有存活的 Enemy
-    /// </summary>
-    public bool HasLivingEnemies()
-    {
-        return GetRemainingEnemyCount() > 0;
-    }
 
     /// <summary>
     /// 獲取活躍的 Target 數量
@@ -648,16 +592,7 @@ public class EntityManager : MonoBehaviour
     {
         var targets = eventManager?.ActiveTargets;
         if (targets == null) return 0;
-        
-        int count = 0;
-        foreach (var target in targets)
-        {
-            if (target != null && !target.IsDead)
-            {
-                count++;
-            }
-        }
-        return count;
+        return targets.Count(target => target != null && !target.IsDead);
     }
 
     /// <summary>
@@ -666,16 +601,9 @@ public class EntityManager : MonoBehaviour
     public bool AreAllTargetsDead()
     {
         var targets = eventManager?.ActiveTargets;
-        if (targets == null || targets.Count == 0) return true;
-        
-        foreach (var target in targets)
-        {
-            if (target != null && !target.IsDead)
-            {
-                return false;
-            }
-        }
-        return true;
+        // 如果沒有目標，返回 false（因為沒有目標 = 沒有目標被殺死，不應該認為"所有目標都死了"）
+        if (targets == null || targets.Count == 0) return false;
+        return !targets.Any(target => target != null && !target.IsDead);
     }
 
     /// <summary>
@@ -707,7 +635,8 @@ public class EntityManager : MonoBehaviour
     /// </summary>
     public List<Enemy> GetAllActiveEnemies()
     {
-        return entityPool != null ? entityPool.GetActiveEnemiesList() : new List<Enemy>();
+        if (spawner == null) return new List<Enemy>();
+        return spawner.SpawnedEnemies.Where(enemy => enemy != null && !enemy.IsDead).ToList();
     }
 
     /// <summary>
@@ -728,24 +657,10 @@ public class EntityManager : MonoBehaviour
     public void KillAllEnemies()
     {
         var allEnemies = GetAllActiveEnemies();
-        allEnemies.AddRange(entityPool?.CulledEnemies ?? new HashSet<Enemy>());
-
         foreach (var enemy in allEnemies)
         {
-            if (enemy != null && !enemy.IsDead)
-            {
-                enemy.Die();
-            }
+            enemy.Die();
         }
-    }
-
-    /// <summary>
-    /// 動態設置最大活躍敵人數量
-    /// </summary>
-    public void SetMaxActiveEnemies(int newMax)
-    {
-        maxActiveEnemies = Mathf.Max(1, newMax);
-        optimizer?.SetMaxActiveEnemies(maxActiveEnemies);
     }
 
     /// <summary>
@@ -769,7 +684,7 @@ public class EntityManager : MonoBehaviour
     {
         yield return null;
         spawner?.SpawnInitialEntities();
-        Debug.Log($"EntityManager: Respawned {ActiveEnemyCount} enemies");
+        //Debug.Log($"EntityManager: Respawned {ActiveEnemyCount} enemies");
     }
 
     #endregion
@@ -784,26 +699,20 @@ public class EntityManager : MonoBehaviour
         if (Player == null) return;
 
         float rangeSqr = alertRange * alertRange;
-        int alertedCount = 0;
-
+        
         // 檢查活躍的敵人
-        var activeEnemies = entityPool?.ActiveEnemies ?? new HashSet<Enemy>();
-        alertedCount += AlertEnemiesInSet(activeEnemies, position, rangeSqr);
-
-        // 檢查被剔除的敵人
-        var culledEnemies = entityPool?.CulledEnemies ?? new HashSet<Enemy>();
-        alertedCount += AlertEnemiesInSet(culledEnemies, position, rangeSqr);
+        var activeEnemies = GetAllActiveEnemies();
+        int alertedCount = AlertEnemiesInList(activeEnemies, position, rangeSqr);
 
         if (showDebugInfo)
         {
-            Debug.Log($"EntityManager: Alerted {alertedCount} enemies within {alertRange} units");
+            //Debug.Log($"EntityManager: Alerted {alertedCount} enemies within {alertRange} units");
         }
     }
 
-    private int AlertEnemiesInSet(HashSet<Enemy> enemySet, Vector2 position, float rangeSqr)
+    private int AlertEnemiesInList(List<Enemy> enemyList, Vector2 position, float rangeSqr)
     {
         int count = 0;
-        var enemyList = new List<Enemy>(enemySet);
 
         foreach (var enemy in enemyList)
         {
@@ -881,7 +790,7 @@ public class EntityManager : MonoBehaviour
             InitializePlayerDetection();
         }
         
-        Debug.Log($"[EntityManager] 玩家偵測系統設定 - 啟用: {enabled}, 自動註冊: {autoRegister}");
+        //Debug.Log($"[EntityManager] 玩家偵測系統設定 - 啟用: {enabled}, 自動註冊: {autoRegister}");
     }
 
     /// <summary>
@@ -904,17 +813,13 @@ public class EntityManager : MonoBehaviour
         spawner?.SpawnEnemy(position, enemyIndex);
         
         // 訂閱新生成敵人的死亡事件
-        if (entityPool != null)
+        if (spawner != null && spawner.SpawnedEnemies.Count > 0)
         {
-            var allEnemies = entityPool.GetActiveEnemiesList();
-            if (allEnemies.Count > 0)
+            var lastEnemy = spawner.SpawnedEnemies[spawner.SpawnedEnemies.Count - 1];
+            if (lastEnemy != null)
             {
-                var lastEnemy = allEnemies[allEnemies.Count - 1];
-                if (lastEnemy != null)
-                {
-                    lastEnemy.OnEnemyDied -= HandleEnemyDied;
-                    lastEnemy.OnEnemyDied += HandleEnemyDied;
-                }
+                lastEnemy.OnEnemyDied -= HandleEnemyDied;
+                lastEnemy.OnEnemyDied += HandleEnemyDied;
             }
         }
     }
@@ -930,18 +835,10 @@ public class EntityManager : MonoBehaviour
     {
         if (!enablePlayerDetection) return;
         
-        if (player != null)
+        Player currentPlayer = player ?? spawner?.Player;
+        if (currentPlayer != null)
         {
-            playerDetection = player.GetComponent<PlayerDetection>();
-            if (playerDetection == null)
-            {
-                Debug.LogWarning("[EntityManager] 找不到 PlayerDetection 組件，玩家偵測功能將被停用");
-                enablePlayerDetection = false;
-            }
-        }
-        else if (spawner?.Player != null)
-        {
-            playerDetection = spawner.Player.GetComponent<PlayerDetection>();
+            playerDetection = currentPlayer.GetComponent<PlayerDetection>();
             if (playerDetection == null)
             {
                 Debug.LogWarning("[EntityManager] 找不到 PlayerDetection 組件，玩家偵測功能將被停用");

@@ -42,7 +42,7 @@ namespace Game.EntityManager
 
                 if (showDebugInfo)
                 {
-                    Debug.Log("[EntityEventManager] Subscribed to Player attack events");
+                    //Debug.Log("[EntityEventManager] Subscribed to Player attack events");
                 }
             }
             else if (showDebugInfo)
@@ -79,7 +79,7 @@ namespace Game.EntityManager
 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"[EntityEventManager] Subscribed to Enemy attack events: {enemy.name}");
+                    //Debug.Log($"[EntityEventManager] Subscribed to Enemy attack events: {enemy.name}");
                 }
             }
         }
@@ -116,7 +116,7 @@ namespace Game.EntityManager
 
                     if (showDebugInfo)
                     {
-                        Debug.Log($"[EntityEventManager] 訂閱 Target 事件: {target.gameObject.name}");
+                        //Debug.Log($"[EntityEventManager] 訂閱 Target 事件: {target.gameObject.name}");
                     }
                 }
             }
@@ -141,7 +141,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"[EntityEventManager] Added Target to event subscription: {target.gameObject.name}");
+                //Debug.Log($"[EntityEventManager] Added Target to event subscription: {target.gameObject.name}");
             }
         }
 
@@ -170,7 +170,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"[EntityEventManager] Target died: {target.gameObject.name}");
+                //Debug.Log($"[EntityEventManager] Target died: {target.gameObject.name}");
             }
 
             // 通知外部（通過事件）
@@ -186,7 +186,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"[EntityEventManager] Target reached escape point: {target.gameObject.name}");
+                //Debug.Log($"[EntityEventManager] Target reached escape point: {target.gameObject.name}");
             }
 
             // 通知外部（通過事件）

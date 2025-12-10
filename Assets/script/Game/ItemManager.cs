@@ -9,7 +9,7 @@ using UnityEditor;
 /// ItemManager 類別：管理場景中所有散落的物品
 /// 職責：載入物品資料、生成物品、處理撿取邏輯
 /// 參考 EnemyManager 的架構設計
-/// </summary>
+/// </summary> 
 [DefaultExecutionOrder(200)] // 在 GameManager (150) 之後執行
 public class ItemManager : MonoBehaviour
 {
@@ -93,7 +93,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Initialized with {TotalItemCount} items");
+            //Debug.Log($"ItemManager: Initialized with {TotalItemCount} items");
         }
     }
     
@@ -117,7 +117,7 @@ public class ItemManager : MonoBehaviour
                 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"ItemManager: Loaded {itemPrefabDict.Count} item mappings from EntityManager");
+                    //Debug.Log($"ItemManager: Loaded {itemPrefabDict.Count} item mappings from EntityManager");
                 }
                 return;
             }
@@ -153,7 +153,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Built prefab dictionary with {itemPrefabDict.Count} item types");
+            //Debug.Log($"ItemManager: Built prefab dictionary with {itemPrefabDict.Count} item types");
         }
     }
     
@@ -205,12 +205,12 @@ public class ItemManager : MonoBehaviour
                     
                     if (showDebugInfo)
                     {
-                        Debug.Log($"ItemManager: Loaded item {itemIndex} - Type: {itemType}, Position: ({x}, {y}, {z})");
+                        //Debug.Log($"ItemManager: Loaded item {itemIndex} - Type: {itemType}, Position: ({x}, {y}, {z})");
                     }
                 }
             }
             
-            Debug.Log($"ItemManager: Loaded {worldItemsData.Count} items from {itemDataFile.name}");
+            //Debug.Log($"ItemManager: Loaded {worldItemsData.Count} items from {itemDataFile.name}");
         }
         catch (System.Exception e)
         {
@@ -231,7 +231,7 @@ public class ItemManager : MonoBehaviour
         worldItemsData.Add(new WorldItemData { index = 1, itemType = "Bow", position = new Vector3(20, 10, 0) });
         worldItemsData.Add(new WorldItemData { index = 2, itemType = "Knife", position = new Vector3(30, 10, 0) });
         
-        Debug.Log($"ItemManager: Created {worldItemsData.Count} default items");
+        //Debug.Log($"ItemManager: Created {worldItemsData.Count} default items");
     }
     
     #endregion
@@ -254,7 +254,7 @@ public class ItemManager : MonoBehaviour
             SpawnItem(itemData);
         }
         
-        Debug.Log($"ItemManager: Spawned {spawnedItems.Count} items");
+        //Debug.Log($"ItemManager: Spawned {spawnedItems.Count} items");
     }
     
     /// <summary>
@@ -276,19 +276,36 @@ public class ItemManager : MonoBehaviour
             return;
         }
         
+        WorldItem worldItem = CreateWorldItem(itemData.itemType, itemData.position, itemPrefab, $"WorldItem_{itemData.itemType}_{itemData.index}");
+        if (worldItem != null)
+        {
+            spawnedItems.Add(worldItem);
+            
+            if (showDebugInfo)
+            {
+                //Debug.Log($"ItemManager: Spawned {itemData.itemType} at {itemData.position}");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 創建 WorldItem（共用方法）
+    /// </summary>
+    private WorldItem CreateWorldItem(string itemType, Vector3 position, GameObject itemPrefab, string defaultName = null)
+    {
         // 生成 WorldItem
         GameObject worldItemGO;
         
         if (worldItemPrefab != null)
         {
             // 使用自訂的 WorldItem Prefab
-            worldItemGO = Instantiate(worldItemPrefab, itemData.position, Quaternion.identity, transform);
+            worldItemGO = Instantiate(worldItemPrefab, position, Quaternion.identity, transform);
         }
         else
         {
             // 創建基本的 WorldItem GameObject
-            worldItemGO = new GameObject($"WorldItem_{itemData.itemType}_{itemData.index}");
-            worldItemGO.transform.position = itemData.position;
+            worldItemGO = new GameObject(defaultName ?? $"WorldItem_{itemType}");
+            worldItemGO.transform.position = position;
             worldItemGO.transform.SetParent(transform);
             worldItemGO.AddComponent<WorldItem>();
         }
@@ -300,19 +317,11 @@ public class ItemManager : MonoBehaviour
             worldItem = worldItemGO.AddComponent<WorldItem>();
         }
         
-        worldItem.SetItemType(itemData.itemType);
+        worldItem.SetItemType(itemType);
         worldItem.SetItemPrefab(itemPrefab);
-        
-        // 設定物品大小
         worldItem.SetItemScale(worldItemScale);
         
-        // 加入已生成列表
-        spawnedItems.Add(worldItem);
-        
-        if (showDebugInfo)
-        {
-            Debug.Log($"ItemManager: Spawned {itemData.itemType} at {itemData.position}");
-        }
+        return worldItem;
     }
     
     #endregion
@@ -338,7 +347,7 @@ public class ItemManager : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log("ItemManager: No items available to pick up");
+                //Debug.Log("ItemManager: No items available to pick up");
             }
             return false;
         }
@@ -356,7 +365,7 @@ public class ItemManager : MonoBehaviour
         {
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: No items within pickup range ({pickupRange})");
+                //Debug.Log($"ItemManager: No items within pickup range ({pickupRange})");
             }
             return false;
         }
@@ -378,8 +387,6 @@ public class ItemManager : MonoBehaviour
         
         foreach (var item in spawnedItems)
         {
-            if (item == null || item.gameObject == null) continue;
-            
             float distanceSqr = (item.Position - position).sqrMagnitude;
             
             if (distanceSqr < closestDistanceSqr)
@@ -403,37 +410,52 @@ public class ItemManager : MonoBehaviour
             return false;
         }
         
-        // 檢查物品是否已經被撿取（GameObject 是否已被銷毀）
-        if (worldItem.gameObject == null)
+        if (showDebugInfo)
         {
-            Debug.LogWarning($"ItemManager: WorldItem {worldItem.ItemType} GameObject already destroyed!");
-            spawnedItems.Remove(worldItem);
-            return false;
+            //Debug.Log($"[ItemManager] Attempting to pickup {worldItem.ItemType}. Current items in holder: {targetHolder.ItemCount}");
         }
-        
-        Debug.Log($"[ItemManager] Attempting to pickup {worldItem.ItemType}. Current items in holder: {targetHolder.ItemCount}");
         
         // 將物品 Prefab 加入 ItemHolder（不裝備，只加到列表尾端）
         Item addedItem = targetHolder.AddItemFromPrefab(worldItem.ItemPrefab);
         
-        if (addedItem == null)
+        // 檢查是否為鑰匙且已持有相同類型（AddItemFromPrefab 會返回 null 但不加入背包）
+        bool isKeyAndAlreadyHas = false;
+        if (addedItem == null && worldItem.ItemPrefab != null)
+        {
+            // 檢查 prefab 是否為 Key
+            Item prefabItem = worldItem.ItemPrefab.GetComponent<Item>();
+            if (prefabItem is Key keyPrefab)
+            {
+                KeyType keyType = keyPrefab.KeyType;
+                // 檢查是否已持有相同類型的鑰匙
+                if (targetHolder.GetKeyByType(keyType) != null)
+                {
+                    isKeyAndAlreadyHas = true;
+                    if (showDebugInfo)
+                    {
+                        Debug.Log($"[ItemManager] 已持有 {keyType} 鑰匙，地上的鑰匙會被移除但不加入背包");
+                    }
+                }
+            }
+        }
+        
+        // 如果添加失敗且不是因為重複鑰匙，則返回失敗
+        if (addedItem == null && !isKeyAndAlreadyHas)
         {
             Debug.LogWarning($"ItemManager: Failed to add item {worldItem.ItemType}");
             return false;
         }
         
-        Debug.Log($"[ItemManager] Successfully added {worldItem.ItemType} to holder. New count: {targetHolder.ItemCount}");
-        
         // 從場景中移除物品（先從列表移除，再銷毀）
-        bool removed = spawnedItems.Remove(worldItem);
-        Debug.Log($"[ItemManager] Removed from spawnedItems: {removed}. Remaining items: {spawnedItems.Count}");
+        // 無論是否加入背包，地上的物品都要消失
+        spawnedItems.Remove(worldItem);
         
         // 銷毀 GameObject
         worldItem.OnPickedUp(); // 會銷毀 GameObject
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Picked up {worldItem.ItemType}. Remaining items: {spawnedItems.Count}");
+            //Debug.Log($"ItemManager: Picked up {worldItem.ItemType}. Remaining items: {spawnedItems.Count}");
         }
         
         return true;
@@ -456,17 +478,26 @@ public class ItemManager : MonoBehaviour
         }
         
         // 找到指定類型且在範圍內的最近物品
-        WorldItem targetItem = spawnedItems
-            .Where(item => item != null && item.ItemType == itemType)
-            .Where(item => Vector3.Distance(item.Position, callerPosition) <= pickupRange)
-            .OrderBy(item => Vector3.Distance(item.Position, callerPosition))
-            .FirstOrDefault();
+        WorldItem targetItem = null;
+        float closestDistanceSqr = pickupRange * pickupRange;
+        
+        foreach (var item in spawnedItems)
+        {
+            if (item == null || item.ItemType != itemType) continue;
+            
+            float distanceSqr = (item.Position - callerPosition).sqrMagnitude;
+            if (distanceSqr <= closestDistanceSqr)
+            {
+                closestDistanceSqr = distanceSqr;
+                targetItem = item;
+            }
+        }
         
         if (targetItem == null)
         {
             if (showDebugInfo)
             {
-                Debug.Log($"ItemManager: No '{itemType}' items found within range");
+                //Debug.Log($"ItemManager: No '{itemType}' items found within range");
             }
             return false;
         }
@@ -532,11 +563,10 @@ public class ItemManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 重新生成所有物品
+    /// 清除所有已生成的物品
     /// </summary>
-    public void RespawnAllItems()
+    private void ClearSpawnedItems()
     {
-        // 清除現有物品
         foreach (var item in spawnedItems)
         {
             if (item != null)
@@ -545,11 +575,20 @@ public class ItemManager : MonoBehaviour
             }
         }
         spawnedItems.Clear();
-        
-        // 重新生成
+    }
+    
+    /// <summary>
+    /// 重新生成所有物品
+    /// </summary>
+    public void RespawnAllItems()
+    {
+        ClearSpawnedItems();
         SpawnAllItems();
         
-        Debug.Log($"ItemManager: Respawned {spawnedItems.Count} items");
+        if (showDebugInfo)
+        {
+            //Debug.Log($"ItemManager: Respawned {spawnedItems.Count} items");
+        }
     }
     
     /// <summary>
@@ -557,16 +596,12 @@ public class ItemManager : MonoBehaviour
     /// </summary>
     public void ClearAllItems()
     {
-        foreach (var item in spawnedItems)
-        {
-            if (item != null)
-            {
-                Destroy(item.gameObject);
-            }
-        }
-        spawnedItems.Clear();
+        ClearSpawnedItems();
         
-        Debug.Log("ItemManager: Cleared all items");
+        if (showDebugInfo)
+        {
+            //Debug.Log("ItemManager: Cleared all items");
+        }
     }
     
     /// <summary>
@@ -593,42 +628,15 @@ public class ItemManager : MonoBehaviour
         
         string itemType = itemComponent.ItemName;
         
-        // 生成 WorldItem
-        GameObject worldItemGO;
-        
-        if (worldItemPrefab != null)
+        WorldItem worldItem = CreateWorldItem(itemType, position, itemPrefab, $"DroppedItem_{itemType}");
+        if (worldItem != null)
         {
-            // 使用自訂的 WorldItem Prefab
-            worldItemGO = Instantiate(worldItemPrefab, position, Quaternion.identity, transform);
-        }
-        else
-        {
-            // 創建基本的 WorldItem GameObject
-            worldItemGO = new GameObject($"DroppedItem_{itemType}");
-            worldItemGO.transform.position = position;
-            worldItemGO.transform.SetParent(transform);
-            worldItemGO.AddComponent<WorldItem>();
-        }
-        
-        // 設定 WorldItem 組件
-        WorldItem worldItem = worldItemGO.GetComponent<WorldItem>();
-        if (worldItem == null)
-        {
-            worldItem = worldItemGO.AddComponent<WorldItem>();
-        }
-        
-        worldItem.SetItemType(itemType);
-        worldItem.SetItemPrefab(itemPrefab);
-        
-        // 設定物品大小
-        worldItem.SetItemScale(worldItemScale);
-        
-        // 加入已生成列表
-        spawnedItems.Add(worldItem);
-        
-        if (showDebugInfo)
-        {
-            Debug.Log($"ItemManager: Dropped {itemType} at {position}");
+            spawnedItems.Add(worldItem);
+            
+            if (showDebugInfo)
+            {
+                //Debug.Log($"ItemManager: Dropped {itemType} at {position}");
+            }
         }
         
         return worldItem;
@@ -669,7 +677,7 @@ public class ItemManager : MonoBehaviour
         
         if (showDebugInfo)
         {
-            Debug.Log($"ItemManager: Dropped {droppedItems.Count} items at {position}");
+            //Debug.Log($"ItemManager: Dropped {droppedItems.Count} items at {position}");
         }
         
         return droppedItems;

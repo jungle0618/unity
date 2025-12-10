@@ -2,86 +2,108 @@
 
 ## 📋 概述
 
-這個文件說明新版 `patroldata.txt` 的格式和使用方式。新格式支援敵人類型、裝備物品和巡邏路徑的完整定義。
+這個文件說明 `patroldata.json` 的格式和使用方式。系統使用 JSON 格式載入實體數據。
 
-## 📝 檔案格式
+## 📝 JSON 格式
 
 ### 基本結構
 
-每個敵人使用 3 行定義：
-
+```json
+{
+  "entities": [
+    {
+      "entityIndex": 0,
+      "type": "Enemy",
+      "items": ["Knife"],
+      "patrolPoints": [{"x": 20, "y": 50, "z": 0}],
+      "rotation": 180
+    }
+  ]
+}
 ```
-{編號} {類別}
-{物品列表}
-{巡邏點列表}
-```
 
-### 格式說明
+### 字段說明
 
-#### 第 1 行：敵人編號和類別
-- **格式**: `{EnemyIndex} {EnemyType}`
-- **EnemyIndex**: 敵人編號（整數）
-- **EnemyType**: 敵人類別（字串）
-  - `Enemy`: 普通敵人
-  - `Guard1`, `Guard2`, `Guard3`: 不同等級的守衛
-  - `Target`: 任務目標
-  - 可自訂其他類別
+#### 必需字段
 
-#### 第 2 行：物品列表
-- **格式**: `{Item1};{Item2};{Item3}` 或 `None`
-- 多個物品用分號 `;` 分隔
-- 使用 `None` 表示無物品
-- 物品名稱需在 EnemyManager 的 Inspector 中設定映射
+- **`entityIndex`** (int): 實體編號
+- **`type`** (string): 實體類型
+  - `"Enemy"`: 普通敵人
+  - `"Target"`: 任務目標
+  - `"Player"`: 玩家（僅用於設置初始位置）
+  - `"Exit"`: 出口點（勝利條件）
+- **`items`** (string[]): 物品列表，空數組 `[]` 表示無物品
+- **`patrolPoints`** (Vector3Data[]): 巡邏點列表，每個點為 `{"x": float, "y": float, "z": float}`
+- **`rotation`** (float): 初始朝向（度數，0-360），預設值：`0`
 
-#### 第 3 行：巡邏點列表
-- **格式**: `x1,y1|x2,y2|x3,y3`
-- 每個巡邏點使用 `x,y` 格式（只需 2D 座標）
-- 多個巡邏點用 `|` 分隔
-- 至少需要 1 個巡邏點
+#### 可選字段
+
+- **`escapePoint`** (Vector3Data): 逃亡點，僅用於 `Target` 類型，格式為 `{"x": float, "y": float, "z": float}`
 
 ### 完整範例
 
-```txt
-# Patrol Data File
-# Format: 
-# Line 1: {EnemyIndex} {EnemyType}
-# Line 2: {Items} (separated by semicolon if multiple, use "None" for no items)
-# Line 3: {Patrol points} (x,y format, separated by | if multiple)
-
-# 低級守衛（單點巡邏，帶小刀）
-0 Guard1
-Knife
-20,50
-
-# 中級守衛（多點巡邏，帶槍和鑰匙）
-1 Guard2
-Gun;BlueKey
-22,41|35,41|35,14|22,14
-
-# 任務目標（無武器）
-2 Target
-None
-23,42|36,42
-
-# 高級守衛（多個物品）
-3 Guard3
-Gun;RedKey;HealthPack
-40,47|46,53
+```json
+{
+  "entities": [
+    {
+      "entityIndex": 0,
+      "type": "Enemy",
+      "items": ["Knife"],
+      "patrolPoints": [{"x": 20, "y": 50, "z": 0}],
+      "rotation": 180
+    },
+    {
+      "entityIndex": 1,
+      "type": "Enemy",
+      "items": ["Knife", "RedKey"],
+      "patrolPoints": [
+        {"x": 22, "y": 41, "z": 0},
+        {"x": 35, "y": 41, "z": 0},
+        {"x": 35, "y": 14, "z": 0},
+        {"x": 22, "y": 14, "z": 0}
+      ],
+      "rotation": 180
+    },
+    {
+      "entityIndex": 0,
+      "type": "Player",
+      "items": ["Knife", "Gun"],
+      "patrolPoints": [{"x": 4, "y": 26, "z": 0}],
+      "rotation": 0
+    },
+    {
+      "entityIndex": 0,
+      "type": "Target",
+      "items": [],
+      "patrolPoints": [{"x": 80, "y": 26, "z": 0}],
+      "rotation": 0,
+      "escapePoint": {"x": 47, "y": 54, "z": 0}
+    }
+  ]
+}
 ```
+
+### JSON 格式優點
+
+1. ✅ **結構化**：清晰的層次結構，易於理解
+2. ✅ **類型明確**：數字、字串、陣列自動識別
+3. ✅ **易於擴展**：新增字段不需要修改解析邏輯
+4. ✅ **工具支持**：編輯器自動補全、語法高亮、驗證
+5. ✅ **錯誤提示**：JSON 格式錯誤會直接報錯，定位問題更容易
 
 ## 🔧 Unity Inspector 設定
 
-### EnemyManager 組件設定
+### EntityManager 組件設定
 
-在 Unity 的 EnemyManager 組件中，您需要設定：
+在 Unity 的 EntityManager 組件中，您需要設定：
 
 1. **Patrol Data File**
-   - 將 `patroldata.txt` 拖曳到此欄位
+   - 將 `patroldata.json` 拖曳到此欄位
 
 2. **Item Mappings** (物品名稱映射)
    - 點擊 "+" 添加新的映射
    - 每個映射包含：
-     - **Item Name**: 物品名稱（必須與 patroldata.txt 中的名稱完全一致）
+     - **Item Name**: 物品名稱（必須與數據文件中的名稱完全一致）
      - **Item Prefab**: 物品的 Prefab 參考
 
 ### 設定範例
@@ -107,26 +129,25 @@ Item Mappings:
 
 系統會在生成敵人時：
 1. 清空敵人的 ItemHolder
-2. 根據 patroldata.txt 中定義的物品名稱
+2. 根據數據文件中定義的物品名稱
 3. 查找 Inspector 中設定的映射
 4. 自動將對應的 Prefab 裝備到敵人身上
 
-## 🎯 敵人類型應用
+## 🎯 實體類型應用
 
 ### 不同類型的用途
 
 - **Enemy**: 基礎敵人，用於一般場景
-- **Guard1/2/3**: 不同等級的守衛
-  - Guard1: 低級守衛（可能較弱、速度慢）
-  - Guard2: 中級守衛
-  - Guard3: 高級守衛（可能較強、速度快）
 - **Target**: 玩家的任務目標
   - 通常不配備武器
   - 可能有特殊的 AI 行為
+  - 可以設置逃亡點（escapePoint）
+- **Player**: 玩家初始位置和裝備
+- **Exit**: 出口點（勝利條件）
 
 ### 未來擴展
 
-您可以在代碼中根據 `enemyType` 實現不同的行為：
+您可以在代碼中根據 `type` 實現不同的行為：
 - 不同的移動速度
 - 不同的血量
 - 不同的視野範圍
@@ -139,10 +160,11 @@ Item Mappings:
    - `Knife` 和 `knife` 是不同的物品
    - 建議統一使用首字母大寫的駝峰命名法
 
-2. **空行和註釋**
-   - 使用 `#` 開頭的行為註釋
-   - 空行會被自動跳過
-   - 建議在每個敵人定義前加上註釋
+2. **JSON 格式要求**
+   - 必須是有效的 JSON 格式
+   - 所有字串必須用雙引號 `"` 包裹
+   - 數組和對象格式必須正確
+   - 可以使用 JSON 驗證工具檢查格式
 
 3. **巡邏點順序**
    - 敵人會按照定義的順序巡邏
@@ -151,44 +173,42 @@ Item Mappings:
 4. **錯誤處理**
    - 如果找不到物品映射，會在 Console 顯示警告
    - 敵人仍會生成，但不會裝備該物品
+   - JSON 解析失敗會顯示錯誤訊息並創建默認數據
 
 ## 🐛 除錯技巧
 
 ### 查看載入資訊
 
 在 Unity Console 中可以看到：
-- 每個敵人的載入資訊
+- 每個實體的載入資訊
 - 物品映射的設定
 - 巡邏點的數量
 
 ### 常見問題
 
-1. **敵人沒有裝備物品**
+1. **實體沒有裝備物品**
    - 檢查 Item Mappings 是否正確設定
    - 檢查物品名稱是否完全一致（包括大小寫）
 
-2. **敵人沒有生成**
-   - 檢查 patroldata.txt 格式是否正確
+2. **實體沒有生成**
+   - 檢查 JSON 文件格式是否正確
    - 檢查 Console 是否有錯誤訊息
+   - 確認文件已正確拖曳到 Inspector
 
 3. **巡邏點不正確**
-   - 檢查座標格式是否為 `x,y`
-   - 檢查是否使用 `|` 分隔多個點
+   - 檢查座標格式是否為 `{"x": float, "y": float, "z": float}`
+   - 確認數組格式正確
+
+4. **JSON 解析失敗**
+   - 使用 JSON 驗證工具檢查格式
+   - 確認所有字串都用雙引號包裹
+   - 確認數組和對象格式正確
+   - 檢查是否有語法錯誤（多餘的逗號、缺少括號等）
 
 ## 📚 相關檔案
 
-- `patroldata.txt`: 敵人資料檔案
-- `EnemyManager.cs`: 管理敵人生成的腳本
+- `patroldata.json`: JSON 格式數據文件
+- `EntityDataLoader.cs`: 數據載入器
+- `EntityManager.cs`: 管理實體生成的腳本
 - `ItemHolder.cs`: 管理物品裝備的腳本
 - `Enemy.cs`: 敵人主控制腳本
-
-## 🔄 從舊格式遷移
-
-如果您有舊格式的 patroldata.txt，新系統仍保持向後相容：
-- 舊的 `enemyPatrolData` 列表仍然存在
-- 可以繼續使用 `GetEnemyPatrolPoints()` 方法
-- 建議逐步遷移到新格式以使用完整功能
-
-
-
-

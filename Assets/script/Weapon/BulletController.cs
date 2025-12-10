@@ -36,14 +36,16 @@ public class BulletController : MonoBehaviour
         // 跳過攻擊者本人
         if (other.gameObject == attacker) return;
         
-        Debug.Log($"子彈擊中: {other.gameObject.name}");
+        ////Debug.Log($"子彈擊中: {other.gameObject.name}");
         
         // 檢查是否擊中敵人
         var enemy = other.GetComponent<Enemy>();
         if (enemy != null)
         {
-            Debug.Log($"子彈擊中敵人: {enemy.gameObject.name}");
-            enemy.Die();
+            ////Debug.Log($"子彈擊中敵人: {enemy.gameObject.name}");
+            // 使用 TakeDamage 統一處理傷害和死亡流程
+            Vector2 attackerPos = attacker != null ? (Vector2)attacker.transform.position : transform.position;
+            enemy.TakeDamage(damage, "Bullet", attackerPos);
             DestroyBullet();
             return;
         }
@@ -52,19 +54,20 @@ public class BulletController : MonoBehaviour
         var player = other.GetComponent<Player>();
         if (player != null)
         {
-            Debug.Log($"子彈擊中玩家: {player.gameObject.name}");
+            ////Debug.Log($"子彈擊中玩家: {player.gameObject.name}");
             
             // 檢查攻擊者是否是敵人
             var enemyAttacker = attacker?.GetComponent<Enemy>();
             if (enemyAttacker != null)
             {
-                player.TakeDamage(damage, "Enemy Bullet Attack");
-                Debug.Log($"敵人子彈對玩家造成 {damage} 點傷害");
+                Vector2 attackerPos = attacker != null ? (Vector2)attacker.transform.position : transform.position;
+                player.TakeDamage(damage, "Enemy Bullet Attack", attackerPos);
+                ////Debug.Log($"敵人子彈對玩家造成 {damage} 點傷害");
             }
             else
             {
                 // 玩家射擊玩家（friendly fire）
-                Debug.Log("玩家子彈擊中玩家 - 可能是 friendly fire");
+                ////Debug.Log("玩家子彈擊中玩家 - 可能是 friendly fire");
             }
             
             DestroyBullet();
@@ -74,7 +77,7 @@ public class BulletController : MonoBehaviour
         // 檢查是否擊中牆壁或其他障礙物
         if (other.CompareTag("Wall") || other.CompareTag("Obstacle"))
         {
-            Debug.Log($"子彈擊中障礙物: {other.gameObject.name}");
+            ////Debug.Log($"子彈擊中障礙物: {other.gameObject.name}");
             DestroyBullet();
             return;
         }

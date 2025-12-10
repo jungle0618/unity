@@ -81,7 +81,7 @@ namespace Game.EntityManager
 
             if (showDebugInfo)
             {
-                Debug.Log($"EntityItemManager: Initialized {itemNameToPrefab.Count} item mappings");
+                //Debug.Log($"EntityItemManager: Initialized {itemNameToPrefab.Count} item mappings");
             }
         }
 
@@ -136,18 +136,51 @@ namespace Game.EntityManager
                     equippedCount++;
                     if (showDebugInfo)
                     {
-                        Debug.Log($"EntityItemManager: Equipped '{itemName}' to {entity.name}");
+                        //Debug.Log($"EntityItemManager: Added '{itemName}' to {entity.name}");
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"EntityItemManager: Failed to equip '{itemName}' to {entity.name}");
+                    Debug.LogWarning($"EntityItemManager: Failed to add '{itemName}' to {entity.name}");
+                }
+            }
+
+            // 添加完所有物品後，裝備第一個物品（優先裝備武器）
+            if (equippedCount > 0)
+            {
+                // 優先尋找武器並裝備
+                var weapons = itemHolder.GetItemsOfType<Weapon>();
+                if (weapons.Count > 0)
+                {
+                    // 裝備第一個武器
+                    var allItems = itemHolder.GetAllItems();
+                    for (int i = 0; i < allItems.Count; i++)
+                    {
+                        if (allItems[i] is Weapon)
+                        {
+                            itemHolder.SwitchToItem(i);
+                            if (showDebugInfo)
+                            {
+                                //Debug.Log($"EntityItemManager: Equipped first weapon '{weapons[0].ItemName}' to {entity.name}");
+                            }
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // 沒有武器，裝備第一個物品
+                    itemHolder.SwitchToItem(0);
+                    if (showDebugInfo)
+                    {
+                        //Debug.Log($"EntityItemManager: Equipped first item to {entity.name}");
+                    }
                 }
             }
 
             if (showDebugInfo && equippedCount > 0)
             {
-                Debug.Log($"EntityItemManager: Equipped {equippedCount} items to {entity.name}");
+                //Debug.Log($"EntityItemManager: Added {equippedCount} items to {entity.name}");
             }
         }
 

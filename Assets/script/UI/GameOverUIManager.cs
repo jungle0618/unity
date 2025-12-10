@@ -95,17 +95,12 @@ public class GameOverUIManager : MonoBehaviour
             return;
         }
         
-        // 當遊戲結束時顯示，其他狀態隱藏
+        // 當遊戲結束時，不立即顯示（等待對話完成後由 MissionDialogueManager 顯示）
+        // 其他狀態隱藏
         if (newState == GameManager.GameState.GameOver)
         {
-            SetVisible(true);
-            
-            // Hide all gameplay UI
-            GameUIManager gameUIManager = FindFirstObjectByType<GameUIManager>();
-            if (gameUIManager != null)
-            {
-                gameUIManager.HideAllGameplayUI();
-            }
+            // 不自動顯示，等待對話完成後由 MissionDialogueManager 調用 GameUIManager.ShowGameOverUI()
+            // SetVisible(true); // 已移除，由 MissionDialogueManager 控制
         }
         else
         {

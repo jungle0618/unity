@@ -8,6 +8,9 @@ using UnityEngine;
 public abstract class BaseVisualizer : MonoBehaviour
 {
     
+    [Header("SpriteRenderer 控制設定")]
+    [SerializeField] protected bool enableSpriteRendererToggle = true; // 是否啟用 SpriteRenderer 的顯示/隱藏切換（用於視野系統）
+    
     [Header("運行時視野顯示設定")]
     [SerializeField] protected bool showRuntimeVision = false; // 是否在遊戲運行時顯示視野範圍
     [SerializeField] protected bool useRuntimeMesh = true; // 是否使用 Mesh 繪製實心視野（否則只顯示輪廓線）
@@ -52,10 +55,6 @@ public abstract class BaseVisualizer : MonoBehaviour
     private int wallsLayerIndex = -1;
     private bool layerCacheInitialized = false;
     
-    // 視野更新快取
-    protected Vector3[] lastVisionPoints;
-    protected bool visionNeedsUpdate = true;
-    
     /// <summary>
     /// 設置是否在運行時顯示視野範圍
     /// </summary>
@@ -71,6 +70,65 @@ public abstract class BaseVisualizer : MonoBehaviour
     public virtual bool GetShowRuntimeVision()
     {
         return showRuntimeVision;
+    }
+    
+    /// <summary>
+    /// 設置是否啟用 SpriteRenderer 的顯示/隱藏切換（用於視野系統）
+    /// </summary>
+    public virtual void SetEnableSpriteRendererToggle(bool enable)
+    {
+        enableSpriteRendererToggle = enable;
+    }
+    
+    /// <summary>
+    /// 獲取是否啟用 SpriteRenderer 的顯示/隱藏切換
+    /// </summary>
+    public virtual bool GetEnableSpriteRendererToggle()
+    {
+        return enableSpriteRendererToggle;
+    }
+    
+    /// <summary>
+    /// 檢查實體是否持有任何鑰匙
+    /// </summary>
+    protected virtual bool HasAnyKey()
+    {
+        if (itemHolder == null) return false;
+        
+        var allItems = itemHolder.GetAllItems();
+        foreach (var item in allItems)
+        {
+            if (item is Key)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// 根據鑰匙持有狀態更新 SpriteRenderer 可見性
+    /// 如果實體持有鑰匙，強制顯示 SpriteRenderer（無論 enableSpriteRendererToggle 設定）
+    /// </summary>
+    protected virtual void UpdateSpriteRendererByKeyStatus()
+    {
+        if (spriteRenderer == null) return;
+        
+        bool hasKey = HasAnyKey();
+        if (hasKey)
+        {
+            // 有鑰匙時強制顯示
+            if (!spriteRenderer.enabled)
+            {
+                spriteRenderer.enabled = true;
+            }
+        }
+        else
+        {
+            // 沒有鑰匙時，根據 enableSpriteRendererToggle 決定是否保持顯示
+            // 如果 toggle 已禁用，保持當前狀態不變
+            // 這樣可以避免在沒鑰匙時意外隱藏特殊敵人的 sprite
+        }
     }
     
     /// <summary>
@@ -94,9 +152,22 @@ public abstract class BaseVisualizer : MonoBehaviour
     public virtual void SetRendererVisibility(bool visible)
     {
         // 禁用/啟用實體自身的 SpriteRenderer
+        // 優先規則：如果持有鑰匙，強制顯示
+        // 否則：僅當啟用切換功能時才根據 visible 參數切換
         if (spriteRenderer != null)
         {
-            spriteRenderer.enabled = visible;
+            bool hasKey = HasAnyKey();
+            if (hasKey)
+            {
+                // 有鑰匙時強制顯示
+                spriteRenderer.enabled = true;
+            }
+            else if (enableSpriteRendererToggle)
+            {
+                // 沒鑰匙且啟用切換時，根據可見性參數設定
+                spriteRenderer.enabled = visible;
+            }
+            // 否則保持當前狀態不變
         }
         
         // 禁用/啟用視野相關的渲染組件
@@ -143,14 +214,6 @@ public abstract class BaseVisualizer : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 設定視覺化顏色（由子類別實現具體邏輯）
-    /// </summary>
-    public virtual void SetVisualizationColors(params Color[] colors)
-    {
-        // 子類別可以覆寫此方法
-    }
-    
     private void Awake()
     {
         // 初始化圖層快取
@@ -422,8 +485,6 @@ public abstract class BaseVisualizer : MonoBehaviour
         {
             UpdateVisionMesh(center, rayEndPoints, color);
         }
-        
-        lastVisionPoints = rayEndPoints;
     }
     
     /// <summary>

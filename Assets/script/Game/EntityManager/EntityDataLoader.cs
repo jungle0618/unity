@@ -5,7 +5,7 @@ namespace Game.EntityManager
 {
     /// <summary>
     /// 實體數據載入器
-    /// 職責：從 patroldata.txt 載入實體數據（Enemy, Target, Player）
+    /// 職責：從 patroldata.json 載入實體數據（Enemy, Target, Player）
     /// </summary>
     public class EntityDataLoader
     {
@@ -19,16 +19,44 @@ namespace Game.EntityManager
             Exit    // 出口點（勝利條件）
         }
 
+        // JSON 序列化用的 Vector3 結構
+        [System.Serializable]
+        private class Vector3Data
+        {
+            public float x;
+            public float y;
+            public float z;
+        }
+
+        // JSON 序列化用的實體數據結構
+        [System.Serializable]
+        private class EntityDataJson
+        {
+            public int entityIndex;
+            public string type;
+            public string[] items;
+            public Vector3Data[] patrolPoints;
+            public float rotation;
+            public Vector3Data escapePoint;
+        }
+
+        // JSON 根結構
+        [System.Serializable]
+        private class PatrolDataJson
+        {
+            public EntityDataJson[] entities;
+        }
+
         // 實體資料結構（擴展以支持不同類型）
         [System.Serializable]
         public class EntityData
         {
             public int entityIndex;
-            public string entityType; // 保留以向後兼容
             public EntityType type = EntityType.Enemy; // 實體類型
             public List<string> itemNames = new List<string>();
             public Vector3[] patrolPoints;
             public Vector3 escapePoint = Vector3.zero; // Target 的逃亡點（可選）
+            public float initialRotation = 0f; // 初始朝向（度數）
         }
 
         private List<EntityData> entityDataList = new List<EntityData>();
@@ -42,12 +70,7 @@ namespace Game.EntityManager
         }
 
         /// <summary>
-        /// 從TextAsset載入所有實體的patrol points（擴展格式）
-        /// 格式：
-        /// Line 1: {EntityIndex} {EntityType} [EntityType 可以是: Enemy, Target, Player]
-        /// Line 2: {Items} (separated by semicolon, "None" for no items)
-        /// Line 3: {Patrol points} (x,y format, separated by | if multiple)
-        /// Line 4 (可選): {Escape point} (x,y format, 僅用於 Target 類型)
+        /// 從TextAsset載入所有實體的patrol points（JSON 格式）
         /// </summary>
         public bool LoadPatrolData(TextAsset patrolDataFile)
         {
@@ -55,157 +78,102 @@ namespace Game.EntityManager
 
             if (patrolDataFile == null)
             {
-                Debug.LogError("EntityDataLoader: Patrol data file (TextAsset) is not assigned! Please assign the patroldata.txt file in the inspector.");
+                Debug.LogError("EntityDataLoader: Patrol data file (TextAsset) is not assigned! Please assign the patroldata.json file in the inspector.");
                 CreateDefaultPatrolData();
                 return false;
             }
 
+            return LoadJsonFormat(patrolDataFile);
+        }
+
+        /// <summary>
+        /// 從 JSON 格式載入數據
+        /// </summary>
+        private bool LoadJsonFormat(TextAsset patrolDataFile)
+        {
             try
             {
-                string[] lines = patrolDataFile.text.Split('\n');
-                int lineIndex = 0;
-
-                while (lineIndex < lines.Length)
+                PatrolDataJson jsonData = JsonUtility.FromJson<PatrolDataJson>(patrolDataFile.text);
+                
+                if (jsonData == null || jsonData.entities == null)
                 {
-                    string line = lines[lineIndex].Trim();
+                    return false;
+                }
 
-                    // 跳過註釋和空行
-                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
-                    {
-                        lineIndex++;
-                        continue;
-                    }
-
-                    // 第1行：讀取 EntityIndex 和 EntityType
-                    string[] indexTypeParts = line.Split(new char[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
-                    if (indexTypeParts.Length < 2)
-                    {
-                        Debug.LogWarning($"EntityDataLoader: Invalid entity definition at line {lineIndex}: {line}");
-                        lineIndex++;
-                        continue;
-                    }
-
+                foreach (var jsonEntity in jsonData.entities)
+                {
                     EntityData entityData = new EntityData();
-                    entityData.entityIndex = int.Parse(indexTypeParts[0]);
-                    entityData.entityType = indexTypeParts[1];
+                    entityData.entityIndex = jsonEntity.entityIndex;
+                    entityData.initialRotation = jsonEntity.rotation;
 
-                    // 根據 EntityType 字符串設置類型
-                    if (indexTypeParts[1].Equals("Target", System.StringComparison.OrdinalIgnoreCase))
+                    // 解析類型
+                    if (jsonEntity.type.Equals("Target", System.StringComparison.OrdinalIgnoreCase))
                     {
                         entityData.type = EntityType.Target;
                     }
-                    else if (indexTypeParts[1].Equals("Player", System.StringComparison.OrdinalIgnoreCase))
+                    else if (jsonEntity.type.Equals("Player", System.StringComparison.OrdinalIgnoreCase))
                     {
                         entityData.type = EntityType.Player;
                     }
-                    else if (indexTypeParts[1].Equals("Exit", System.StringComparison.OrdinalIgnoreCase))
+                    else if (jsonEntity.type.Equals("Exit", System.StringComparison.OrdinalIgnoreCase))
                     {
                         entityData.type = EntityType.Exit;
                     }
                     else
                     {
-                        entityData.type = EntityType.Enemy; // 默認為 Enemy
+                        entityData.type = EntityType.Enemy;
                     }
 
-                    lineIndex++;
-
-                    // 第2行：讀取 Items
-                    if (lineIndex < lines.Length)
+                    // 解析物品列表
+                    if (jsonEntity.items != null)
                     {
-                        string itemsLine = lines[lineIndex].Trim();
-                        if (!string.IsNullOrWhiteSpace(itemsLine) && !itemsLine.StartsWith("#"))
+                        foreach (string item in jsonEntity.items)
                         {
-                            if (itemsLine != "None")
+                            if (!string.IsNullOrEmpty(item))
                             {
-                                string[] itemNames = itemsLine.Split(';');
-                                foreach (string itemName in itemNames)
-                                {
-                                    string trimmedName = itemName.Trim();
-                                    if (!string.IsNullOrEmpty(trimmedName))
-                                    {
-                                        entityData.itemNames.Add(trimmedName);
-                                    }
-                                }
-                            }
-                            lineIndex++;
-                        }
-                    }
-
-                    // 第3行：讀取 Patrol Points
-                    if (lineIndex < lines.Length)
-                    {
-                        string patrolLine = lines[lineIndex].Trim();
-                        if (!string.IsNullOrWhiteSpace(patrolLine) && !patrolLine.StartsWith("#"))
-                        {
-                            List<Vector3> patrolPoints = new List<Vector3>();
-                            string[] pointsArray = patrolLine.Split('|');
-
-                            foreach (string pointStr in pointsArray)
-                            {
-                                string[] coords = pointStr.Split(',');
-                                if (coords.Length >= 2)
-                                {
-                                    float x = float.Parse(coords[0].Trim());
-                                    float y = float.Parse(coords[1].Trim());
-                                    float z = 0f;
-                                    patrolPoints.Add(new Vector3(x, y, z));
-                                }
-                            }
-
-                            entityData.patrolPoints = patrolPoints.ToArray();
-                            lineIndex++;
-                        }
-                    }
-
-                    // 第4行（可選）：讀取逃亡點（僅用於 Target）
-                    if (entityData.type == EntityType.Target && lineIndex < lines.Length)
-                    {
-                        string escapeLine = lines[lineIndex].Trim();
-                        if (!string.IsNullOrWhiteSpace(escapeLine) && !escapeLine.StartsWith("#"))
-                        {
-                            string[] escapeCoords = escapeLine.Split(',');
-                            if (escapeCoords.Length >= 2)
-                            {
-                                float x = float.Parse(escapeCoords[0].Trim());
-                                float y = float.Parse(escapeCoords[1].Trim());
-                                entityData.escapePoint = new Vector3(x, y, 0f);
-                                lineIndex++;
+                                entityData.itemNames.Add(item);
                             }
                         }
                     }
 
-                    // 添加到列表
-                    // Enemy 和 Target 需要 patrol points，Player 和 Exit 只需要位置（第一個點）
-                    if (entityData.type == EntityType.Player || entityData.type == EntityType.Exit)
+                    // 解析巡邏點
+                    if (jsonEntity.patrolPoints != null && jsonEntity.patrolPoints.Length > 0)
                     {
-                        // Player 和 Exit 只需要第一個點作為初始位置
-                        if (entityData.patrolPoints != null && entityData.patrolPoints.Length > 0)
+                        List<Vector3> patrolPoints = new List<Vector3>();
+                        foreach (var point in jsonEntity.patrolPoints)
                         {
-                            entityDataList.Add(entityData);
+                            patrolPoints.Add(new Vector3(point.x, point.y, point.z));
                         }
+                        entityData.patrolPoints = patrolPoints.ToArray();
                     }
-                    else if (entityData.patrolPoints != null && entityData.patrolPoints.Length > 0)
+
+                    // 解析逃亡點（僅用於 Target）
+                    if (jsonEntity.escapePoint != null && entityData.type == EntityType.Target)
+                    {
+                        entityData.escapePoint = new Vector3(
+                            jsonEntity.escapePoint.x,
+                            jsonEntity.escapePoint.y,
+                            jsonEntity.escapePoint.z
+                        );
+                    }
+
+                    // 驗證數據有效性
+                    if (entityData.patrolPoints != null && entityData.patrolPoints.Length > 0)
                     {
                         entityDataList.Add(entityData);
-                    }
-
-                    // 跳過空行（用於分隔實體定義）
-                    while (lineIndex < lines.Length && string.IsNullOrWhiteSpace(lines[lineIndex].Trim()))
-                    {
-                        lineIndex++;
                     }
                 }
 
                 if (showDebugInfo)
                 {
-                    Debug.Log($"EntityDataLoader: Loaded {entityDataList.Count} entities from {patrolDataFile.name}");
+                    Debug.Log($"EntityDataLoader: Successfully loaded {entityDataList.Count} entities from JSON format");
                 }
 
-                return true;
+                return entityDataList.Count > 0;
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"EntityDataLoader: Error loading patrol data: {e.Message}");
+                Debug.LogError($"EntityDataLoader: Error loading JSON format patrol data: {e.Message}");
                 CreateDefaultPatrolData();
                 return false;
             }
@@ -222,7 +190,6 @@ namespace Game.EntityManager
             EntityData defaultEnemy = new EntityData
             {
                 entityIndex = 0,
-                entityType = "Enemy",
                 type = EntityType.Enemy,
                 patrolPoints = new Vector3[] { Vector3.zero }
             };

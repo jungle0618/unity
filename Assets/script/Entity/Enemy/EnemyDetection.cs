@@ -8,6 +8,7 @@ using UnityEngine;
 /// 
 /// 【封裝說明】
 /// 此類的屬性（如 viewRange, viewAngle, chaseRange）應通過 Enemy 類的公共方法進行修改，而不是直接訪問。
+/// 注意：chaseRange 是 Enemy 專屬功能，不在基類中。
 /// 正確方式：使用 Enemy.UpdateDangerLevelStats() 來更新偵測參數。
 /// </summary>
 public class EnemyDetection : BaseDetection
@@ -54,6 +55,7 @@ public class EnemyDetection : BaseDetection
     private DangerousManager dangerousManager;
     private Camera mainCamera;
     private Player player; // 快取 Player 引用以檢查蹲下狀態
+    private Enemy enemy; // 快取 Enemy 引用以獲取 nearViewRange
 
     /// <summary>
     /// 設定狀態機引用（由 Enemy 調用）
@@ -73,8 +75,9 @@ public class EnemyDetection : BaseDetection
             mainCamera = FindFirstObjectByType<Camera>();
         }
         
-        // 快取 Player 引用
+        // 快取 Player 和 Enemy 引用
         player = FindFirstObjectByType<Player>();
+        enemy = GetComponent<Enemy>();
     }
     
     /// <summary>
@@ -98,40 +101,23 @@ public class EnemyDetection : BaseDetection
 
     private void Update()
     {
-        // 每幀彙報距離與可視狀態給 DangerousManager
+        // 每幀彙報距離、視野半徑與可視狀態給 DangerousManager
         if (dangerousManager == null) return;
 
         // 檢查是否應該進行偵測
         if (!ShouldPerformDetection())
         {
             // 如果不需要偵測，報告最大距離和不可見狀態
-            dangerousManager.ReportEnemyPerception(float.MaxValue, false);
-            dangerousManager.ReportEnemyActuallySeesPlayer(false);
+            dangerousManager.ReportEnemyPerception(float.MaxValue, 0f, false);
             return;
         }
 
         bool canSee = CanSeeCurrentTarget();
         float distance = GetDistanceToTarget();
+        float currentViewRange = GetViewRange(); // 獲取當前視野半徑（最終值）
         
-        // 【新增】總是回報敵人是否實際看到玩家（用於防止危險值在追擊時下降）
-        dangerousManager.ReportEnemyActuallySeesPlayer(canSee);
-        
-        // 【新增】檢查是否應該增加危險等級
-        // 在 Safe Area 中，如果玩家沒有武器，不應該增加危險等級
-        bool shouldIncreaseDanger = ShouldIncreaseDangerLevel(canSee);
-        
-        // 如果不應該增加危險，完全不報告給 DangerousManager
-        // 這樣距離也不會影響危險值
-        if (!shouldIncreaseDanger)
-        {
-            // 報告最大距離（表示沒有威脅）
-            dangerousManager.ReportEnemyPerception(float.MaxValue, false);
-        }
-        else
-        {
-            // 正常報告距離和可見性
-            dangerousManager.ReportEnemyPerception(distance, canSee);
-        }
+        // 報告距離、視野半徑和可見性
+        dangerousManager.ReportEnemyPerception(distance, currentViewRange, canSee);
     }
     
     /// <summary>
@@ -197,24 +183,13 @@ public class EnemyDetection : BaseDetection
         return playerHasWeapon;
     }
 
-    /// <summary>
-    /// 設定偵測目標（覆寫基類方法）
-    /// </summary>
-    public override void SetTarget(Transform playerTarget)
-    {
-        base.SetTarget(playerTarget);
-    }
-
-    /// <summary>
-    /// 檢查是否可以看到玩家（保留向後兼容的別名）
-    /// </summary>
-    public bool CanSeePlayer()
-    {
-        return CanSeeCurrentTarget();
-    }
+    // CanSeePlayer() 已由基類 BaseDetection 統一提供
 
     /// <summary>
     /// 檢查是否可以看到指定目標（覆寫基類抽象方法）
+    /// 檢查兩個視野範圍：
+    /// 1. 主要視野（有角度限制）
+    /// 2. 360度視野（全方向，近距離，僅在危險等級最高或Chase/Search狀態時有效）
     /// </summary>
     public override bool CanSeeTarget(Vector2 targetPos)
     {
@@ -223,10 +198,30 @@ public class EnemyDetection : BaseDetection
         
         Vector2 currentPos = transform.position;
         Vector2 dirToTarget = targetPos - currentPos;
+        float distanceToTarget = dirToTarget.magnitude;
 
-        // 距離檢查（使用從 Enemy 獲取的視野範圍）
+        // 首先檢查360度視野（近距離全方向，僅在特定條件下有效）
+        if (ShouldUseNearViewRange())
+        {
+            float nearViewRange = GetNearViewRange();
+            if (distanceToTarget <= nearViewRange)
+            {
+                // 在360度視野範圍內，只需要檢查遮擋
+                if (!IsBlockedByObstacle(currentPos, targetPos))
+                {
+                    // 自動面向目標（如果啟用）
+                    if (lookAtTarget && dirToTarget.magnitude > 0.1f)
+                    {
+                        LookAtTarget(dirToTarget);
+                    }
+                    return true;
+                }
+            }
+        }
+
+        // 如果不在360度視野內，檢查主要視野（有角度限制）
         float currentViewRange = GetViewRange();
-        if (dirToTarget.magnitude > currentViewRange)
+        if (distanceToTarget > currentViewRange)
             return false;
 
         // 角度檢查：以 transform.rotation 為基準（使用從 Enemy 獲取的視野角度）
@@ -258,11 +253,14 @@ public class EnemyDetection : BaseDetection
     /// </summary>
     public override void SetDetectionParameters(params object[] parameters)
     {
-        if (parameters.Length >= 3)
+        if (parameters.Length >= 2)
         {
             currentViewRange = (float)parameters[0];
             currentViewAngle = (float)parameters[1];
-            chaseRange = (float)parameters[2];
+        }
+        if (parameters.Length >= 3)
+        {
+            chaseRange = (float)parameters[2]; // 更新追擊範圍
         }
     }
 
@@ -274,11 +272,11 @@ public class EnemyDetection : BaseDetection
     {
         currentViewRange = newViewRange;
         currentViewAngle = newViewAngle;
-        chaseRange = newChaseRange;
+        chaseRange = newChaseRange; // 更新追擊範圍
     }
 
     /// <summary>
-    /// 檢查目標是否超出追擊範圍
+    /// 檢查目標是否超出追擊範圍（僅 Enemy 使用）
     /// </summary>
     public bool IsTargetOutOfChaseRange()
     {
@@ -286,41 +284,10 @@ public class EnemyDetection : BaseDetection
         return Vector2.Distance(transform.position, GetTarget().position) > chaseRange;
     }
 
-    /// <summary>
-    /// 獲取朝向目標的方向（覆寫基類方法）
-    /// </summary>
-    public override Vector2 GetDirectionToTarget()
-    {
-        return base.GetDirectionToTarget();
-    }
-
-    /// <summary>
-    /// 獲取到目標的距離（覆寫基類方法）
-    /// </summary>
-    public override float GetDistanceToTarget()
-    {
-        return base.GetDistanceToTarget();
-    }
-
     // IsBlockedByObstacle 已移至 BaseDetection
+    // SetTarget, GetDirectionToTarget, GetDistanceToTarget, HasValidTarget, ClearTarget 已由基類 BaseDetection 統一提供
 
     public void SetRaycastDetection(bool enabled) => useRaycastDetection = enabled;
-
-    /// <summary>
-    /// 檢查是否有有效的目標（覆寫基類方法）
-    /// </summary>
-    public override bool HasValidTarget()
-    {
-        return base.HasValidTarget();
-    }
-
-    /// <summary>
-    /// 清除目標（覆寫基類方法）
-    /// </summary>
-    public override void ClearTarget()
-    {
-        base.ClearTarget();
-    }
 
     /// <summary>
     /// 面向目標方向
@@ -378,6 +345,39 @@ public class EnemyDetection : BaseDetection
     }
 
     /// <summary>
+    /// 檢查是否應該使用360度視野（nearViewRange）
+    /// 條件：危險等級最高（Critical）或處於 Chase/Search 狀態
+    /// </summary>
+    private bool ShouldUseNearViewRange()
+    {
+        // 檢查是否處於 Chase 或 Search 狀態
+        if (stateMachine != null)
+        {
+            EnemyState currentState = stateMachine.CurrentState;
+            if (currentState == EnemyState.Chase || currentState == EnemyState.Search)
+            {
+                return true;
+            }
+        }
+
+        // 檢查危險等級是否為最高（Critical）
+        if (dangerousManager != null)
+        {
+            return dangerousManager.CurrentDangerLevelType == DangerousManager.DangerLevel.Critical;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 獲取近距離360度視野範圍（從 Enemy 獲取）
+    /// </summary>
+    private float GetNearViewRange()
+    {
+        return enemy != null ? enemy.NearViewRange : 2f; // 默認值
+    }
+
+    /// <summary>
     /// 檢查敵人是否在攝影機視野外
     /// </summary>
     private bool IsOutsideCameraView()
@@ -395,6 +395,16 @@ public class EnemyDetection : BaseDetection
     }
 
     /// <summary>
+    /// 檢查敵人是否在攝影機視野內
+    /// </summary>
+    public bool IsInsideCameraView()
+    {
+        if (!enableCameraCulling || mainCamera == null) return true; // 如果未啟用剔除，視為在視野內
+
+        return !IsOutsideCameraView();
+    }
+
+    /// <summary>
     /// 檢查是否應該進行偵測
     /// </summary>
     private bool ShouldPerformDetection()
@@ -405,7 +415,7 @@ public class EnemyDetection : BaseDetection
             // 只有在追擊或搜索狀態時才繼續偵測
             if (stateMachine != null)
             {
-                return stateMachine.CurrentState == EnemyState.Chase || 
+                return stateMachine.CurrentState == EnemyState.Chase ||
                        stateMachine.CurrentState == EnemyState.Search;
             }
         }
@@ -413,30 +423,5 @@ public class EnemyDetection : BaseDetection
         return true; // 其他情況都進行偵測
     }
 
-    /// <summary>
-    /// 檢查是否應該更新 AI 邏輯（考慮攝影機剔除）
-    /// 根據 enemy_ai.md：當不在 Chase 或 Search 狀態且不在攝影機範圍內時，不更新 AI
-    /// </summary>
-    public bool ShouldUpdateAI()
-    {
-        if (stateMachine == null) return false;
-        
-        EnemyState currentState = stateMachine.CurrentState;
-        
-        // Chase 和 Search 狀態始終更新（即使視野外）
-        if (currentState == EnemyState.Chase || currentState == EnemyState.Search)
-        {
-            return true;
-        }
-        
-        // 其他狀態需要檢查是否在攝影機視野內
-        if (enableCameraCulling && IsOutsideCameraView())
-        {
-            // 不在 Chase/Search 狀態且不在攝影機視野內，不更新 AI
-            return false;
-        }
-        
-        return true; // 在攝影機視野內，正常更新
-    }
 
 }

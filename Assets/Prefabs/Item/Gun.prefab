@@ -4968,6 +4968,7 @@ GameObject:
   m_Component:
   - component: {fileID: 64429745122103922}
   - component: {fileID: 8893544660778553826}
+  - component: {fileID: 3143689069840469098}
   m_Layer: 0
   m_Name: Gun
   m_TagString: Untagged
@@ -5016,7 +5017,34 @@ MonoBehaviour:
   startingAmmo: 3
   bulletPrefab: {fileID: 3795827902366607150, guid: 1e30be19f9284df4cbe350826c5bbac4,
     type: 3}
-  bulletSpeed: 30
+  bulletSpeed: 250
   firePoint: {fileID: 2495505718286392461}
   alertRange: 15
   muzzleFlash: {fileID: 0}
+  enableBaseJitter: 1
+  maxBaseJitterAngle: 4
+  enableMovementJitter: 1
+  maxJitterAngle: 10
+  jitterSpeedThreshold: 0.1
+--- !u!114 &3143689069840469098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6995291979389097282}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 703f76e04b12409ca6b2cca57863a2fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GunTrajectoryGuide
+  lineColor: {r: 1, g: 0, b: 0, a: 0.5}
+  lineWidth: 0.05
+  lineLength: 5
+  segmentCount: 10
+  dashLength: 0.5
+  gapLength: 0.5
+  jitterAreaColor: {r: 1, g: 0.5, b: 0, a: 0.2}
+  jitterBoundaryLines: 2
+  onlyShowForPlayer: 1
+  sortingOrder: 10

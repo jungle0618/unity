@@ -55,6 +55,7 @@ public class GameManager : MonoBehaviour
 
     // Properties
     public bool IsPaused => Time.timeScale == 0f;
+    public GameState CurrentState => currentState;
 
     // Events
     public delegate void GameStateChangeHandler(GameState oldState, GameState newState);
@@ -179,6 +180,11 @@ public class GameManager : MonoBehaviour
                 Debug.Log("[GameManager] Game is playing, pausing game");
                 TogglePause();
             }
+            else if (currentState == GameState.Paused)
+            {
+                Debug.Log("[GameManager] Game is paused, resuming game");
+                TogglePause();
+            }
         }
     }
 
@@ -197,7 +203,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void Initialize()
     {
-        Debug.Log("[GameManager] Initializing...");
+        //Debug.Log("[GameManager] Initializing...");
         
         // DON'T find references in Awake/Initialize - they don't exist yet in MainMenuScene
         // They will be found when the game scene loads via OnSceneLoaded
@@ -214,7 +220,7 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        Debug.Log($"[GameManager] Scene loaded: {scene.name}");
+        //Debug.Log($"[GameManager] Scene loaded: {scene.name}");
         
         // Set game state based on scene
         if (scene.name == "MainMenuScene")
@@ -296,14 +302,8 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log("[GameManager] EntityManager found and registered");
             
-            // 訂閱 EntityManager 的 OnPlayerReady 事件，確保 Player 初始化完成後再設置事件監聽
-            entityManager.OnPlayerReady += SetupPlayerEventListeners;
-            
-            // 如果 Player 已經存在，立即設置事件監聽
-            if (entityManager.Player != null)
-            {
-                SetupPlayerEventListeners();
-            }
+            // 注意：玩家事件監聽已移至 WinConditionManager
+            // GameManager 不再需要監聽玩家事件
         }
     }
     
@@ -312,20 +312,6 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ClearGameplayReferences()
     {
-        // 取消 EntityManager 事件訂閱
-        if (entityManager != null)
-        {
-            entityManager.OnPlayerReady -= SetupPlayerEventListeners;
-            
-            // 取消玩家事件監聽
-            if (entityManager.Player != null)
-            {
-                entityManager.Player.OnPlayerDied -= HandlePlayerDeath;
-                // 注意：OnPlayerWon 已不再使用，勝利條件由 CheckVictoryCondition 處理
-                entityManager.Player.OnPlayerReachedSpawnPoint -= HandlePlayerReachedSpawnPoint;
-            }
-        }
-        
         // 清理 Target 列表
         activeTargets.Clear();
         
@@ -333,127 +319,8 @@ public class GameManager : MonoBehaviour
         // Don't clear spawnPointManager if it uses DontDestroyOnLoad
     }
     
-    /// <summary>
-    /// 設定玩家事件監聽
-    /// </summary>
-    private void SetupPlayerEventListeners()
-    {
-        // 通過 EntityManager 訪問 Player 並監聽事件
-        if (entityManager != null && entityManager.Player != null)
-        {
-            // 先取消訂閱（避免重複訂閱）
-            entityManager.Player.OnPlayerDied -= HandlePlayerDeath;
-            entityManager.Player.OnPlayerReachedSpawnPoint -= HandlePlayerReachedSpawnPoint;
-            
-            // 再訂閱事件
-            entityManager.Player.OnPlayerDied += HandlePlayerDeath;
-            // 注意：OnPlayerWon 已不再使用，勝利條件由 CheckVictoryCondition 處理
-            entityManager.Player.OnPlayerReachedSpawnPoint += HandlePlayerReachedSpawnPoint;
-            Debug.Log("[GameManager] Player event listeners registered");
-        }
-        else
-        {
-            Debug.LogWarning("[GameManager] EntityManager or Player not found - cannot register listeners");
-        }
-    }
-    
-    /// <summary>
-    /// 處理玩家死亡
-    /// </summary>
-    private void HandlePlayerDeath()
-    {
-        Debug.Log("[GameManager] Player died - ending game");
-        
-        // 觸發遊戲結束（會顯示結算頁面，不再自動返回主畫面）
-        GameOver();
-    }
-    
-    /// <summary>
-    /// 處理玩家勝利（已廢棄，不再使用）
-    /// 現在由 HandlePlayerReachedSpawnPoint 和 OnTargetDied 共同檢查勝利條件
-    /// </summary>
-    [System.Obsolete("此方法已廢棄，請使用 HandlePlayerReachedSpawnPoint 和 OnTargetDied 來檢查勝利條件", true)]
-    private void HandlePlayerWin()
-    {
-        // 此方法已不再使用，保留僅為向後兼容
-        // 實際勝利檢查已移至 CheckVictoryCondition
-        Debug.LogWarning("[GameManager] HandlePlayerWin called (deprecated - should not be called)");
-    }
-    
-    /// <summary>
-    /// 處理玩家回到出生點
-    /// </summary>
-    private void HandlePlayerReachedSpawnPoint()
-    {
-        Debug.Log("[GameManager] Player reached spawn point");
-        CheckVictoryCondition();
-    }
-    
-    /// <summary>
-    /// 處理 Target 死亡
-    /// </summary>
-    public void OnTargetDied(Target target)
-    {
-        if (target == null) return;
-        
-        Debug.Log($"[GameManager] Target died: {target.gameObject.name}");
-        CheckVictoryCondition();
-    }
-    
-    /// <summary>
-    /// 處理 Target 到達逃亡點（失敗條件）
-    /// </summary>
-    public void OnTargetReachedEscapePoint(Target target)
-    {
-        if (target == null) return;
-        
-        Debug.Log($"[GameManager] Target reached escape point: {target.gameObject.name} - Game Over!");
-        
-        // 觸發遊戲失敗（會顯示結算頁面，不再自動返回主畫面）
-        GameOver();
-    }
-    
-    /// <summary>
-    /// 檢查勝利條件
-    /// 獲勝條件：Target 死亡 且 玩家回到出生點
-    /// </summary>
-    private void CheckVictoryCondition()
-    {
-        if (entityManager == null || entityManager.Player == null)
-        {
-            return;
-        }
-        
-        // 檢查玩家是否死亡
-        if (entityManager.Player.IsDead)
-        {
-            return; // 玩家已死亡，不檢查勝利
-        }
-        
-        // 檢查是否所有 Target 都已死亡（使用 GameManager 的記錄）
-        if (!AreAllTargetsDead())
-        {
-            return; // 還有 Target 存活，不勝利
-        }
-        
-        // 檢查玩家是否在出生點
-        // 注意：這個方法在 HandlePlayerReachedSpawnPoint 中調用時，玩家應該在出生點
-        // 但為了安全起見，我們再次檢查
-        Vector3 playerPosition = entityManager.Player.transform.position;
-        Vector3 spawnPoint = entityManager.Player.SpawnPoint;
-        float distance = Vector3.Distance(playerPosition, spawnPoint);
-        
-        if (distance > entityManager.Player.SpawnPointTolerance)
-        {
-            // 玩家不在出生點，不勝利
-            return;
-        }
-        
-        Debug.Log("[GameManager] Victory condition met: All targets dead and player at spawn point!");
-        
-        // 觸發遊戲勝利（會顯示任務成功頁面，不再自動返回主畫面）
-        GameWin();
-    }
+    // 勝利/失敗條件檢查已移至 WinConditionManager
+    // GameManager 只負責狀態管理和事件通知
 
     /// <summary>
     /// Change the game state
@@ -761,26 +628,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 測試玩家死亡流程（僅用於測試）
-    /// </summary>
-    [ContextMenu("Test Player Death")]
-    public void TestPlayerDeath()
-    {
-        Debug.Log("[GameManager] Testing player death flow...");
-        HandlePlayerDeath();
-    }
-    
-    /// <summary>
-    /// 測試玩家勝利流程（僅用於測試）
-    /// </summary>
-    [ContextMenu("Test Player Win")]
-    public void TestPlayerWin()
-    {
-        Debug.Log("[GameManager] Testing player win flow...");
-        // 直接調用 CheckVictoryCondition 來測試勝利條件
-        CheckVictoryCondition();
-    }
+    // 測試方法已移除，勝利/失敗條件檢查已移至 WinConditionManager
 
     private void OnDestroy()
     {

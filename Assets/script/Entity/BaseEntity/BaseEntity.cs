@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// 基礎實體抽象類別
@@ -15,6 +16,9 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     [System.NonSerialized] protected BaseVisualizer visualizer;
     [System.NonSerialized] protected ItemHolder itemHolder; // 已實作好的組件
     [System.NonSerialized] protected EntityHealth entityHealth; // 血量管理組件
+    
+    // 死亡處理標記
+    private bool isHandleDie = false;
 
     // 組件屬性（供外部訪問）
     public BaseStateMachine<TState> StateMachine => stateMachine;
@@ -22,16 +26,35 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     public BaseDetection Detection => detection;
     public BaseVisualizer Visualizer => visualizer;
     public ItemHolder ItemHolder => itemHolder;
-    
-    // 向後兼容的屬性
-    public ItemHolder WeaponHolder => itemHolder;
 
     // 實體屬性
     public Vector2 Position => transform.position;
-    public bool IsDead => stateMachine?.IsDead ?? false;
+    public bool IsDead => entityHealth?.IsDead ?? false;
+    
+    // 視野相關屬性（統一提供，避免子類重複定義）
+    public float ViewRange => BaseViewRange;
+    public float ViewAngle => BaseViewAngle;
+    
+    // 血量相關屬性（統一提供，避免子類重複定義）
+    public int MaxHealth => entityHealth?.MaxHealth ?? 0;
+    public int CurrentHealth => entityHealth?.CurrentHealth ?? 0;
+    public float HealthPercentage => entityHealth?.HealthPercentage ?? 0f;
+    public bool IsInvulnerable => entityHealth?.IsInvulnerable ?? false;
+    
+    // 血量變化事件（統一提供，避免子類重複定義）
+    public event System.Action<int, int> OnHealthChanged
+    {
+        add { if (entityHealth != null) entityHealth.OnHealthChanged += value; }
+        remove { if (entityHealth != null) entityHealth.OnHealthChanged -= value; }
+    }
 
     [Header("基礎屬性（遊戲開始後不會改變）")]
-    [Tooltip("基礎移動速度（遊戲開始後不會改變）")]
+    [Tooltip("基礎移動速度（遊戲開始後不會改變）\n" +
+             "建議在 Inspector 中直接設置此值：\n" +
+             "- Player: 5.0\n" +
+             "- Enemy: 6.0\n" +
+             "- Target: 2.0\n" +
+             "如果未設置（≤0），子類會在初始化時使用默認值")]
     [SerializeField] protected float baseSpeed = 2f;
     [Tooltip("基礎視野範圍（遊戲開始後不會改變）")]
     [SerializeField] protected float baseViewRange = 8f;
@@ -58,7 +81,7 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     protected virtual void Update()
     {
         if (IsDead) return;
-        UpdateEntity();
+        // 子類別可以覆寫此方法來實現具體更新邏輯
     }
 
     protected virtual void FixedUpdate()
@@ -107,23 +130,21 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     /// <summary>
     /// 初始化基礎數值（從組件讀取，如果尚未設定）
     /// 這些值在遊戲開始後不會改變
+    /// 
+    /// 【重要】建議在 Inspector 中直接設置 baseSpeed，而不是依賴此方法
+    /// 子類別可以覆寫此方法來設置特定類型的默認值（僅作為後備方案）
     /// </summary>
     protected virtual void InitializeBaseValues()
     {
-        // 如果基礎數值未設定（為 0 或負數），從組件讀取
+        // 如果基礎速度未在 Inspector 中設定（為 0 或負數），嘗試從組件讀取
+        // 注意：這只是後備方案，建議在 Inspector 中直接設置
         if (baseSpeed <= 0f && movement != null)
         {
             baseSpeed = movement.GetSpeed();
         }
 
-        if (baseViewRange <= 0f && detection != null)
-        {
-            // 嘗試從 Detection 組件獲取視野範圍
-            // 注意：BaseDetection 可能沒有直接的方法獲取，子類別需要覆寫此方法
-        }
-
         // 基礎數值一旦設定就不應該再改變
-        // 子類別可以覆寫此方法來從特定組件讀取初始值
+        // 子類別可以覆寫此方法來設置特定類型的默認值（如 baseViewRange, baseViewAngle）
     }
 
     /// <summary>
@@ -155,14 +176,6 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     #region 更新邏輯
 
     /// <summary>
-    /// 更新實體（每幀調用）
-    /// </summary>
-    protected virtual void UpdateEntity()
-    {
-        // 子類別可以覆寫此方法來實現具體更新邏輯
-    }
-
-    /// <summary>
     /// 固定更新實體（固定時間步長調用）
     /// </summary>
     protected virtual void FixedUpdateEntity()
@@ -177,6 +190,34 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     #endregion
 
     #region 公共方法
+
+    /// <summary>
+    /// 造成傷害（統一處理從受傷到死亡的完整流程）
+    /// </summary>
+    /// <param name="damage">傷害值</param>
+    /// <param name="source">傷害來源</param>
+    /// <param name="attackerPosition">攻擊者位置（用於視野檢測，可選）</param>
+    public virtual void TakeDamage(int damage, string source = "", Vector2? attackerPosition = null)
+    {
+        if (entityHealth == null) return;
+        
+        // 注意：傷害減少直接從 EntityHealth 獲取
+        
+        // 使用 EntityHealth 處理傷害
+        // 如果生命值歸零，EntityHealth 會觸發 OnEntityDied 事件
+        // BaseEntity 已訂閱此事件，會自動調用 HandleEntityDeath() -> Die()
+        // 子類可以覆寫 GetEntityDisplayName() 來自定義實體名稱（用於日誌）
+        entityHealth.TakeDamage(damage, source, GetEntityDisplayName(), attackerPosition);
+    }
+    
+    /// <summary>
+    /// 獲取實體顯示名稱（用於日誌等）
+    /// 子類可以覆寫此方法來自定義名稱
+    /// </summary>
+    protected virtual string GetEntityDisplayName()
+    {
+        return gameObject.name;
+    }
 
     /// <summary>
     /// 設定目標（委託給 Detection 組件）
@@ -195,35 +236,33 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     }
 
     /// <summary>
-    /// 實體死亡（統一處理通用邏輯）
+    /// 實體死亡（統一處理通用邏輯和死亡邏輯）
     /// </summary>
     public virtual void Die()
     {
-        // 檢查是否已經死亡（避免重複處理）
-        if (IsDead) return;
+        if (isHandleDie) return;
+        isHandleDie = true;
 
-        // 停止移動（通用操作）
+        // 通用操作
         movement?.StopMovement();
-
-        // 清理 BaseVisualizer 創建的對象
-        if (visualizer != null)
-        {
-            visualizer.CleanupCreatedObjects();
-        }
-
-        // 通知子類別處理特定死亡邏輯（狀態改變、事件觸發等）
+        visualizer?.CleanupCreatedObjects();
+        
+        // 死亡處理（狀態改變、禁用 GameObject、觸發事件等）
         OnDeath();
         
-        // 掉落物品（通用操作，子類可以覆寫 DropAllItems 來控制是否掉落）
+        // 掉落物品
         DropAllItems();
     }
 
     /// <summary>
-    /// 死亡處理（由子類別實現）
+    /// 死亡處理（由子類實現：改變狀態、禁用 GameObject、觸發事件）
     /// </summary>
     protected virtual void OnDeath()
     {
-        
+        // 子類需要覆寫此方法來實現：
+        // 1. 改變狀態為 Dead
+        // 2. 禁用 GameObject（或延遲禁用）
+        // 3. 觸發實體特定事件
     }
     
     /// <summary>
@@ -231,21 +270,8 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     /// </summary>
     protected virtual void DropAllItems()
     {
-        // 檢查 itemHolder 是否存在（不是所有實體都有 ItemHolder 組件，這是正常的）
-        if (itemHolder == null || itemHolder.ItemCount == 0)
-        {
-            // 如果 itemHolder 為 null，這是正常的（某些實體不需要物品系統）
-            // 只有在 itemHolder 存在但沒有物品時才記錄調試信息
-            if (itemHolder != null && itemHolder.ItemCount == 0)
-            {
-                // 有 itemHolder 但沒有物品，這是正常的，不需要記錄
-                // Debug.Log($"{gameObject.name}: itemHolder 存在但沒有物品，跳過掉落");
-            }
-            // itemHolder 為 null 的情況不記錄，因為這是設計選擇
-            return; // 沒有物品需要掉落
-        }
+        if (itemHolder == null || itemHolder.ItemCount == 0) return;
         
-        // 尋找場景中的 ItemManager
         ItemManager itemManager = FindFirstObjectByType<ItemManager>();
         if (itemManager == null)
         {
@@ -253,31 +279,45 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
             return;
         }
         
-        // 獲取所有物品及其對應的 Prefab
         var itemsWithPrefabs = itemHolder.GetAllItemsWithPrefabs();
+        if (itemsWithPrefabs.Count == 0) return;
         
-        if (itemsWithPrefabs.Count == 0)
-        {
-            return; // 沒有物品需要掉落
-        }
+        // 掉落機率設定
+        const float weaponDropChance = 0.25f;  // 武器掉落機率：25%
+        const float nonWeaponDropChance = 1.0f; // 非武器掉落機率：100%
         
-        // 提取 Prefab 列表
-        List<GameObject> prefabs = new List<GameObject>();
+        // 對每個物品分別檢查掉落機率
+        List<GameObject> prefabsToDrop = new List<GameObject>();
+        
         foreach (var pair in itemsWithPrefabs)
         {
-            if (pair.Value != null)
+            Item item = pair.Key;
+            GameObject prefab = pair.Value;
+            
+            if (prefab == null) continue;
+            
+            // 判斷是否為武器
+            bool isWeapon = item is Weapon;
+            
+            // 根據物品類型決定掉落機率
+            float dropChance = isWeapon ? weaponDropChance : nonWeaponDropChance;
+            
+            // 進行掉落機率檢查
+            float randomValue = Random.Range(0f, 1f);
+            if (randomValue <= dropChance)
             {
-                prefabs.Add(pair.Value);
+                prefabsToDrop.Add(prefab);
             }
         }
         
-        // 在死亡位置掉落物品（圓形散落）
-        itemManager.DropItemsAtPosition(prefabs, transform.position, 1.5f);
+        // 掉落通過機率檢查的物品
+        if (prefabsToDrop.Count > 0)
+        {
+            itemManager.DropItemsAtPosition(prefabsToDrop, transform.position, 1.5f);
+        }
         
-        // 清空 ItemHolder 的所有物品
+        // 清除所有物品（無論是否掉落）
         itemHolder.ClearAllItems();
-        
-        Debug.Log($"{gameObject.name}: Dropped {prefabs.Count} items at death position");
     }
 
     /// <summary>
@@ -294,6 +334,49 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
     public virtual float GetDistanceToTarget()
     {
         return detection?.GetDistanceToTarget() ?? float.MaxValue;
+    }
+    
+    /// <summary>
+    /// 治療（統一提供，避免子類重複定義）
+    /// </summary>
+    public virtual void Heal(int healAmount)
+    {
+        entityHealth?.Heal(healAmount);
+    }
+    
+    /// <summary>
+    /// 完全治療（統一提供，避免子類重複定義）
+    /// </summary>
+    public virtual void FullHeal()
+    {
+        entityHealth?.FullHeal();
+    }
+    
+    /// <summary>
+    /// 設定血量（統一提供，避免子類重複定義）
+    /// </summary>
+    public virtual void SetHealth(int health)
+    {
+        if (entityHealth == null) return;
+        entityHealth.SetHealth(health);
+        if (IsDead) Die();
+    }
+    
+    /// <summary>
+    /// 增加最大血量（統一提供，避免子類重複定義）
+    /// </summary>
+    public virtual void IncreaseMaxHealth(int amount)
+    {
+        entityHealth?.IncreaseMaxHealth(amount);
+    }
+    
+    /// <summary>
+    /// 獲取傷害減少值（統一提供，避免子類重複定義）
+    /// </summary>
+    public virtual float GetDamageReduction()
+    {
+        // 注意：傷害減少現在直接從 EntityHealth 獲取，不再從 EntityStats 獲取
+        return entityHealth?.DamageReduction ?? 0f;
     }
 
     #endregion
@@ -320,4 +403,3 @@ public abstract class BaseEntity<TState> : MonoBehaviour where TState : System.E
 
     #endregion
 }
-

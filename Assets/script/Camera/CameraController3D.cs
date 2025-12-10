@@ -5,6 +5,16 @@ public class CameraController3D : MonoBehaviour
     public Camera orthoCamera;
     private Camera perspectiveCamera;
     private float distance;
+
+    private Vector3 overwritePosition;
+    private bool isOverwritePosition = false;
+
+    public void OverwritePosition(Vector3 position)
+    {
+        overwritePosition = position;
+        isOverwritePosition = true;
+    }
+
     void Start()
     {
         perspectiveCamera = GetComponent<Camera>();
@@ -29,5 +39,11 @@ public class CameraController3D : MonoBehaviour
         transform.position = target - transform.forward * distance;
 
         transform.LookAt(target);
+
+        if (isOverwritePosition)
+        {
+            transform.position = overwritePosition;
+            isOverwritePosition = false;
+        }
     }
 }

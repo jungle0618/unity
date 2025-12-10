@@ -75,6 +75,14 @@ public abstract class BaseDetection : MonoBehaviour
         if (target == null) return false;
         return CanSeeTarget(target.position);
     }
+    
+    /// <summary>
+    /// 檢查是否可以看到玩家（CanSeeCurrentTarget 的別名，統一提供）
+    /// </summary>
+    public virtual bool CanSeePlayer()
+    {
+        return CanSeeCurrentTarget();
+    }
 
     /// <summary>
     /// 獲取到目標的距離
@@ -150,6 +158,14 @@ public abstract class BaseDetection : MonoBehaviour
     {
         wallsLayerMask = walls;
         objectsLayerMask = objects;
+    }
+    
+    /// <summary>
+    /// 檢查是否應該更新 AI 邏輯（由子類實現具體邏輯，考慮攝影機剔除等）
+    /// </summary>
+    public virtual bool ShouldUpdateAI()
+    {
+        return true; // 預設始終更新，子類可以覆寫
     }
 }
 
